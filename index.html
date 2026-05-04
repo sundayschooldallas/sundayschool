@@ -2061,6 +2061,7 @@ function addNewParent() {
   setTimeout(() => renderParentsTab(), 1500);
 }
 function renderClassesTab() {
+  try {
   const grade7 = [], grade8 = [], pending = [], unassigned = [];
 
   // Find duplicates — same child name (case-insensitive) registered under multiple parents
@@ -2215,6 +2216,10 @@ function renderClassesTab() {
   }
 
   document.getElementById("tabClassesContent").innerHTML = html;
+  } catch(e) {
+    console.log("renderClassesTab error:", e);
+    document.getElementById("tabClassesContent").innerHTML = `<div style="text-align:center;padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`;
+  }
 }
 
 function keepThisEntry(keepPh, keepParent, childName, removePhs) {
