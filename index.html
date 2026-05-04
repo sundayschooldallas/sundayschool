@@ -45,28 +45,73 @@
   .verify-screen {
     min-height: 100vh; display: flex; flex-direction: column;
     align-items: center; justify-content: center; padding: 30px 24px; text-align: center;
-    position: relative;
+    position: relative; overflow: hidden;
+    background: linear-gradient(160deg, #0d0b1f 0%, #1a1040 40%, #0d2a1f 100%);
   }
-  .verify-icon { font-size: 54px; margin-bottom: 16px; }
-  .verify-screen h2 { font-size: 22px; font-weight: 800; color: var(--purple-dark); margin-bottom: 8px; }
-  .verify-screen p { font-size: 14px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; max-width: 290px; }
-  .phone-input-wrap { width: 100%; max-width: 340px; }
+  /* Animated glowing orbs */
+  .verify-screen::before {
+    content: '';
+    position: absolute; top: -120px; right: -80px;
+    width: 380px; height: 380px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92,74,199,0.35) 0%, transparent 70%);
+    animation: floatOrb1 8s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .verify-screen::after {
+    content: '';
+    position: absolute; bottom: -100px; left: -60px;
+    width: 320px; height: 320px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(15,110,86,0.3) 0%, transparent 70%);
+    animation: floatOrb2 10s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes floatOrb1 {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50% { transform: translate(-30px, 30px) scale(1.1); }
+  }
+  @keyframes floatOrb2 {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50% { transform: translate(20px, -20px) scale(1.15); }
+  }
+  /* Stars/particles */
+  .verify-screen .stars {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 85% 35%, rgba(255,255,255,0.6) 0%, transparent 100%),
+      radial-gradient(2px 2px at 20% 90%, rgba(255,255,255,0.25) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(2px 2px at 60% 40%, rgba(255,255,255,0.2) 0%, transparent 100%);
+  }
+  .verify-icon { font-size: 54px; margin-bottom: 16px; position: relative; z-index: 1; filter: drop-shadow(0 0 20px rgba(92,74,199,0.6)); }
+  .verify-screen h2 { font-size: 22px; font-weight: 800; color: white; margin-bottom: 8px; position: relative; z-index: 1; text-shadow: 0 0 30px rgba(92,74,199,0.5); }
+  .verify-screen p { font-size: 14px; color: rgba(255,255,255,0.7); margin-bottom: 28px; line-height: 1.6; max-width: 290px; position: relative; z-index: 1; font-family: 'Noto Serif Ethiopic', serif; }
+  .phone-input-wrap { width: 100%; max-width: 340px; position: relative; z-index: 1; }
   .phone-input-wrap input {
     width: 100%; padding: 15px 18px;
     font-family: 'Nunito', sans-serif; font-size: 17px; font-weight: 700;
-    border: 2px solid #ddd8f8; border-radius: 12px;
-    outline: none; color: var(--text); background: white;
-    text-align: center; letter-spacing: 1px; transition: border-color 0.2s;
+    border: 1.5px solid rgba(255,255,255,0.15); border-radius: 16px;
+    outline: none; color: white; background: rgba(255,255,255,0.08);
+    text-align: center; letter-spacing: 1px; transition: all 0.2s;
+    backdrop-filter: blur(10px);
   }
+  .phone-input-wrap input::placeholder { color: rgba(255,255,255,0.35); }
+  .phone-input-wrap input:focus { border-color: rgba(92,74,199,0.6); background: rgba(255,255,255,0.12); box-shadow: 0 0 20px rgba(92,74,199,0.2); }
   .phone-input-wrap input:focus { border-color: var(--purple); }
   .phone-input-wrap input::placeholder { color: #bbb; font-weight: 600; letter-spacing: 0; font-size: 14px; }
   .verify-btn {
     width: 100%; margin-top: 12px; padding: 15px;
-    background: var(--purple); color: white; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #5c4ac7, #3b2f8f);
+    color: white; border: none; border-radius: 16px;
     font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 8px 24px rgba(92,74,199,0.4);
+    transition: all 0.2s; position: relative; z-index: 1;
   }
-  .verify-btn:active { opacity: 0.85; }
-  .verify-error { margin-top: 12px; font-size: 13px; color: var(--red); font-weight: 700; display: none; }
+  .verify-btn:active { transform: scale(0.98); opacity: 0.9; }
+  .verify-error { margin-top: 12px; font-size: 13px; color: #ff8a8a; font-weight: 700; display: none; position: relative; z-index: 1; }
 
   .main-app { display: none; }
   header {
@@ -219,12 +264,13 @@
 <body>
 
 <div class="verify-screen" id="verifyScreen">
-  <div style="position:absolute;top:16px;right:16px;">
-    <span onclick="showAdminLogin()" style="font-size:12px;color:#bbb;cursor:pointer;text-decoration:underline;">Admin access</span>
+  <div class="stars"></div>
+  <div style="position:absolute;top:16px;right:16px;z-index:10;">
+    <span onclick="showAdminLogin()" style="font-size:12px;color:rgba(255,255,255,0.4);cursor:pointer;text-decoration:underline;">Admin access</span>
   </div>
   <div class="verify-icon">⛪</div>
-  <h2>Grade 7 and 8 Parent Sunday Assignment</h2>
-  <p style="font-family:'Noto Serif Ethiopic',serif;font-size:16px;font-weight:700;color:#3b2f8f;">ቁጽሪ ተሌፎንኩም ኣእትው</p>
+  <h2>Sunday School Parents</h2>
+  <p style="font-family:'Noto Serif Ethiopic',serif;font-size:16px;font-weight:700;color:#ffffff;text-shadow:0 0 16px rgba(255,255,255,0.6);">ቁጽሪ ተሌፎንኩም ኣእትው</p>
 
   <!-- TODAY'S PAIR — shown immediately -->
   <div id="todayPairBanner" style="width:100%;max-width:380px;margin:16px 0;"></div>
