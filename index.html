@@ -426,6 +426,28 @@ async function saveStatus(date, name, phone, status) {
 }
 
 // Load all statuses from Google Sheets on startup
+// Convert any date format to "Mon D" format matching the roster
+function normalizeDate(dateStr) {
+  if (!dateStr) return "";
+  const s = String(dateStr).trim();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const fullMonths = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+  // Already "May 3" format
+  if (/^[A-Za-z]+ \d+$/.test(s)) return s;
+  // "May 3, 2026" format
+  const m1 = s.match(/^([A-Za-z]+)\s+(\d+),?\s*\d*$/);
+  if (m1) return m1[1].charAt(0).toUpperCase() + m1[1].slice(1,3).toLowerCase() + " " + parseInt(m1[2]);
+  // "5/3/2026" format
+  const m2 = s.match(/^(\d+)\/(\d+)\/\d+$/);
+  if (m2) return months[parseInt(m2[1]) - 1] + " " + parseInt(m2[2]);
+  // Try JS Date
+  try {
+    const d = new Date(s);
+    if (!isNaN(d)) return months[d.getMonth()] + " " + d.getDate();
+  } catch(e) {}
+  return s;
+}
+
 async function loadStatusesFromSheet() {
   try {
     const res = await fetch(SHEET_URL + "?nocache=" + Date.now(), { mode: "cors" });
@@ -433,6 +455,9 @@ async function loadStatusesFromSheet() {
     const data = await res.json();
     data.forEach(row => {
       if (row.date && row.name && row.status) {
+        const normalizedDate = normalizeDate(row.date);
+        statuses[getKey(normalizedDate, row.name)] = row.status;
+        // Also store with original date as fallback
         statuses[getKey(row.date, row.name)] = row.status;
       }
     });
@@ -520,7 +545,6 @@ function showApp() {
 }
 
 const TEACHERS = { 7: "Bereket Isayas", 8: "Amanuel Habte" };
-
 let selectedGrade = null;
 
 function selectGrade(grade) {
@@ -618,7 +642,19 @@ function signOut() {
   document.getElementById("verifyError").style.display = "none";
 }
 
-function renderTodayPairBanner() {
+async function initTodayPairBanner() {
+  try {
+    await loadStatusesFromSheet();
+  } catch(e) {}
+  try { renderTodayPairBanner(0); } catch(e) {}
+  // Refresh every 60 seconds
+  setTimeout(() => initTodayPairBanner(), 60000);
+}
+
+let bannerOffset = 0; // 0 = current/next, 1 = 1 week back, 2 = 2 weeks back etc.
+
+function renderTodayPairBanner(offset) {
+  if (offset !== undefined) bannerOffset = offset;
   const now = getMockNow();
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const todayStr = `${months[now.getMonth()]} ${now.getDate()}`;
@@ -628,83 +664,105 @@ function renderTodayPairBanner() {
   const banner = document.getElementById("todayPairBanner");
   if (!banner) return;
 
-  // Find today's week and next week
-  const todayWeek = roster.find(w => w.date === todayStr);
-  const upcomingWeeks = roster.filter(w => {
-    const parts = w.date.split(" ");
-    const mIdx = months.indexOf(parts[0]);
-    const d = parseInt(parts[1]);
-    const wDate = new Date(2026, mIdx, d);
-    return wDate > now;
+  // Build sorted list of all roster weeks
+  const sortedWeeks = roster.slice().sort((a, b) => {
+    const parse = d => { const [m,day] = d.split(" "); return new Date(2026, months.indexOf(m), parseInt(day)); };
+    return parse(a.date) - parse(b.date);
   });
-  const nextWeek = upcomingWeeks[0];
 
-  // Decide what to show
-  let displayWeek = null;
-  let isToday = false;
-
-  if (isSunday && todayWeek && !isPast12) {
-    // It's Sunday before 12pm — show today
-    displayWeek = todayWeek;
-    isToday = true;
-  } else if (nextWeek) {
-    // After 12pm on Sunday OR not Sunday — show next week
-    displayWeek = nextWeek;
-    isToday = false;
+  // Find current display index
+  let currentIndex;
+  if (isSunday && !isPast12) {
+    currentIndex = sortedWeeks.findIndex(w => w.date === todayStr);
+    if (currentIndex === -1) currentIndex = sortedWeeks.findIndex(w => {
+      const [m,d] = w.date.split(" ");
+      return new Date(2026, months.indexOf(m), parseInt(d)) >= now;
+    });
+  } else {
+    currentIndex = sortedWeeks.findIndex(w => {
+      const [m,d] = w.date.split(" ");
+      return new Date(2026, months.indexOf(m), parseInt(d)) > now;
+    });
+    if (currentIndex === -1) currentIndex = sortedWeeks.length - 1;
   }
 
-  if (!displayWeek) { banner.style.display = "none"; return; }
+  const displayIndex = currentIndex - bannerOffset;
+  if (displayIndex < 0 || !sortedWeeks[displayIndex]) { banner.style.display = "none"; return; }
+
+  const displayWeek = sortedWeeks[displayIndex];
   banner.style.display = "block";
+
+  const isCurrentWeek = displayIndex === currentIndex;
+  const isPastWeek = displayIndex < currentIndex;
 
   const parentColors = [
     { bg: "linear-gradient(135deg,#e05c8a,#993556)", light: "rgba(224,92,138,0.25)", border: "rgba(224,92,138,0.5)" },
     { bg: "linear-gradient(135deg,#17b8d4,#0a6b7a)", light: "rgba(23,184,212,0.25)", border: "rgba(23,184,212,0.5)" },
   ];
 
-  const label = isToday
-    ? `<span style="font-family:'Noto Serif Ethiopic',serif;font-size:14px;font-weight:800;color:#FFD700;text-shadow:0 0 12px rgba(255,215,0,0.5);">ሎሚ ዝተሓጋገዙ ወለዲ</span>`
-    : `<span style="font-family:'Noto Serif Ethiopic',serif;font-size:13px;font-weight:800;color:rgba(255,255,255,0.75);">ዝቅጽል ሰንበት — ${displayWeek.date}</span>`;
+  const label = isCurrentWeek && isSunday && !isPast12
+    ? `<span style="font-family:'Noto Serif Ethiopic',serif;font-size:13px;font-weight:800;color:#FFD700;text-shadow:0 0 12px rgba(255,215,0,0.5);">ሎሚ ዝተሓጋገዙ ወለዲ</span>`
+    : isPastWeek
+    ? `<span style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.7);">📅 ${displayWeek.date}</span>`
+    : `<div style="text-align:center;">
+        <div style="display:inline-block;background:linear-gradient(135deg,#FFD700,#ff9500);color:#0d0b1f;font-size:11px;font-weight:900;padding:4px 14px;border-radius:20px;letter-spacing:0.5px;box-shadow:0 0 16px rgba(255,215,0,0.5);margin-bottom:4px;">🔔 UPCOMING SUNDAY</div>
+        <div style="font-size:15px;font-weight:900;color:white;text-shadow:0 0 10px rgba(255,255,255,0.4);">📅 ${displayWeek.date}</div>
+      </div>`;
+
+  const canGoBack = displayIndex > 0;
+  const canGoForward = bannerOffset > 0;
+
+  const backBtn = canGoBack
+    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer;" onclick="renderTodayPairBanner(${bannerOffset + 1})">
+        <div style="color:#22a06b;font-size:22px;font-weight:900;line-height:1;">←</div>
+        <span style="font-family:'Noto Serif Ethiopic',serif;font-size:10px;font-weight:800;color:#ffffff;text-align:center;line-height:1.4;max-width:72px;">ዝሓለፈ ሰሙን ዝነበሩ ስድራ</span>
+      </div>`
+    : `<div style="width:32px;"></div>`;
+
+  const forwardBtn = canGoForward
+    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer;" onclick="renderTodayPairBanner(${bannerOffset - 1})">
+        <div style="color:#22a06b;font-size:22px;font-weight:900;line-height:1;">→</div>
+      </div>`
+    : `<div style="width:32px;"></div>`;
 
   banner.innerHTML = `
     <div style="background:linear-gradient(135deg,#0d0b1f,#1a1535,#2d2060);border-radius:20px;padding:16px;color:white;box-shadow:0 8px 32px rgba(13,11,31,0.4);border:1px solid rgba(255,255,255,0.1);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-        ${label}
-        <div style="font-size:12px;font-weight:800;background:${isToday ? "rgba(255,215,0,0.2)" : "rgba(255,255,255,0.1)"};color:${isToday ? "#FFD700" : "rgba(255,255,255,0.7)"};padding:4px 10px;border-radius:20px;">
-          📅 ${displayWeek.date}
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+        ${backBtn}
+        <div style="flex:1;text-align:center;">${label}</div>
+        ${forwardBtn}
       </div>
+      ${isPastWeek ? `<div style="text-align:center;font-size:10px;font-weight:800;color:rgba(255,255,255,0.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:1.5px;">Past Sunday</div>` : ""}
       <div style="display:flex;gap:10px;">
         ${displayWeek.parents.map((p, i) => {
           const s = getStatus(displayWeek.date, p.name);
           const confirmed = s === "confirmed";
           const c = parentColors[i % parentColors.length];
           return `
-          <div style="flex:1;background:${confirmed ? "rgba(34,160,107,0.2)" : c.light};border:1.5px solid ${confirmed ? "rgba(34,160,107,0.5)" : c.border};border-radius:16px;padding:14px;text-align:center;transition:all 0.3s;">
+          <div style="flex:1;background:${confirmed ? "rgba(34,160,107,0.2)" : c.light};border:1.5px solid ${confirmed ? "rgba(34,160,107,0.5)" : c.border};border-radius:16px;padding:14px;text-align:center;">
             <div style="width:48px;height:48px;border-radius:50%;background:${c.bg};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;margin:0 auto 10px;box-shadow:0 4px 14px rgba(0,0,0,0.3);">
               ${p.name.charAt(0)}
             </div>
             <div style="font-size:15px;font-weight:800;color:white;margin-bottom:6px;">${p.name}</div>
-            <div style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;
-              background:${confirmed ? "#22a06b" : "rgba(0,87,183,0.08)"};
-              color:${confirmed ? "#ffffff" : "#ffffff"};
-              border:${confirmed ? "none" : "2px solid rgba(100,180,255,0.9)"};
-              letter-spacing:0.5px;
-              text-shadow:${confirmed ? "none" : "0 0 10px rgba(100,180,255,0.8)"};">
-              ${confirmed ? "✅" : "Not In Class Yet"}
+            <div style="display:inline-block;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;
+              background:${confirmed ? "#22a06b" : isPastWeek ? "rgba(200,50,50,0.3)" : "rgba(0,87,183,0.08)"};
+              color:#ffffff;
+              border:${confirmed ? "none" : isPastWeek ? "2px solid rgba(255,100,100,0.6)" : "2px solid rgba(100,180,255,0.9)"};
+              text-shadow:${confirmed ? "none" : "0 0 10px rgba(100,180,255,0.5)"};">
+              ${confirmed ? "✅" : isPastWeek ? "❌ Did not serve" : "Not In Class Yet"}
             </div>
           </div>`;
         }).join("")}
       </div>
-      ${displayWeek.perf ? `<div style="text-align:center;margin-top:12px;font-size:12px;font-weight:800;color:rgba(255,215,0,0.9);background:rgba(255,215,0,0.1);border-radius:10px;padding:6px;">⭐ Performance Sunday — parents help arrange</div>` : ""}
+      ${displayWeek.perf ? `<div style="text-align:center;margin-top:12px;font-size:12px;font-weight:800;color:rgba(255,215,0,0.9);background:rgba(255,215,0,0.1);border-radius:10px;padding:6px;">⭐ Performance Sunday</div>` : ""}
     </div>`;
 
-  // Auto-refresh every minute to switch at 12pm
-  setTimeout(() => { try { renderTodayPairBanner(); } catch(e){} }, 60000);
+  // Auto-refresh handled by initTodayPairBanner
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  // Render today's pair banner on login page
-  try { renderTodayPairBanner(); } catch(e) {}
+  // Load statuses from sheet then render banner — refreshes every 60s
+  try { initTodayPairBanner(); } catch(e) {}
 
   try {
     if (myPhone) {
@@ -1030,241 +1088,13 @@ function showAdminLogin() {
   document.getElementById("adminLogin").style.display = "flex";
 }
 function showVerify() {
-  document.getElementById("adminLogin").style.display = "none";
-  document.getElementById("adminDash").style.display = "none";
-  document.getElementById("advocateDash").style.display = "none";
-  document.getElementById("rollCallDash").style.display = "none";
-  document.getElementById("mainApp").style.display = "none";
+  const ids = ["adminLogin","adminDash","advocateDash","mainApp","childInfoScreen"];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
   document.getElementById("verifyScreen").style.display = "flex";
-  localStorage.removeItem("myPhone");
+  try { localStorage.removeItem("myPhone"); } catch(e) {}
   myPhone = ""; myName = ""; myWeek = null; myParent = null; myPartner = null;
 }
-const ROLL_CALL_PASSWORD = "JesusislordRollCall";
-
-// ── ROLL CALL SYSTEM ──────────────────────────────────
-function getRollCallKey(date, type) { return `rollcall__${date}__${type}`; }
-
-function getRollCallData(date, type) {
-  const raw = localStorage.getItem(getRollCallKey(date, type));
-  return raw ? JSON.parse(raw) : {};
-}
-
-function saveRollCallData(date, type, data) {
-  localStorage.setItem(getRollCallKey(date, type), JSON.stringify(data));
-}
-
-function getRollCallStudents() {
-  const students = [];
-  const seen = new Set();
-  roster.forEach(week => {
-    week.parents.forEach(p => {
-      const ci = getChildInfoByParent(p.name);
-      if (!ci || !ci.name || seen.has(ci.name)) return;
-      if (ci.unassigned) return;
-      seen.add(ci.name);
-      students.push({ childName: ci.name, parentName: p.name, grade: ci.grade, teacher: ci.teacher, phone: p.e });
-    });
-  });
-  return students.sort((a,b) => a.grade - b.grade || a.childName.localeCompare(b.childName));
-}
-
-let rollCallType = "morning"; // "morning" or "final"
-let tapCounts = {}; // tracks double-tap per student
-
-function showRollCall(type) {
-  const now = getMockNow();
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const todayStr = `${months[now.getMonth()]} ${now.getDate()}`;
-
-  rollCallType = type;
-  tapCounts = {};
-
-  document.getElementById("rollCallDash").style.display = "block";
-  document.getElementById("rollCallTitle").textContent = type === "morning" ? "📋 10:15 AM Roll Call" : "📋 11:50 AM Final Roll Call";
-  document.getElementById("rollCallSubtitle").textContent = type === "morning" ? "Tap each present student TWICE to mark them" : "Final check — mark any late arrivals present";
-  document.getElementById("rollCallTime").textContent = `📅 ${todayStr}`;
-
-  renderRollCall(todayStr);
-}
-
-function renderRollCall(todayStr) {
-  const students = getRollCallStudents();
-  const morningData = getRollCallData(todayStr, "morning");
-  const finalData = getRollCallData(todayStr, "final");
-  const container = document.getElementById("rollCallContent");
-
-  if (students.length === 0) {
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">No students registered yet. Parents need to add their child info first.</div>`;
-    return;
-  }
-
-  const grade7 = students.filter(s => s.grade === 7);
-  const grade8 = students.filter(s => s.grade === 8);
-
-  const renderStudentList = (list) => list.map(s => {
-    const isMorningPresent = morningData[s.childName] === "present";
-    const isFinalPresent = finalData[s.childName] === "present";
-    const isAbsent = finalData[s.childName] === "absent";
-    const taps = tapCounts[s.childName] || 0;
-
-    let statusBg, statusText, statusColor, btnText, btnBg, btnDisabled = false;
-
-    if (rollCallType === "morning") {
-      if (isMorningPresent) {
-        statusBg = "#e4f7ef"; statusText = "✅ Present"; statusColor = "#0e6b47";
-        btnText = "✅ Marked"; btnBg = "#22a06b"; btnDisabled = true;
-      } else if (taps === 1) {
-        statusBg = "#fff4e0"; statusText = "👆 Tap once more"; statusColor = "#854f0b";
-        btnText = "👆 Tap again to confirm"; btnBg = "#f5a623"; btnDisabled = false;
-      } else {
-        statusBg = "#f4f3f8"; statusText = "⏳ Not marked"; statusColor = "#7b7a90";
-        btnText = "Tap to mark present"; btnBg = "#ede9fb"; btnDisabled = false;
-      }
-    } else {
-      // Final roll call
-      if (isMorningPresent || isFinalPresent) {
-        statusBg = "#e4f7ef"; statusText = "✅ Present"; statusColor = "#0e6b47";
-        btnText = "✅ Present"; btnBg = "#22a06b"; btnDisabled = true;
-      } else if (isAbsent) {
-        statusBg = "#fdeaea"; statusText = "🚫 Absent"; statusColor = "#a32d2d";
-        btnText = "🚫 Absent"; btnBg = "#e03e3e"; btnDisabled = true;
-      } else if (taps === 1) {
-        statusBg = "#fff4e0"; statusText = "👆 Tap once more"; statusColor = "#854f0b";
-        btnText = "👆 Tap again"; btnBg = "#f5a623"; btnDisabled = false;
-      } else {
-        statusBg = "#fdeaea"; statusText = "⚠️ Not here yet"; statusColor = "#a32d2d";
-        btnText = "Tap if arrived"; btnBg = "#ede9fb"; btnDisabled = false;
-      }
-    }
-
-    return `
-      <div style="background:white;border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);display:flex;align-items:center;gap:12px;">
-        <div style="width:42px;height:42px;border-radius:50%;background:${statusBg};border:2px solid ${statusColor};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:${statusColor};flex-shrink:0;">
-          ${s.childName.charAt(0)}
-        </div>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:800;color:#1a1535;">${s.childName}</div>
-          <div style="font-size:11px;color:#7b7a90;">Parent: ${s.parentName}</div>
-          <div style="font-size:11px;font-weight:700;color:${statusColor};margin-top:2px;">${statusText}</div>
-        </div>
-        <button onclick="tapStudent('${s.childName}','${todayStr}')" ${btnDisabled ? "disabled" : ""}
-          style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:10px;cursor:${btnDisabled ? "default" : "pointer"};background:${btnBg};color:${btnDisabled ? "white" : "#1a1535"};white-space:nowrap;opacity:${btnDisabled ? "0.8" : "1"};">
-          ${btnText}
-        </button>
-      </div>`;
-  }).join("");
-
-  let html = `
-    <div style="background:#fdeaea;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-size:13px;font-weight:700;color:#a32d2d;">
-      ${rollCallType === "morning"
-        ? "⏰ Tap each present student <strong>TWICE</strong> to confirm. Students not marked will get Late to Class deducted."
-        : "🔔 Final roll call. Anyone not marked present will be marked <strong>Absent</strong> and sent to Advocate."}
-    </div>
-
-    <div style="background:white;border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:0 4px 12px rgba(92,74,199,0.08);">
-      <div style="background:linear-gradient(135deg,#0f6e56,#1db88a);padding:10px 14px;">
-        <div style="font-size:14px;font-weight:800;color:white;">Grade 7 — Bereket Isayas</div>
-      </div>
-      ${grade7.length > 0 ? renderStudentList(grade7) : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No Grade 7 students yet.</div>'}
-    </div>
-
-    <div style="background:white;border-radius:14px;margin-bottom:16px;overflow:hidden;box-shadow:0 4px 12px rgba(92,74,199,0.08);">
-      <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);padding:10px 14px;">
-        <div style="font-size:14px;font-weight:800;color:white;">Grade 8 — Amanuel Habte</div>
-      </div>
-      ${grade8.length > 0 ? renderStudentList(grade8) : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No Grade 8 students yet.</div>'}
-    </div>
-
-    <button onclick="submitRollCall('${todayStr}')"
-      style="width:100%;padding:16px;background:linear-gradient(135deg,#7a0d1f,#c0392b);color:white;border:none;border-radius:14px;font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(192,57,43,0.4);">
-      ${rollCallType === "morning" ? "✅ Submit Morning Roll Call" : "🔔 Submit Final Roll Call & Mark Absences"}
-    </button>`;
-
-  container.innerHTML = html;
-}
-
-function tapStudent(childName, todayStr) {
-  const morningData = getRollCallData(todayStr, "morning");
-  const finalData = getRollCallData(todayStr, "final");
-
-  // Skip if already marked
-  if (rollCallType === "morning" && morningData[childName] === "present") return;
-  if (rollCallType === "final" && (morningData[childName] === "present" || finalData[childName] === "present" || finalData[childName] === "absent")) return;
-
-  tapCounts[childName] = (tapCounts[childName] || 0) + 1;
-
-  if (tapCounts[childName] >= 2) {
-    // Mark present
-    if (rollCallType === "morning") {
-      morningData[childName] = "present";
-      saveRollCallData(todayStr, "morning", morningData);
-    } else {
-      finalData[childName] = "present";
-      saveRollCallData(todayStr, "final", finalData);
-    }
-    tapCounts[childName] = 0;
-    showToast("✅ " + childName + " marked present!");
-  }
-
-  renderRollCall(todayStr);
-}
-
-function submitRollCall(todayStr) {
-  const students = getRollCallStudents();
-  const morningData = getRollCallData(todayStr, "morning");
-  const finalData = getRollCallData(todayStr, "final");
-
-  if (rollCallType === "morning") {
-    // Mark everyone not present as late — deduct Late to Class star
-    let lateCount = 0;
-    students.forEach(s => {
-      if (morningData[s.childName] !== "present") {
-        // Auto deduct Late to Class to 1 star
-        const existing = getTrackerData(s.parentName, todayStr) || {};
-        existing["punctuality"] = { stars: 1, comment: "Auto-marked late at 10:15 AM roll call" };
-        saveTrackerData(s.parentName, todayStr, existing);
-        // Sync to Sheets
-        fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
-          body: JSON.stringify({ type:"tracker", parentName: s.parentName, date: todayStr, category:"punctuality", stars:1, comment:"Auto-marked late at 10:15 AM roll call" })
-        }).catch(()=>{});
-        lateCount++;
-      }
-    });
-    showToast(`✅ Roll call submitted! ${students.length - lateCount} present, ${lateCount} marked late.`);
-    showVerify();
-
-  } else {
-    // Final roll call — mark absent everyone not yet present
-    let absentCount = 0;
-    const absentKids = [];
-    students.forEach(s => {
-      if (morningData[s.childName] !== "present" && finalData[s.childName] !== "present") {
-        finalData[s.childName] = "absent";
-        absentCount++;
-        absentKids.push(s);
-        // Also deduct late star if not already done
-        const existing = getTrackerData(s.parentName, todayStr) || {};
-        if (!existing["punctuality"] || existing["punctuality"].stars === 5) {
-          existing["punctuality"] = { stars: 1, comment: "Absent — not present at final roll call 11:50 AM" };
-          saveTrackerData(s.parentName, todayStr, existing);
-          fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
-            body: JSON.stringify({ type:"tracker", parentName: s.parentName, date: todayStr, category:"punctuality", stars:1, comment:"Absent — not present at final roll call 11:50 AM" })
-          }).catch(()=>{});
-        }
-        // Save absence note for advocate
-        const notes = getAdvocateNotes(s.parentName);
-        notes.push({ type:"absent", text:`${s.childName} was absent on ${todayStr}. Parent: ${s.parentName}.`, date: todayStr });
-        saveAdvocateNotes(s.parentName, notes);
-      }
-    });
-    saveRollCallData(todayStr, "final", finalData);
-    showToast(`🔔 Final roll call done! ${absentCount} student${absentCount !== 1 ? "s" : ""} marked absent.`);
-    showVerify();
-  }
-}
-
-// Add roll call to verifyAdmin
-
+const ADVOCATE_PASSWORD = "Jesusislord4Lemlem";
 
 async function verifyAdmin() {
   const pw = document.getElementById("adminPwInput").value;
@@ -1279,12 +1109,6 @@ async function verifyAdmin() {
     document.getElementById("advocateDash").style.display = "block";
     await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
     renderAdvocateDash();
-  } else if (pw === ROLL_CALL_PASSWORD) {
-    document.getElementById("adminLogin").style.display = "none";
-    await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
-    const now = getMockNow();
-    const type = now.getHours() >= 11 ? "final" : "morning";
-    showRollCall(type);
   } else {
     document.getElementById("adminError").style.display = "block";
   }
@@ -1961,6 +1785,8 @@ async function loadNewParentsFromSheet() {
     });
   } catch(e) { console.log("Could not load new parents from sheet"); }
 }
+
+// Cache of children data loaded from Sheets
 let childrenSheetData = [];
 
 async function loadChildrenFromSheet() {
@@ -2595,23 +2421,7 @@ function renderParentTracker() {
   html += `</div>`;
   return html;
 }
-<!-- ROLL CALL SCREEN -->
-<div id="rollCallDash" style="display:none;padding-bottom:48px;background:#f0eefb;min-height:100vh;">
-  <div style="background:linear-gradient(135deg,#7a0d1f,#c0392b,#e74c3c);color:white;padding:28px 20px 24px;position:relative;overflow:hidden;">
-    <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:24px;">📋</div>
-        <div>
-          <div style="font-size:17px;font-weight:800;" id="rollCallTitle">Roll Call</div>
-          <div style="font-size:11px;opacity:0.7;margin-top:1px;" id="rollCallSubtitle">Sunday School — Grade 7 & 8</div>
-        </div>
-      </div>
-      <button onclick="showVerify()" style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:white;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:7px 14px;cursor:pointer;">Sign out</button>
-    </div>
-    <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.7);margin-top:8px;" id="rollCallTime"></div>
-  </div>
-  <div style="max-width:480px;margin:0 auto;padding:16px 14px;">
-    <div id="rollCallContent"></div>
-  </div>
-</div>
+</script>
+
+</body>
+</html>
