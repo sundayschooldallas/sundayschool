@@ -2070,8 +2070,94 @@ function addNewParent() {
   setTimeout(() => renderParentsTab(), 1500);
 }
 function renderClassesTab() {
-  try {
+  const el = document.getElementById("tabClassesContent");
+  if (!el) return;
+
   const grade7 = [], grade8 = [], pending = [], unassigned = [];
+  const seen = new Set();
+
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      const ci = getChildInfoByParent(p.name);
+      if (!ci || !ci.name) {
+        if (!seen.has(p.name)) { seen.add(p.name); pending.push({ parent: p.name, h: p.h }); }
+        return;
+      }
+      const key = p.name;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const entry = { child: ci.name, parent: p.name, teacher: ci.teacher || TEACHERS[ci.grade] || "", grade: ci.grade, h: p.h };
+      if (ci.unassigned) { unassigned.push(entry); return; }
+      if (ci.grade === 7) grade7.push(entry);
+      else if (ci.grade === 8) grade8.push(entry);
+    });
+  });
+
+  const rowHTML = (e, color) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
+      <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">${e.child.charAt(0).toUpperCase()}</div>
+      <div style="flex:1;min-width:100px;">
+        <div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div>
+        <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
+        <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${e.grade===7?8:7})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#ede9fb;color:#3b2f8f;">→ ${e.grade===7?"Gr.8":"Gr.7"}</button>
+        <button onclick="unassignStudent('${e.h}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;">⏸ Unassign</button>
+        <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
+      </div>
+    </div>`;
+
+  let html = `<div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">🎓 Children grouped by class. Swap, unassign, or remove as needed.</div>`;
+
+  html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
+    <div style="background:linear-gradient(135deg,#0f6e56,#1db88a);padding:14px 16px;">
+      <div style="font-size:16px;font-weight:800;color:white;">Grade 7</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.85);">👨‍🏫 Bereket Isayas · ${grade7.length} student${grade7.length!==1?"s":""}</div>
+    </div>
+    ${grade7.length>0 ? grade7.map(e=>rowHTML(e,"linear-gradient(135deg,#0f6e56,#1db88a)")).join("") : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No children registered yet.</div>'}
+  </div>`;
+
+  html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
+    <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);padding:14px 16px;">
+      <div style="font-size:16px;font-weight:800;color:white;">Grade 8</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.85);">👨‍🏫 Amanuel Habte · ${grade8.length} student${grade8.length!==1?"s":""}</div>
+    </div>
+    ${grade8.length>0 ? grade8.map(e=>rowHTML(e,"linear-gradient(135deg,#3b2f8f,#5c4ac7)")).join("") : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No children registered yet.</div>'}
+  </div>`;
+
+  if (unassigned.length > 0) {
+    html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+      <div style="background:linear-gradient(135deg,#5a3e8a,#a07de0);padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:white;">⏸ Unassigned — Admin Hold</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.85);">${unassigned.length} student${unassigned.length!==1?"s":""} on hold</div>
+      </div>
+      ${unassigned.map(e=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
+          <div style="flex:1;"><div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div><div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent} · Was Grade ${e.grade}</div></div>
+          <div style="display:flex;gap:5px;">
+            <button onclick="reassignStudent('${e.h}','${e.child}',${e.grade})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e4f7ef;color:#0e6b47;">✅ Reassign</button>
+            <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
+          </div>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  if (pending.length > 0) {
+    html += `<div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+      <div style="background:linear-gradient(135deg,#854f0b,#f5a623);padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:white;">⏳ Pending — No child info yet</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.85);">${pending.length} parent${pending.length!==1?"s":""} haven't filled in child info</div>
+      </div>
+      ${pending.map(p=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
+          <div style="font-size:13px;font-weight:700;color:#7b7a90;">👤 ${p.parent}</div>
+          <button onclick="removeStudent('${p.h}','${p.parent}','')" style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
 
   // Find duplicates — same child name (case-insensitive) registered under multiple parents
   const childCount = {};
@@ -2129,107 +2215,6 @@ function renderClassesTab() {
     <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
       🎓 Children grouped by class. Swap, unassign (admin-only hold), or remove as needed.
     </div>
-
-    <div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
-      <div style="background:linear-gradient(135deg,#0f6e56,#1db88a);padding:14px 16px;">
-        <div style="font-size:16px;font-weight:800;color:white;">Grade 7</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">👨‍🏫 Bereket Isayas &nbsp;·&nbsp; ${grade7.length} student${grade7.length !== 1 ? "s" : ""}</div>
-      </div>
-      ${renderClass(grade7, "linear-gradient(135deg,#0f6e56,#1db88a)")}
-    </div>
-
-    <div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
-      <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);padding:14px 16px;">
-        <div style="font-size:16px;font-weight:800;color:white;">Grade 8</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">👨‍🏫 Amanuel Habte &nbsp;·&nbsp; ${grade8.length} student${grade8.length !== 1 ? "s" : ""}</div>
-      </div>
-      ${renderClass(grade8, "linear-gradient(135deg,#3b2f8f,#5c4ac7)")}
-    </div>`;
-
-  // UNASSIGNED SECTION
-  if (unassigned.length > 0) {
-    html += `
-    <div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
-      <div style="background:linear-gradient(135deg,#5a3e8a,#a07de0);padding:14px 16px;">
-        <div style="font-size:15px;font-weight:800;color:white;">⏸ Unassigned — Admin Hold</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">${unassigned.length} student${unassigned.length !== 1 ? "s" : ""} on hold (not visible to parents)</div>
-      </div>
-      ${unassigned.map(e => `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
-          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#5a3e8a,#a07de0);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">
-            ${e.child.charAt(0).toUpperCase()}
-          </div>
-          <div style="flex:1;min-width:100px;">
-            <div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div>
-            <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent} &nbsp;·&nbsp; Was Grade ${e.grade}</div>
-          </div>
-          <div style="display:flex;gap:5px;flex-shrink:0;">
-            <button onclick="reassignStudent('${e.h}','${e.child}',${e.grade})"
-              style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e4f7ef;color:#0e6b47;white-space:nowrap;">
-              ✅ Reassign
-            </button>
-            <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')"
-              style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;white-space:nowrap;">
-              ✕ Remove
-            </button>
-          </div>
-        </div>`).join("")}
-    </div>`;
-  }
-
-  // PENDING SECTION
-  if (pending.length > 0) {
-    html += `
-    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
-      <div style="background:linear-gradient(135deg,#854f0b,#f5a623);padding:14px 16px;">
-        <div style="font-size:15px;font-weight:800;color:white;">⏳ Pending — No child info yet</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">${pending.length} parent${pending.length !== 1 ? "s" : ""} haven't filled in child info</div>
-      </div>
-      ${pending.map(p => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
-          <div style="font-size:13px;font-weight:700;color:#7b7a90;">👤 ${p.parent}</div>
-          <button onclick="removeStudent('${p.h}','${p.parent}','')"
-            style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">
-            ✕ Remove
-          </button>
-        </div>`).join("")}
-    </div>`;
-  }
-
-  // DUPLICATES SECTION
-  if (duplicates.length > 0) {
-    html += `
-    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);margin-top:14px;">
-      <div style="background:linear-gradient(135deg,#7a0d1f,#c0392b);padding:14px 16px;">
-        <div style="font-size:15px;font-weight:800;color:white;">⚠️ Duplicate Entries</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">Same child registered under multiple parents — keep one</div>
-      </div>
-      ${duplicates.map(([key, entries]) => `
-        <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
-          <div style="font-size:14px;font-weight:800;color:#1a1535;margin-bottom:10px;">👦 ${entries[0].displayName}</div>
-          ${entries.map((e, i) => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:10px;background:${i === 0 ? "#f0fdf4" : "#fdf2f2"};margin-bottom:6px;gap:8px;flex-wrap:wrap;">
-              <div>
-                <div style="font-size:13px;font-weight:800;color:#1a1535;">👤 ${e.parent}</div>
-                <div style="font-size:11px;color:#7b7a90;">Grade ${e.grade} · ${e.teacher || "No teacher"}</div>
-              </div>
-              <div style="display:flex;gap:6px;">
-                <button onclick="keepThisEntry('${e.h}','${e.parent}','${childName}',[${entries.filter((_,j)=>j!==i).map(x=>"'"+x.h+"'").join(',')}])"
-                  style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e4f7ef;color:#0e6b47;">
-                  ✅ Keep this
-                </button>
-              </div>
-            </div>`).join("")}
-        </div>`).join("")}
-    </div>`;
-  }
-
-  document.getElementById("tabClassesContent").innerHTML = html;
-  } catch(e) {
-    console.log("renderClassesTab error:", e);
-    document.getElementById("tabClassesContent").innerHTML = `<div style="text-align:center;padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`;
-  }
-}
 
 function keepThisEntry(keepPh, keepParent, childName, removePhs) {
   if (!confirm(`Keep ${childName} under ${keepParent} and remove the other ${removePhs.length} duplicate(s)?`)) return;
