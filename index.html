@@ -1338,7 +1338,7 @@ async function renderAdvocateDash() {
           <div style="flex:1;">
             <div style="font-size:16px;font-weight:800;color:white;">${ci.name}</div>
             <div style="font-size:12px;color:rgba(255,255,255,0.75);">Grade ${ci.grade} &nbsp;·&nbsp; Parent: ${p.name}</div>
-            ${(function(){ let ph=""; roster.forEach(w=>w.parents.forEach(r=>{if(r.name===p.name)ph=r.h;})); return ph?`<a href="tel:+1${ph}" style="font-size:12px;color:#7effd4;font-weight:800;text-decoration:none;">📞 +1${ph}</a>`:""; })()}
+            <div style="font-size:12px;color:#7effd4;font-weight:800;margin-top:3px;">📞 ${(function(){ let ph=""; roster.forEach(function(w){ w.parents.forEach(function(r){ if(r.name===p.name) ph=r.h; }); }); return ph ? "+1"+ph : "No phone on file"; })()}</div>
           </div>
           <div style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;">${statusLabel}</div>
         </div>
