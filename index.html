@@ -457,13 +457,19 @@ function normalizeDate(dateStr) {
   if (!dateStr) return "";
   const s = String(dateStr).trim();
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const fullMonths = ["january","february","march","april","may","june","july","august","september","october","november","december"];
   // Already "May 3" format
   if (/^[A-Za-z]+ \d+$/.test(s)) return s;
   // "May 3, 2026" format
   const m1 = s.match(/^([A-Za-z]+)\s+(\d+),?\s*\d*$/);
   if (m1) return m1[1].charAt(0).toUpperCase() + m1[1].slice(1,3).toLowerCase() + " " + parseInt(m1[2]);
-  // "5/3/2026" format
+  // "03/05/2026" DD/MM/YYYY format (Google Sheets default)
+  const m3 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m3) {
+    const day = parseInt(m3[1]);
+    const month = parseInt(m3[2]) - 1; // month is second part in DD/MM/YYYY
+    return months[month] + " " + day;
+  }
+  // "5/3/2026" MM/DD/YYYY format fallback
   const m2 = s.match(/^(\d+)\/(\d+)\/\d+$/);
   if (m2) return months[parseInt(m2[1]) - 1] + " " + parseInt(m2[2]);
   // Try JS Date
@@ -483,11 +489,21 @@ async function loadStatusesFromSheet() {
       if (row.date && row.name && row.status) {
         const normDate = normalizeDate(row.date);
         const n = String(row.name).trim();
-        // Store all variants so any spelling/case works
+        // Store all variants
         statuses[getKey(normDate, n)] = row.status;
         statuses[getKey(normDate, n.toLowerCase())] = row.status;
         statuses[getKey(row.date, n)] = row.status;
         statuses[getKey(row.date, n.toLowerCase())] = row.status;
+        // Also try alternate date interpretation (MM/DD vs DD/MM)
+        const s = String(row.date).trim();
+        const mAlt = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (mAlt) {
+          const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+          // Try MM/DD interpretation too
+          const altDate = months[parseInt(mAlt[1]) - 1] + " " + parseInt(mAlt[2]);
+          statuses[getKey(altDate, n)] = row.status;
+          statuses[getKey(altDate, n.toLowerCase())] = row.status;
+        }
       }
     });
     localStorage.setItem("rosterStatuses", JSON.stringify(statuses));
