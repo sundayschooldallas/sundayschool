@@ -2494,14 +2494,16 @@ function getRollCallStudents() {
   childrenSheetData.forEach(row => {
     if (!row.childName || !row.grade || row.unassigned || seen.has(row.childName)) return;
     seen.add(row.childName);
-    students.push({ childName: row.childName, parentName: row.parentName, grade: row.grade });
+    let phone = "";
+    roster.forEach(week => week.parents.forEach(p => { if (p.name === row.parentName) phone = p.h; }));
+    students.push({ childName: row.childName, parentName: row.parentName, grade: row.grade, phone });
   });
   roster.forEach(week => {
     week.parents.forEach(p => {
       const ci = getChildInfoByParent(p.name);
       if (!ci || !ci.name || seen.has(ci.name) || ci.unassigned) return;
       seen.add(ci.name);
-      students.push({ childName: ci.name, parentName: p.name, grade: ci.grade });
+      students.push({ childName: ci.name, parentName: p.name, grade: ci.grade, phone: p.h });
     });
   });
   return students.sort((a,b) => a.grade - b.grade || a.childName.localeCompare(b.childName));
@@ -2586,7 +2588,7 @@ function renderRollCallScreen() {
         </div>
         <div>
           <div style="font-size:18px;font-weight:900;color:white;">${s.childName}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">Parent: ${s.parentName}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">Parent: ${s.parentName}${s.phone ? ' · +1' + s.phone : ''}</div>
         </div>
       </div>
       ${isOpen ? `
