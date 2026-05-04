@@ -1113,6 +1113,8 @@ function showToast(msg) {
 
 // ── ADMIN ─────────────────────────────────────────────
 const ADMIN_PASSWORD = "Jesusislord";
+const ADVOCATE_PASSWORD = "Jesusislord4Lemlem";
+const ROLL_CALL_PASSWORD = "JesusislordRollCall";
 
 function showAdminLogin() {
   document.getElementById("verifyScreen").style.display = "none";
@@ -1128,7 +1130,6 @@ function showVerify() {
   clearInterval(rollCallInterval);
   myPhone = ""; myName = ""; myWeek = null; myParent = null; myPartner = null;
 }
-const ADVOCATE_PASSWORD = "Jesusislord4Lemlem";
 
 async function verifyAdmin() {
   const pw = document.getElementById("adminPwInput").value;
@@ -2521,7 +2522,6 @@ function renderParentTracker() {
 }
 
 // ── ROLL CALL SYSTEM ─────────────────────────────────────
-const ROLL_CALL_PASSWORD = "JesusislordRollCall";
 
 function getParentPhone(parentName) {
   let phone = "";
