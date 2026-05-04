@@ -2488,15 +2488,26 @@ function renderParentTracker() {
 // ── ROLL CALL SYSTEM ─────────────────────────────────────
 const ROLL_CALL_PASSWORD = "JesusislordRollCall";
 
+function getParentPhone(parentName) {
+  let phone = "";
+  roster.forEach(week => week.parents.forEach(p => {
+    if (p.name === parentName) phone = p.h;
+  }));
+  return phone;
+}
+
 function getRollCallStudents() {
   const students = [];
   const seen = new Set();
   childrenSheetData.forEach(row => {
     if (!row.childName || !row.grade || row.unassigned || seen.has(row.childName)) return;
     seen.add(row.childName);
-    let phone = "";
-    roster.forEach(week => week.parents.forEach(p => { if (p.name === row.parentName) phone = p.h; }));
-    students.push({ childName: row.childName, parentName: row.parentName, grade: row.grade, phone });
+    students.push({
+      childName: row.childName,
+      parentName: row.parentName,
+      grade: Number(row.grade),
+      phone: getParentPhone(row.parentName)
+    });
   });
   roster.forEach(week => {
     week.parents.forEach(p => {
