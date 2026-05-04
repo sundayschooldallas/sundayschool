@@ -900,6 +900,12 @@ function setMock(scenario) {
     mockOverride = new Date(year, monthIndex, day, 9, 0, 0);
   } else if (scenario === "sunday_after10") {
     mockOverride = new Date(year, monthIndex, day, 10, 30, 0);
+  } else if (scenario === "rollcall_before") {
+    mockOverride = new Date(year, monthIndex, day, 10, 14, 0);
+  } else if (scenario === "rollcall_open") {
+    mockOverride = new Date(year, monthIndex, day, 10, 16, 0);
+  } else if (scenario === "rollcall_closed") {
+    mockOverride = new Date(year, monthIndex, day, 10, 26, 0);
   } else {
     mockOverride = null;
   }
@@ -909,6 +915,9 @@ function setMock(scenario) {
     before: "📅 Simulating: Day before (Saturday noon)",
     sunday_before10: "⏰ Simulating: Sunday 9:00 AM (before class)",
     sunday_after10: "✅ Simulating: Sunday 10:30 AM (class time)",
+    rollcall_before: "🔔 Simulating: Sunday 10:14 AM (1 min before roll call)",
+    rollcall_open: "📋 Simulating: Sunday 10:16 AM (roll call OPEN)",
+    rollcall_closed: "🔴 Simulating: Sunday 10:26 AM (roll call CLOSED)",
     real: "🕐 Using real time"
   };
   badge.textContent = labels[scenario];
@@ -2621,6 +2630,41 @@ async function showRollCallDash() {
   document.getElementById("rollCallContent").innerHTML = `<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.6);font-size:14px;font-weight:700;">⏳ Loading students...</div>`;
   try { await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]); } catch(e) {}
   renderRollCallScreen();
+  // Show test controls always (hidden on real Sundays only)
+  const now2 = getMockNow();
+  const isRealSunday = now2.getDay() === 0 && !mockOverride;
+  if (!isRealSunday) {
+    const content = document.getElementById("rollCallContent");
+    if (content) {
+      const testDiv = document.createElement("div");
+      testDiv.style.cssText = "margin-top:20px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;";
+      testDiv.innerHTML = `
+        <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🧪 Test Controls</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="setRollCallMock('before')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.1);color:white;">⏳ 10:14 AM</button>
+          <button onclick="setRollCallMock('open')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(34,160,107,0.3);color:white;">🟢 10:16 AM</button>
+          <button onclick="setRollCallMock('closed')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(200,50,50,0.3);color:white;">🔴 10:26 AM</button>
+          <button onclick="setRollCallMock('real')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);">Real Time</button>
+        </div>`;
+      content.appendChild(testDiv);
+    }
+  }
+}
+
+function setRollCallMock(scenario) {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  // Use May 10 2026 (a Sunday) for testing
+  const d = new Date(2026, 4, 10); // May 10
+  if (scenario === "before") mockOverride = new Date(2026, 4, 10, 10, 14, 0);
+  else if (scenario === "open")   mockOverride = new Date(2026, 4, 10, 10, 16, 0);
+  else if (scenario === "closed") {
+    mockOverride = new Date(2026, 4, 10, 10, 26, 0);
+    // Clear the auto-deduct flag so it runs fresh
+    localStorage.removeItem("rollCallAutoDeduct__May 10");
+  }
+  else mockOverride = null;
+  clearInterval(rollCallInterval);
+  renderRollCallScreen();
 }
 
 let rollCallInterval = null;
@@ -2720,7 +2764,64 @@ function renderRollCallScreen() {
   // Auto-refresh every second for countdown
   clearInterval(rollCallInterval);
   if (isTooEarly || isOpen) {
-    rollCallInterval = setInterval(() => renderRollCallScreen(), 1000);
+    rollCallInterval = setInterval(() => {
+      const n = getMockNow();
+      const nm = n.getHours() * 60 + n.getMinutes();
+      // Just crossed 10:25 — auto-deduct late stars
+      if (nm >= endMin) {
+        clearInterval(rollCallInterval);
+        autoDeductLateStars(todayStr);
+        renderRollCallScreen();
+      } else {
+        renderRollCallScreen();
+      }
+    }, 1000);
+  }
+
+  // If already closed and we haven't auto-deducted yet, do it now
+  if (isClosed) {
+    const alreadyRan = localStorage.getItem("rollCallAutoDeduct__" + todayStr);
+    if (!alreadyRan) autoDeductLateStars(todayStr);
+  }
+}
+
+function autoDeductLateStars(todayStr) {
+  // Only run once per day
+  if (localStorage.getItem("rollCallAutoDeduct__" + todayStr)) return;
+  localStorage.setItem("rollCallAutoDeduct__" + todayStr, "done");
+
+  const students = getRollCallStudents();
+  const rollData = getRollCallData(todayStr);
+  let count = 0;
+
+  students.forEach(s => {
+    if (rollData[s.childName] !== "present") {
+      // Not marked present — deduct Late to Class to 1 star
+      const existing = getTrackerData(s.parentName, todayStr) || {};
+      // Only deduct if not already rated
+      if (!existing["punctuality"] || existing["punctuality"].stars === 5) {
+        existing["punctuality"] = { stars: 1, comment: "Auto: not present at 10:15 AM roll call" };
+        saveTrackerData(s.parentName, todayStr, existing);
+        // Sync to Sheets
+        fetch(SHEET_URL, {
+          method: "POST", mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            type: "tracker",
+            parentName: s.parentName,
+            date: todayStr,
+            category: "punctuality",
+            stars: 1,
+            comment: "Auto: not present at 10:15 AM roll call"
+          })
+        }).catch(() => {});
+        count++;
+      }
+    }
+  });
+
+  if (count > 0) {
+    showToast("⏰ Roll call closed — " + count + " student" + (count !== 1 ? "s" : "") + " marked late automatically.");
   }
 }
 
