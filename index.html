@@ -1260,7 +1260,28 @@ function getCategoryStrikes(parentName) {
   return catStrikes;
 }
 
-function renderAdvocateDash() {
+async function renderAdvocateDash() {
+  // Load all tracker data from sheet first
+  try {
+    const res = await fetch(SHEET_URL + "?type=tracker&nocache=" + Date.now(), { mode: "cors" });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) {
+        const byParent = {};
+        rows.forEach(r => {
+          if (!byParent[r.parentName]) byParent[r.parentName] = {};
+          if (!byParent[r.parentName][r.date]) byParent[r.parentName][r.date] = {};
+          byParent[r.parentName][r.date][r.category] = { stars: r.stars, comment: r.comment };
+        });
+        Object.entries(byParent).forEach(([parentName, dates]) => {
+          Object.entries(dates).forEach(([date, data]) => {
+            saveTrackerData(parentName, date, data);
+          });
+        });
+      }
+    }
+  } catch(e) { console.log("Could not load tracker for advocate"); }
+
   const container = document.getElementById("advocateContent");
 
   // Find all parents with any below-5 ratings
@@ -1317,6 +1338,7 @@ function renderAdvocateDash() {
           <div style="flex:1;">
             <div style="font-size:16px;font-weight:800;color:white;">${ci.name}</div>
             <div style="font-size:12px;color:rgba(255,255,255,0.75);">Grade ${ci.grade} &nbsp;·&nbsp; Parent: ${p.name}</div>
+            ${(function(){ let ph=""; roster.forEach(w=>w.parents.forEach(r=>{if(r.name===p.name)ph=r.h;})); return ph?`<a href="tel:+1${ph}" style="font-size:12px;color:#7effd4;font-weight:800;text-decoration:none;">📞 +1${ph}</a>`:""; })()}
           </div>
           <div style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;">${statusLabel}</div>
         </div>
@@ -2793,41 +2815,43 @@ function renderRollCallScreen() {
 
 function autoDeductLateStars(todayStr) {
   // Only run once per day
-  if (localStorage.getItem("rollCallAutoDeduct__" + todayStr)) return;
+  if (localStorage.getItem("rollCallAutoDeduct__" + todayStr)) {
+    console.log("autoDeductLateStars: already ran for", todayStr);
+    return;
+  }
   localStorage.setItem("rollCallAutoDeduct__" + todayStr, "done");
 
   const students = getRollCallStudents();
   const rollData = getRollCallData(todayStr);
+  console.log("autoDeductLateStars:", todayStr, "students:", students.length, "rollData:", rollData);
   let count = 0;
 
   students.forEach(s => {
-    if (rollData[s.childName] !== "present") {
-      // Not marked present — deduct Late to Class to 1 star
+    const isPresent = rollData[s.childName] === "present";
+    console.log(s.childName, "present:", isPresent);
+    if (!isPresent) {
       const existing = getTrackerData(s.parentName, todayStr) || {};
-      // Only deduct if not already rated
-      if (!existing["punctuality"] || existing["punctuality"].stars === 5) {
-        existing["punctuality"] = { stars: 1, comment: "Auto: not present at 10:15 AM roll call" };
-        saveTrackerData(s.parentName, todayStr, existing);
-        // Sync to Sheets
-        fetch(SHEET_URL, {
-          method: "POST", mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({
-            type: "tracker",
-            parentName: s.parentName,
-            date: todayStr,
-            category: "punctuality",
-            stars: 1,
-            comment: "Auto: not present at 10:15 AM roll call"
-          })
-        }).catch(() => {});
-        count++;
-      }
+      existing["punctuality"] = { stars: 1, comment: "Auto: not present at 10:15 AM roll call" };
+      saveTrackerData(s.parentName, todayStr, existing);
+      fetch(SHEET_URL, {
+        method: "POST", mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          type: "tracker",
+          parentName: s.parentName,
+          date: todayStr,
+          category: "punctuality",
+          stars: 1,
+          comment: "Auto: not present at 10:15 AM roll call"
+        })
+      }).catch(() => {});
+      count++;
     }
   });
 
+  console.log("autoDeductLateStars: deducted for", count, "students");
   if (count > 0) {
-    showToast("⏰ Roll call closed — " + count + " student" + (count !== 1 ? "s" : "") + " marked late automatically.");
+    showToast("⏰ " + count + " student" + (count !== 1 ? "s" : "") + " marked late automatically.");
   }
 }
 
