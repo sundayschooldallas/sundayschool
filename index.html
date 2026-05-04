@@ -1519,8 +1519,8 @@ function renderAttendanceTab(isSunday, isPastCheck) {
       const label = s === "confirmed" ? "Confirmed" : "Pending";
       const labelColor = s === "confirmed" ? "#0e6b47" : "#7b7a90";
       const cancelBtn = s === "confirmed"
-        ? '<button onclick="cancelConfirmation(\'' + week.date + '\',\'' + p.name + '\')" style="margin-left:8px;padding:4px 10px;font-family:\'Nunito\',sans-serif;font-size:11px;font-weight:800;background:#fdeaea;color:#a32d2d;border:1px solid #f7bfbf;border-radius:8px;cursor:pointer;">✕ Cancel</button>'
-        : "";
+        ? '<button onclick="cancelConfirmation(\'' + week.date + '\',\'' + p.name + '\')" style="margin-left:6px;padding:4px 10px;font-family:\'Nunito\',sans-serif;font-size:11px;font-weight:800;background:#fdeaea;color:#a32d2d;border:1px solid #f7bfbf;border-radius:8px;cursor:pointer;">✕ Cancel</button>'
+        : '<button onclick="adminMarkAttended(\'' + week.date + '\',\'' + p.name + '\',\'' + p.h + '\')" style="margin-left:6px;padding:4px 10px;font-family:\'Nunito\',sans-serif;font-size:11px;font-weight:800;background:#e4f7ef;color:#0e6b47;border:1px solid #a8ecd3;border-radius:8px;cursor:pointer;">✅ Mark Attended</button>';
       html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
         <div style="font-size:13px;font-weight:700;">${p.name}</div>
         <div style="display:flex;align-items:center;"><span style="font-size:12px;font-weight:800;color:${labelColor};">${icon} ${label}</span>${cancelBtn}</div>
@@ -1576,6 +1576,16 @@ function renderSwapTab() {
   }
 
   document.getElementById("tabSwapContent").innerHTML = html;
+}
+
+function adminMarkAttended(date, name, phone) {
+  saveStatus(date, name, phone, "confirmed");
+  showToast("✅ " + name + " marked as attended for " + date);
+  // Re-render attendance tab
+  const now = getMockNow();
+  const isSunday = now.getDay() === 0;
+  const isPastCheck = now.getHours() >= 11;
+  renderAttendanceTab(isSunday, isPastCheck);
 }
 
 function cancelConfirmation(date, name) {
