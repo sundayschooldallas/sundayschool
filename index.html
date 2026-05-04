@@ -2063,14 +2063,15 @@ function addNewParent() {
 function renderClassesTab() {
   const grade7 = [], grade8 = [], pending = [], unassigned = [];
 
-  // Find duplicates — same child name registered under multiple parents
+  // Find duplicates — same child name (case-insensitive) registered under multiple parents
   const childCount = {};
   roster.forEach(week => {
     week.parents.forEach(p => {
       const ci = getChildInfoByParent(p.name);
       if (!ci || !ci.name) return;
-      if (!childCount[ci.name]) childCount[ci.name] = [];
-      childCount[ci.name].push({ parent: p.name, h: p.h, grade: ci.grade, teacher: ci.teacher });
+      const key = ci.name.trim().toLowerCase();
+      if (!childCount[key]) childCount[key] = [];
+      childCount[key].push({ parent: p.name, h: p.h, grade: ci.grade, teacher: ci.teacher, displayName: ci.name });
     });
   });
   const duplicates = Object.entries(childCount).filter(([,entries]) => entries.length > 1);
@@ -2193,9 +2194,9 @@ function renderClassesTab() {
         <div style="font-size:15px;font-weight:800;color:white;">⚠️ Duplicate Entries</div>
         <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">Same child registered under multiple parents — keep one</div>
       </div>
-      ${duplicates.map(([childName, entries]) => `
+      ${duplicates.map(([key, entries]) => `
         <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
-          <div style="font-size:14px;font-weight:800;color:#1a1535;margin-bottom:10px;">👦 ${childName}</div>
+          <div style="font-size:14px;font-weight:800;color:#1a1535;margin-bottom:10px;">👦 ${entries[0].displayName}</div>
           ${entries.map((e, i) => `
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:10px;background:${i === 0 ? "#f0fdf4" : "#fdf2f2"};margin-bottom:6px;gap:8px;flex-wrap:wrap;">
               <div>
@@ -2553,10 +2554,12 @@ function getParentPhone(parentName) {
 
 function getRollCallStudents() {
   const students = [];
-  const seen = new Set();
+  const seen = new Set(); // stores lowercase names
   childrenSheetData.forEach(row => {
-    if (!row.childName || !row.grade || row.unassigned || seen.has(row.childName)) return;
-    seen.add(row.childName);
+    if (!row.childName || !row.grade || row.unassigned) return;
+    const key = row.childName.trim().toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
     students.push({
       childName: row.childName,
       parentName: row.parentName,
@@ -2567,8 +2570,10 @@ function getRollCallStudents() {
   roster.forEach(week => {
     week.parents.forEach(p => {
       const ci = getChildInfoByParent(p.name);
-      if (!ci || !ci.name || seen.has(ci.name) || ci.unassigned) return;
-      seen.add(ci.name);
+      if (!ci || !ci.name || ci.unassigned) return;
+      const key = ci.name.trim().toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
       students.push({ childName: ci.name, parentName: p.name, grade: ci.grade, phone: p.h });
     });
   });
