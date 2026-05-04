@@ -2211,13 +2211,8 @@ function renderClassesTab() {
       </div>`).join("");
   };
 
-  let html = `
-    <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
-      🎓 Children grouped by class. Swap, unassign (admin-only hold), or remove as needed.
-    </div>
-
 function keepThisEntry(keepPh, keepParent, childName, removePhs) {
-  if (!confirm(`Keep ${childName} under ${keepParent} and remove the other ${removePhs.length} duplicate(s)?`)) return;
+  if (!confirm("Keep " + childName + " under " + keepParent + " and remove the other " + removePhs.length + " duplicate(s)?")) return;
   removePhs.forEach(ph => {
     localStorage.removeItem("childInfo__" + ph);
     childrenSheetData = childrenSheetData.filter(r => r.phone !== ph);
