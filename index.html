@@ -2627,9 +2627,13 @@ function saveRollCallEntry(date, childName, status) {
 
 async function showRollCallDash() {
   document.getElementById("rollCallDash").style.display = "block";
-  document.getElementById("rollCallContent").innerHTML = `<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.6);font-size:14px;font-weight:700;">⏳ Loading students...</div>`;
-  try { await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]); } catch(e) {}
+  // Render immediately with whatever data we have
   renderRollCallScreen();
+  // Load from sheet in background then re-render
+  try { 
+    await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]); 
+    renderRollCallScreen();
+  } catch(e) {}
 }
 
 function setRollCallMock(scenario) {
