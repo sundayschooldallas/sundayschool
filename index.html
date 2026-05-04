@@ -1482,6 +1482,15 @@ function showAdminTab(tab) {
     const btn = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1));
     if (btn) { btn.style.background = tab === t ? "#3b2f8f" : "#ede9fb"; btn.style.color = tab === t ? "white" : "#3b2f8f"; }
   });
+  // Reload children from sheet when Classes or Tracker tab opened
+  if (tab === "classes" || tab === "tracker") {
+    loadChildrenFromSheet().then(() => {
+      if (tab === "classes") renderClassesTab();
+      if (tab === "tracker") renderTrackerTab();
+    }).catch(() => {
+      if (tab === "classes") renderClassesTab();
+    });
+  }
 }
 
 function renderAttendanceTab(isSunday, isPastCheck) {
