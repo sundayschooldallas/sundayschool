@@ -1261,12 +1261,20 @@ function getCategoryStrikes(parentName) {
 }
 
 async function renderAdvocateDash() {
-  // Load all tracker data from sheet first
+  // Clear all local tracker cache and reload fresh from Sheets
   try {
     const res = await fetch(SHEET_URL + "?type=tracker&nocache=" + Date.now(), { mode: "cors" });
     if (res.ok) {
       const rows = await res.json();
       if (Array.isArray(rows)) {
+        // Clear ALL local tracker data first
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("tracker__")) keysToRemove.push(key);
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        // Now save only what's in Sheets
         const byParent = {};
         rows.forEach(r => {
           if (!byParent[r.parentName]) byParent[r.parentName] = {};
