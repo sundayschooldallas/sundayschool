@@ -427,7 +427,15 @@ const SHEET_URL = "https://script.google.com/macros/s/AKfycbxF-fJc7yQ6i2xv8JXfH0
 // Local cache so UI stays fast
 const statuses = JSON.parse(localStorage.getItem("rosterStatuses") || "{}");
 function getKey(date, name) { return `${date}__${name}`; }
-function getStatus(date, name) { return statuses[getKey(date, name)] || "pending"; }
+function getStatus(date, name) {
+  const normDate = normalizeDate(date);
+  const n = String(name).trim();
+  return statuses[getKey(normDate, n)]
+    || statuses[getKey(date, n)]
+    || statuses[getKey(normDate, n.toLowerCase())]
+    || statuses[getKey(date, n.toLowerCase())]
+    || "pending";
+}
 
 // Save to both local cache AND Google Sheets
 async function saveStatus(date, name, phone, status) {
@@ -473,10 +481,13 @@ async function loadStatusesFromSheet() {
     const data = await res.json();
     data.forEach(row => {
       if (row.date && row.name && row.status) {
-        const normalizedDate = normalizeDate(row.date);
-        statuses[getKey(normalizedDate, row.name)] = row.status;
-        // Also store with original date as fallback
-        statuses[getKey(row.date, row.name)] = row.status;
+        const normDate = normalizeDate(row.date);
+        const n = String(row.name).trim();
+        // Store all variants so any spelling/case works
+        statuses[getKey(normDate, n)] = row.status;
+        statuses[getKey(normDate, n.toLowerCase())] = row.status;
+        statuses[getKey(row.date, n)] = row.status;
+        statuses[getKey(row.date, n.toLowerCase())] = row.status;
       }
     });
     localStorage.setItem("rosterStatuses", JSON.stringify(statuses));
