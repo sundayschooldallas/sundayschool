@@ -1201,7 +1201,6 @@ async function verifyAdmin() {
     renderAdvocateDash();
   } else if (pw === ROLL_CALL_PASSWORD) {
     document.getElementById("adminLogin").style.display = "none";
-    await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
     showRollCallDash();
   } else {
     document.getElementById("adminError").style.display = "block";
@@ -2625,15 +2624,13 @@ function saveRollCallEntry(date, childName, status) {
   localStorage.setItem(getRollCallKey(date), JSON.stringify(data));
 }
 
-async function showRollCallDash() {
+function showRollCallDash() {
   document.getElementById("rollCallDash").style.display = "block";
-  // Render immediately with whatever data we have
   renderRollCallScreen();
-  // Load from sheet in background then re-render
-  try { 
-    await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]); 
-    renderRollCallScreen();
-  } catch(e) {}
+  // Silently refresh from sheet in background
+  Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
+    .then(() => renderRollCallScreen())
+    .catch(() => {});
 }
 
 function setRollCallMock(scenario) {
