@@ -872,8 +872,19 @@ window.addEventListener("DOMContentLoaded", () => {
 // ── MOCK TESTING CONTROLS ──────────────────────────────
 let mockOverride = null;
 
+let mockStartReal = null;
+let mockStartTime = null;
+let rollCallInterval = null;
+
 function getMockNow() {
-  return mockOverride ? new Date(mockOverride) : new Date();
+  if (!mockOverride) return new Date();
+  // If mock was just set, start advancing from that point
+  if (!mockStartReal) {
+    mockStartReal = Date.now();
+    mockStartTime = new Date(mockOverride);
+  }
+  const elapsed = Date.now() - mockStartReal;
+  return new Date(mockStartTime.getTime() + elapsed);
 }
 
 function isAttendanceWindow() {
@@ -2642,14 +2653,17 @@ function setRollCallMock(scenario) {
     localStorage.removeItem("rollCallAutoDeduct__May 10");
   }
   else mockOverride = null;
+  // Reset advancing clock
+  mockStartReal = null;
+  mockStartTime = null;
   clearInterval(rollCallInterval);
-  // Reload students then render
+  rollCallInterval = null;
+  renderRollCallScreen();
+  window.scrollTo(0, 0);
   Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
     .then(() => renderRollCallScreen())
-    .catch(() => renderRollCallScreen());
+    .catch(() => {});
 }
-
-let rollCallInterval = null;
 
 function renderRollCallScreen() {
   const now = getMockNow();
