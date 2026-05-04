@@ -1209,8 +1209,9 @@ async function verifyAdmin() {
   } else if (pw === ADVOCATE_PASSWORD) {
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("advocateDash").style.display = "block";
+    document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">⏳ Loading data from server...</div>`;
     await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
-    renderAdvocateDash();
+    await renderAdvocateDash();
   } else if (pw === ROLL_CALL_PASSWORD) {
     document.getElementById("adminLogin").style.display = "none";
     showRollCallDash();
