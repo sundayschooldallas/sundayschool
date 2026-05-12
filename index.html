@@ -456,6 +456,28 @@ const SHEET_URL = "https://script.google.com/macros/s/AKfycbxORxRQdFY3fUZGGVxWad
 // Local cache so UI stays fast
 const statuses = JSON.parse(localStorage.getItem("rosterStatuses") || "{}");
 function getKey(date, name) { return `${date}__${name}`; }
+// Normalize any date string to "Mon D" format for display
+function normalizeRosterDate(dateStr) {
+  if (!dateStr) return "";
+  const s = String(dateStr).trim();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  // Already "Aug 16" format
+  if (/^[A-Za-z]+ \d+$/.test(s)) return s;
+  // Try parsing as JS Date
+  try {
+    const d = new Date(s);
+    if (!isNaN(d)) return months[d.getMonth()] + " " + d.getDate();
+  } catch(e) {}
+  return s;
+}
+
+// Apply to all roster dates on load
+function normalizeRosterDates() {
+  roster.forEach(week => {
+    week.date = normalizeRosterDate(week.date);
+  });
+}
+
 function getStatus(date, name) {
   const normDate = normalizeDate(date);
   const n = String(name).trim();
@@ -2038,6 +2060,8 @@ async function loadNewParentsFromSheet() {
     const data = await res.json();
     if (!Array.isArray(data)) return;
     newParentsFromSheet = data;
+    // Normalize dates first
+    data.forEach(p => { p.date = normalizeRosterDate(p.date); });
     // Merge into roster without touching existing hardcoded entries
     data.forEach(p => {
       // Check not already in roster
@@ -2241,6 +2265,9 @@ function addNewParent() {
     }
     week.parents.push(newParent);
   }
+
+  // Ensure date is in clean format before saving
+  assignedDate = normalizeRosterDate(assignedDate);
 
   resEl.innerHTML = `
     <div style="background:#e4f7ef;border-radius:12px;padding:14px;color:#0e6b47;font-weight:800;font-size:13px;">
