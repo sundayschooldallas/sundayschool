@@ -1,464 +1,3005 @@
 <!DOCTYPE html>
+<!-- v2.1.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Care Clock">
-<title>Care Clock</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunday School Roster — 7th & 8th Grade</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@400;700&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --green:#1D9E75; --green-l:#EAF3DE; --green-d:#0F6E56; --green-t:#3B6D11;
-  --red:#E24B4A; --red-l:#FCEBEB; --red-t:#A32D2D;
-  --amber:#EF9F27; --amber-l:#FAEEDA; --amber-t:#854F0B;
-  --blue:#378ADD; --blue-l:#E6F1FB; --blue-t:#185FA5;
-  --bg:#f5f5f3; --card:#fff; --bdr:rgba(0,0,0,.1); --bdr2:rgba(0,0,0,.2);
-  --tx:#1a1a1a; --tx2:#555; --tx3:#999;
-  --r:12px; --rs:8px;
-}
-@media(prefers-color-scheme:dark){
-  :root{
-    --bg:#111; --card:#1e1e1e; --bdr:rgba(255,255,255,.1); --bdr2:rgba(255,255,255,.2);
-    --tx:#f0f0f0; --tx2:#aaa; --tx3:#666;
-    --green-l:#0a2e1e; --green-t:#5DCAA5;
-    --red-l:#2e0a0a; --red-t:#F09595;
-    --amber-l:#2e1e00; --amber-t:#FAC775;
-    --blue-l:#0a1e2e; --blue-t:#85B7EB;
+  :root {
+    --purple: #5c4ac7;
+    --purple-light: #ede9fb;
+    --purple-dark: #3b2f8f;
+    --amber: #f5a623;
+    --amber-light: #fff4e0;
+    --green: #22a06b;
+    --green-light: #e4f7ef;
+    --red: #e03e3e;
+    --red-light: #fdeaea;
+    --gray: #f4f3f8;
+    --text: #1a1535;
+    --muted: #7b7a90;
+    --radius: 16px;
+    --shadow: 0 4px 20px rgba(92,74,199,0.10);
   }
-}
-html,body{height:100%;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-body{padding-bottom:env(safe-area-inset-bottom);}
-#app{max-width:480px;margin:0 auto;padding:1rem;min-height:100vh;}
-.card{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1rem;}
-.lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);margin-bottom:.75rem;}
-.hrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
-.av{width:42px;height:42px;border-radius:50%;background:var(--green-l);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--green-t);flex-shrink:0;}
-.tabs{display:flex;background:var(--card);border:1px solid var(--bdr);border-radius:var(--rs);padding:3px;margin-bottom:1rem;gap:2px;}
-.tab{flex:1;padding:7px 4px;font-size:13px;font-weight:500;border-radius:6px;cursor:pointer;border:none;background:transparent;color:var(--tx2);}
-.tab.on{background:var(--bg);color:var(--tx);font-weight:700;}
-.tbig{font-size:44px;font-weight:300;color:var(--tx);letter-spacing:-2px;text-align:center;margin:.5rem 0;font-variant-numeric:tabular-nums;}
-.dsm{font-size:14px;color:var(--tx2);text-align:center;}
-.eld{font-size:16px;font-weight:700;color:var(--green);text-align:center;margin-top:4px;font-variant-numeric:tabular-nums;}
-.bdg{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;}
-.bdg-in{background:var(--green-l);color:var(--green-t);}
-.bdg-out{background:var(--red-l);color:var(--red-t);}
-.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.dg{background:var(--green);animation:pulse 1.5s infinite;}
-.dr{background:var(--red);}
-.da{background:var(--amber);}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-.geo{font-size:13px;padding:10px 12px;border-radius:var(--rs);margin-bottom:.75rem;display:flex;align-items:flex-start;gap:8px;line-height:1.4;}
-.g-ok{background:var(--green-l);color:var(--green-t);}
-.g-fail{background:var(--red-l);color:var(--red-t);}
-.g-neu{background:var(--amber-l);color:var(--amber-t);}
-.btn{width:100%;padding:13px;border-radius:var(--rs);font-size:15px;font-weight:600;cursor:pointer;border:none;transition:opacity .15s,transform .1s;}
-.btn:active{transform:scale(.98);}
-.bg{background:var(--green);color:#fff;}.bg:hover{opacity:.9;}
-.br{background:var(--red);color:#fff;}.br:hover{opacity:.9;}
-.bo{background:transparent;border:1px solid var(--bdr2);color:var(--tx);}
-.bo:hover{background:var(--bg);}
-.btn:disabled{background:var(--bdr);color:var(--tx3);cursor:not-allowed;transform:none;}
-.bsm{padding:7px 14px;font-size:13px;font-weight:500;border-radius:var(--rs);cursor:pointer;background:transparent;border:1px solid var(--bdr2);color:var(--tx2);}
-.bdel{background:transparent;border:1px solid rgba(226,75,74,.3);color:var(--red-t);width:100%;padding:11px;border-radius:var(--rs);font-size:14px;font-weight:500;cursor:pointer;}
-.fld{margin-bottom:.875rem;}
-.fld label{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:5px;}
-.fld input{width:100%;padding:10px 12px;font-size:15px;border:1px solid var(--bdr2);border-radius:var(--rs);background:var(--card);color:var(--tx);outline:none;transition:border .15s;}
-.fld input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(55,138,221,.15);}
-.fld input::placeholder{color:var(--tx3);}
-.hint{font-size:12px;color:var(--tx3);margin-top:5px;line-height:1.4;}
-.div{height:1px;background:var(--bdr);margin:.875rem 0;}
-.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem;}
-.met{background:var(--bg);border-radius:var(--rs);padding:.875rem;}
-.ml{font-size:11px;color:var(--tx3);margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;}
-.mv{font-size:22px;font-weight:700;color:var(--tx);}
-.lrow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bdr);}
-.lrow:last-child{border-bottom:none;}
-.ll{font-size:14px;color:var(--tx2);}
-.lv{font-size:14px;font-weight:600;color:var(--green);}
-.trow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;}
-.stbl{width:100%;border-collapse:collapse;font-size:13px;}
-.stbl th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bdr);font-weight:600;color:var(--tx3);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
-.stbl td{padding:10px 6px;border-bottom:1px solid var(--bdr);color:var(--tx);}
-.stbl tr:last-child td{border-bottom:none;}
-.wdl{font-size:12px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em;margin:.75rem 0 4px;}
-.noti{font-size:12px;color:var(--tx3);text-align:center;margin-top:.5rem;line-height:1.4;}
-.emp{font-size:14px;color:var(--tx3);text-align:center;padding:2rem 1rem;}
-.smsg{font-size:13px;min-height:20px;margin-bottom:.75rem;line-height:1.5;}
-.mok{color:var(--green-t);} .merr{color:var(--red-t);} .mneu{color:var(--tx3);}
-.sscr{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--bdr);border-top-color:var(--green);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px;}
-@keyframes sp{to{transform:rotate(360deg)}}
-/* Admin panel styles */
-.admin-lock{position:absolute;top:1rem;right:1rem;background:transparent;border:none;cursor:pointer;color:var(--tx3);font-size:20px;padding:4px;}
-.admin-overlay{background:rgba(0,0,0,.5);position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:100;padding:1rem;}
-.admin-modal{background:var(--card);border-radius:var(--r);padding:1.5rem;width:100%;max-width:400px;}
-.admin-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--blue-l);color:var(--blue-t);margin-bottom:1rem;}
-.coord-display{background:var(--bg);border-radius:var(--rs);padding:.75rem;font-size:12px;color:var(--tx2);font-variant-numeric:tabular-nums;margin-bottom:.75rem;line-height:1.6;}
-.coord-display strong{color:var(--tx);display:block;margin-bottom:2px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', sans-serif; background: #f0eefb; color: var(--text); min-height: 100vh; padding-bottom: 48px; }
+
+  /* ── RESPONSIVE ── */
+  @media (min-width: 600px) {
+    .verify-screen h2 { font-size: 28px; }
+    .phone-input-wrap { max-width: 420px; }
+    .phone-input-wrap input { font-size: 19px; padding: 17px 20px; }
+    .verify-btn { font-size: 18px; padding: 17px; }
+    .verify-icon { font-size: 68px; }
+  }
+  @media (min-width: 768px) {
+    body { max-width: 600px; margin: 0 auto; }
+    .verify-screen { padding: 40px 40px; }
+  }
+  @media (max-width: 360px) {
+    .verify-screen h2 { font-size: 18px; }
+    .phone-input-wrap input { font-size: 14px; padding: 12px 14px; }
+  }
+
+  .verify-screen {
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 30px 24px; text-align: center;
+    position: relative; overflow: hidden;
+    background: linear-gradient(160deg, #0d0b1f 0%, #1a1040 40%, #0d2a1f 100%);
+  }
+  /* Animated glowing orbs */
+  .verify-screen::before {
+    content: '';
+    position: absolute; top: -120px; right: -80px;
+    width: 380px; height: 380px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(92,74,199,0.35) 0%, transparent 70%);
+    animation: floatOrb1 8s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .verify-screen::after {
+    content: '';
+    position: absolute; bottom: -100px; left: -60px;
+    width: 320px; height: 320px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(15,110,86,0.3) 0%, transparent 70%);
+    animation: floatOrb2 10s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes floatOrb1 {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50% { transform: translate(-30px, 30px) scale(1.1); }
+  }
+  @keyframes floatOrb2 {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50% { transform: translate(20px, -20px) scale(1.15); }
+  }
+  /* Stars/particles */
+  .verify-screen .stars {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 85% 35%, rgba(255,255,255,0.6) 0%, transparent 100%),
+      radial-gradient(2px 2px at 20% 90%, rgba(255,255,255,0.25) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(2px 2px at 60% 40%, rgba(255,255,255,0.2) 0%, transparent 100%);
+  }
+  .verify-icon { font-size: 54px; margin-bottom: 16px; position: relative; z-index: 1; filter: drop-shadow(0 0 20px rgba(92,74,199,0.6)); }
+  .verify-screen h2 { font-size: 22px; font-weight: 800; color: white; margin-bottom: 8px; position: relative; z-index: 1; text-shadow: 0 0 30px rgba(92,74,199,0.5); }
+  .verify-screen p { font-size: 14px; color: rgba(255,255,255,0.7); margin-bottom: 28px; line-height: 1.6; max-width: 290px; position: relative; z-index: 1; font-family: 'Noto Serif Ethiopic', serif; }
+  .phone-input-wrap { width: 100%; max-width: 340px; position: relative; z-index: 1; }
+  .phone-input-wrap input {
+    width: 100%; padding: 15px 18px;
+    font-family: 'Nunito', sans-serif; font-size: 17px; font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,0.15); border-radius: 16px;
+    outline: none; color: white; background: rgba(255,255,255,0.08);
+    text-align: center; letter-spacing: 1px; transition: all 0.2s;
+    backdrop-filter: blur(10px);
+  }
+  .phone-input-wrap input::placeholder { color: rgba(255,255,255,0.35); }
+  .phone-input-wrap input:focus { border-color: rgba(92,74,199,0.6); background: rgba(255,255,255,0.12); box-shadow: 0 0 20px rgba(92,74,199,0.2); }
+  .phone-input-wrap input:focus { border-color: var(--purple); }
+  .phone-input-wrap input::placeholder { color: #bbb; font-weight: 600; letter-spacing: 0; font-size: 14px; }
+  .verify-btn {
+    width: 100%; margin-top: 12px; padding: 15px;
+    background: linear-gradient(135deg, #5c4ac7, #3b2f8f);
+    color: white; border: none; border-radius: 16px;
+    font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 8px 24px rgba(92,74,199,0.4);
+    transition: all 0.2s; position: relative; z-index: 1;
+  }
+  .verify-btn:active { transform: scale(0.98); opacity: 0.9; }
+  .verify-error { margin-top: 12px; font-size: 13px; color: #ff8a8a; font-weight: 700; display: none; position: relative; z-index: 1; }
+
+  .main-app { display: none; }
+  header {
+    background: linear-gradient(135deg, var(--purple-dark) 0%, var(--purple) 100%);
+    color: white; padding: 24px 20px 20px; text-align: center; position: relative;
+  }
+  header .emoji { font-size: 28px; margin-bottom: 4px; }
+  header h1 { font-size: 18px; font-weight: 800; }
+  header p { font-size: 12px; opacity: 0.75; margin-top: 3px; }
+  .you-badge {
+    display: inline-block; margin-top: 10px;
+    background: rgba(255,255,255,0.2); color: white;
+    font-size: 13px; font-weight: 700; padding: 6px 16px; border-radius: 20px;
+  }
+  .signout { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 8px; cursor: pointer; text-decoration: underline; display: block; }
+
+  .container { max-width: 480px; margin: 0 auto; padding: 18px 14px 0; }
+
+  .my-card {
+    background: white; border-radius: var(--radius);
+    box-shadow: 0 6px 28px rgba(92,74,199,0.18);
+    overflow: hidden; margin-bottom: 10px;
+    animation: fadeUp 0.35s ease both;
+  }
+  .my-card-header {
+    background: linear-gradient(135deg, var(--purple-dark), var(--purple));
+    padding: 16px 18px 14px; color: white;
+  }
+  .my-card-header .label { font-size: 11px; font-weight: 700; opacity: 0.75; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .my-card-header .big-date { font-size: 26px; font-weight: 800; }
+  .my-card-header .perf-note { font-size: 12px; margin-top: 6px; background: rgba(255,255,255,0.15); display: inline-block; padding: 3px 10px; border-radius: 20px; }
+  .my-card-body { padding: 16px 18px; }
+  .partner-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; flex-shrink: 0;
+  }
+  .partner-label { font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .partner-name { font-size: 16px; font-weight: 800; }
+  .partner-phone { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .respond-section { border-top: 1px solid #f0eefb; padding-top: 14px; }
+  .respond-label { font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+  .respond-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+  .respond-btn {
+    flex: 1; min-width: 140px; padding: 13px 8px; border: none; border-radius: 12px;
+    font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 800;
+    cursor: pointer; transition: opacity 0.15s, transform 0.15s;
+  }
+  .respond-btn:active { transform: scale(0.97); }
+  .btn-confirm { background: var(--green); color: white; }
+  .btn-cantmake { background: var(--red); color: white; }
+  .responded-banner {
+    text-align: center; padding: 13px;
+    border-radius: 10px; font-size: 14px; font-weight: 800;
+  }
+  .responded-confirmed { background: var(--green-light); color: var(--green); }
+  .responded-cantmake { background: var(--red-light); color: var(--red); }
+  .change-link { font-size: 12px; font-weight: 600; opacity: 0.7; cursor: pointer; display: block; margin-top: 4px; }
+
+  .section-divider {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 0 10px; font-size: 12px; font-weight: 800;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .section-divider::before, .section-divider::after { content: ""; flex: 1; height: 1px; background: #ddd8f8; }
+
+  .week-card {
+    background: white; border-radius: var(--radius);
+    margin-bottom: 12px; box-shadow: var(--shadow); overflow: hidden;
+    animation: fadeUp 0.4s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .week-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--purple-light); border-bottom: 1px solid #ddd8f8;
+  }
+  .week-header.perf { background: var(--amber-light); border-bottom: 1px solid #f5d98a; }
+  .week-header.mine { background: linear-gradient(90deg, #3b2f8f, #5c4ac7); }
+  .week-date { font-size: 14px; font-weight: 800; color: var(--purple-dark); }
+  .week-header.perf .week-date { color: #a06800; }
+  .week-header.mine .week-date { color: white; }
+  .perf-tag { font-size: 11px; font-weight: 700; background: var(--amber); color: white; padding: 3px 8px; border-radius: 20px; }
+  .mine-tag { font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.25); color: white; padding: 3px 8px; border-radius: 20px; }
+  .parents-list { padding: 8px 12px 10px; }
+  .parent-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 8px; border-radius: 10px; margin-bottom: 6px; background: var(--gray);
+  }
+  .parent-row.is-me { background: var(--purple-light); }
+  .parent-row:last-child { margin-bottom: 0; }
+  .parent-left { display: flex; align-items: center; gap: 8px; }
+  .sm-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; flex-shrink: 0;
+  }
+  .parent-name { font-size: 13px; font-weight: 700; }
+  .parent-phone { font-size: 11px; color: var(--muted); }
+  .status-icon { font-size: 16px; padding-right: 4px; }
+  .status-btn-sm {
+    border: none; cursor: pointer; font-size: 11px; font-weight: 700;
+    padding: 5px 10px; border-radius: 20px; white-space: nowrap;
+    font-family: 'Nunito', sans-serif;
+  }
+  .sp { background: #ede9fb; color: var(--purple); }
+  .sc { background: var(--green-light); color: var(--green); }
+  .sk { background: var(--red-light); color: var(--red); }
+
+  .modal-bg {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26,21,53,0.55); z-index: 100;
+    align-items: flex-end; justify-content: center;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: white; border-radius: 24px 24px 0 0;
+    padding: 24px 24px 36px; width: 100%; max-width: 480px;
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(60px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .modal h3 { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+  .modal p { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .modal-btns { display: flex; flex-direction: column; gap: 10px; }
+  .modal-btn {
+    padding: 14px; border-radius: 12px; border: none;
+    font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .modal-btn:active { opacity: 0.85; }
+  .mbtn-confirm { background: var(--green); color: white; }
+  .mbtn-cantmake { background: var(--red); color: white; }
+  .mbtn-cancel { background: var(--gray); color: var(--muted); }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: white; padding: 12px 22px; border-radius: 30px;
+    font-size: 13px; font-weight: 700; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s; z-index: 200; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
 </style>
 </head>
 <body>
-<div id="app"></div>
+
+<div class="verify-screen" id="verifyScreen">
+  <div class="stars"></div>
+  <div style="position:absolute;top:16px;right:16px;z-index:10;">
+    <span onclick="showAdminLogin()" style="font-size:12px;color:rgba(255,255,255,0.4);cursor:pointer;text-decoration:underline;">Admin access</span>
+  </div>
+  <div class="verify-icon">⛪</div>
+  <h2>Sunday School Parents</h2>
+  <p style="font-family:'Noto Serif Ethiopic',serif;font-size:16px;font-weight:700;color:#ffffff;text-shadow:0 0 16px rgba(255,255,255,0.6);">ቁጽሪ ተሌፎንኩም ኣእትው</p>
+
+  <!-- TODAY'S PAIR — shown immediately -->
+  <div id="todayPairBanner" style="width:100%;max-width:380px;margin:16px 0;"></div>
+
+  <div class="phone-input-wrap">
+    <input type="tel" id="phoneInput" placeholder="+1 (000) 000-0000" />
+    <input type="password" id="pinInput" placeholder="Your PIN (4 digits)" style="width:100%;padding:15px 18px;font-family:'Nunito',sans-serif;font-size:17px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;text-align:center;letter-spacing:4px;margin-top:10px;transition:border-color 0.2s;" maxlength="4" />
+    <button class="verify-btn" onclick="verifyPhone()">Find my assignment →</button>
+    <div class="verify-error" id="verifyError">❌ Phone number or PIN is incorrect.</div>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div id="adminLogin" style="display:none;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;padding:30px 24px;text-align:center;background:#f0eefb;">
+  <div style="font-size:40px;margin-bottom:12px;">🔐</div>
+  <h2 style="font-size:20px;font-weight:800;color:#3b2f8f;margin-bottom:8px;">Secure Access</h2>
+  <p style="font-size:13px;color:#7b7a90;margin-bottom:20px;">Enter your password</p>
+  <div style="width:100%;max-width:300px;">
+    <input type="password" id="adminPwInput" placeholder="Password" style="width:100%;padding:14px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;text-align:center;background:white;" />
+    <button onclick="verifyAdmin()" style="width:100%;margin-top:10px;padding:14px;background:#3b2f8f;color:white;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;">Enter →</button>
+    <div id="adminError" style="display:none;margin-top:10px;font-size:13px;color:#e03e3e;font-weight:700;">❌ Incorrect password</div>
+    <div style="margin-top:14px;"><span onclick="showVerify()" style="font-size:12px;color:#bbb;cursor:pointer;text-decoration:underline;">← Back</span></div>
+  </div>
+</div>
+
+<!-- ADVOCATE PORTAL -->
+<div id="advocateDash" style="display:none;padding-bottom:48px;background:#f0eefb;min-height:100vh;">
+  <div style="background:linear-gradient(135deg,#0d3b2e,#0f6e56,#1db88a);color:white;padding:28px 20px 24px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+    <div style="position:absolute;bottom:-30px;left:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:24px;">💚</div>
+        <div>
+          <div style="font-size:17px;font-weight:800;">Advocate Portal</div>
+          <div style="font-size:11px;opacity:0.7;margin-top:1px;">Parent Behavior Support</div>
+        </div>
+      </div>
+      <button onclick="showVerify()" style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:white;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:7px 14px;cursor:pointer;position:relative;z-index:10;">Sign out</button>
+    </div>
+  </div>
+  <div style="max-width:480px;margin:0 auto;padding:16px 14px;">
+    <div id="advocateContent"></div>
+  </div>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div id="adminDash" style="display:none;padding-bottom:48px;background:#f0eefb;min-height:100vh;">
+
+  <!-- BEAUTIFUL HEADER -->
+  <div style="background:linear-gradient(135deg,#0d0b1f,#1a1535,#2d2060);color:white;padding:28px 20px 24px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+    <div style="position:absolute;bottom:-30px;left:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:24px;">🛡️</div>
+        <div>
+          <div style="font-size:17px;font-weight:800;">Admin Dashboard</div>
+          <div style="font-size:11px;opacity:0.6;margin-top:1px;">Sunday School — Grade 7 & 8</div>
+        </div>
+      </div>
+      <button onclick="showVerify()" style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:white;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:7px 14px;cursor:pointer;position:relative;z-index:10;">Sign out</button>
+    </div>
+
+    <!-- TODAY'S DATE -->
+    <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.6);margin-bottom:10px;" id="adminTodayDate"></div>
+
+    <!-- TODAY'S PAIR HERO CARD -->
+    <div id="adminTodayHero"></div>
+  </div>
+
+  <div style="max-width:480px;margin:0 auto;padding:16px 14px;">
+    <div id="adminContent"></div>
+  </div>
+</div>
+
+<div class="main-app" id="mainApp">
+  <header>
+    <div style="position:absolute;top:14px;right:16px;">
+      <span onclick="showAdminLogin()" style="font-size:11px;color:rgba(255,255,255,0.5);cursor:pointer;text-decoration:underline;">Admin</span>
+    </div>
+    <div class="emoji">⛪</div>
+    <h1>Sunday School Volunteer Roster</h1>
+    <p>7th & 8th Grade — May to July 2026</p>
+    <div class="you-badge" id="youBadge"></div>
+    <span class="signout" onclick="signOut()">Not you? Sign out</span>
+  </header>
+  <div class="container">
+    <div id="myCard"></div>
+  </div>
+</div>
+
+<!-- CHILD INFO SCREEN -->
+<div id="childInfoScreen" style="display:none;min-height:100vh;background:#f0eefb;padding-bottom:40px;">
+  <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);padding:28px 20px 24px;text-align:center;color:white;">
+    <div style="font-size:28px;margin-bottom:8px;">👨‍👧</div>
+    <div style="font-size:20px;font-weight:800;margin-bottom:4px;">Your Child's Info</div>
+    <div style="font-size:13px;opacity:0.8;">This only takes a moment — fill in once</div>
+  </div>
+  <div style="max-width:480px;margin:0 auto;padding:20px 16px;">
+    <div style="background:white;border-radius:20px;padding:20px;box-shadow:0 4px 20px rgba(92,74,199,0.1);">
+
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Child's Full Name</div>
+        <input type="text" id="childNameInput" placeholder="Enter your child's name"
+          style="width:100%;padding:13px 14px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;" />
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Grade</div>
+        <div style="display:flex;gap:10px;">
+          <button id="grade7btn" onclick="selectGrade(7)"
+            style="flex:1;padding:13px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:2px solid #ddd8f8;border-radius:12px;background:white;color:#7b7a90;cursor:pointer;transition:all 0.15s;">
+            Grade 7
+          </button>
+          <button id="grade8btn" onclick="selectGrade(8)"
+            style="flex:1;padding:13px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:2px solid #ddd8f8;border-radius:12px;background:white;color:#7b7a90;cursor:pointer;transition:all 0.15s;">
+            Grade 8
+          </button>
+        </div>
+      </div>
+
+      <!-- Teacher assignment banner (shown after grade selected) -->
+      <div id="teacherBanner" style="display:none;border-radius:14px;padding:14px 16px;margin-bottom:16px;text-align:center;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;opacity:0.8;margin-bottom:4px;">Your Child's Teacher</div>
+        <div style="font-size:18px;font-weight:800;" id="teacherName"></div>
+      </div>
+
+      <div id="childInfoError" style="display:none;font-size:13px;color:#e03e3e;font-weight:700;margin-bottom:12px;">❌ Please fill in your child's name and select a grade.</div>
+
+      <button onclick="saveChildInfo()"
+        style="width:100%;padding:15px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);color:white;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;cursor:pointer;">
+        Save & Continue →
+      </button>
+
+      <div style="text-align:center;margin-top:14px;">
+        <span onclick="skipChildInfo()" style="font-size:12px;color:#bbb;cursor:pointer;text-decoration:underline;">Skip for now</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<div class="toast" id="toast"></div>
 
 <script>
-const KEY='care_clock_v6';
-function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return{config:null,sessions:[]};}
-function save(d){try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){}}
+// Phone numbers encoded for privacy — decoded at runtime only
+function dp(e) { return atob(e); }
+const roster = [
+  { date: "May 3",  parents: [{ name: "Zebib",     h: "4692649554", e: "KzE0NjkyNjQ5NTU0", pin: "7677" }, { name: "Tsega",      h: "2149064949", e: "KzEyMTQ5MDY0OTQ5", pin: "8918" }] },
+  { date: "May 10", parents: [{ name: "Abinice",   h: "4693951831", e: "KzE0NjkzOTUxODMx", pin: "7926" }, { name: "Bini",        h: "2145169566", e: "KzEyMTQ1MTY5NTY2", pin: "4338" }] },
+  { date: "May 17", parents: [{ name: "Dahlak",    h: "5106418990", e: "KzE1MTA2NDE4OTkw", pin: "3230" }, { name: "Dr Yemane",   h: "2147498471", e: "KzEyMTQ3NDk4NDcx", pin: "5513" }] },
+  { date: "May 24", parents: [{ name: "Eyasu",     h: "7023721476", e: "KzE3MDIzNzIxNDc2", pin: "3014" }, { name: "Frezghi",     h: "2145178851", e: "KzEyMTQ1MTc4ODUx", pin: "7672" }] },
+  { date: "May 31", parents: [{ name: "Ghirmay",   h: "2145847142", e: "KzEyMTQ1ODQ3MTQy", pin: "4262" }, { name: "Henok H.",    h: "4696882694", e: "KzE0Njk2ODgyNjk0", pin: "4647" }], perf: true },
+  { date: "Jun 7",  parents: [{ name: "Henok M.",  h: "6825574545", e: "KzE2ODI1NTc0NTQ1", pin: "8294" }, { name: "John",        h: "2142991221", e: "KzEyMTQyOTkxMjIx", pin: "1617" }] },
+  { date: "Jun 14", parents: [{ name: "Kiflom",    h: "7866375192", e: "KzE3ODY2Mzc1MTky", pin: "6731" }, { name: "Lucia",       h: "2149008876", e: "KzEyMTQ5MDA4ODc2", pin: "2693" }] },
+  { date: "Jun 21", parents: [{ name: "Mebrahtu",  h: "2148618939", e: "KzEyMTQ4NjE4OTM5", pin: "1849" }, { name: "Mehari",      h: "7146835957", e: "KzE3MTQ2ODM1OTU3", pin: "3647" }] },
+  { date: "Jun 28", parents: [{ name: "Merry",     h: "4153687248", e: "KzE0MTUzNjg3MjQ4", pin: "8024" }, { name: "Mesfin",      h: "4693248549", e: "KzE0NjkzMjQ4NTQ5", pin: "4939" }], perf: true },
+  { date: "Jul 5",  parents: [{ name: "Rahel",     h: "2149942164", e: "KzEyMTQ5OTQyMTY0", pin: "8382" }, { name: "Ruth",        h: "4159008984", e: "KzE0MTU5MDA4OTg0", pin: "7442" }] },
+  { date: "Jul 12", parents: [{ name: "Selam",     h: "4693459379", e: "KzE0NjkzNDU5Mzc5", pin: "7842" }, { name: "Semere",      h: "7204706348", e: "KzE3MjA0NzA2MzQ4", pin: "8673" }] },
+  { date: "Jul 19", parents: [{ name: "Senait H.", h: "4692009220", e: "KzE0NjkyMDA5MjIw", pin: "2220" }, { name: "Senait M.",   h: "6146950610", e: "KzE2MTQ2OTUwNjEw", pin: "5699" }] },
+  { date: "Jul 26", parents: [{ name: "Shalom",    h: "7204721019", e: "KzE3MjA0NzIxMDE5", pin: "7597" }, { name: "Solomon",     h: "2147533005", e: "KzEyMTQ3NTMzMDA1", pin: "3857" }], perf: true },
+  { date: "Aug 2",  parents: [{ name: "Bereket",   h: "5108623261", e: "KzE1MTA4NjIzMjYx", pin: "7618" }, { name: "Betiel",      h: "4698316885", e: "KzE0Njk4MzE2ODg1", pin: "7238" }] },
+  { date: "Aug 9",  parents: [{ name: "Amanuel",   h: "4698106505", e: "KzE0Njk4MTA2NTA1", pin: "5140" }, { name: "Debora",      h: "2148362058", e: "KzEyMTQ4MzYyMDU4", pin: "6339" }] },
+];
 
-let data=load();
-let S={
-  view:data.config?'main':'admin_setup',
-  tab:'clock',
-  in:false,inTime:null,
-  locOk:false,locChecked:false,locDist:null,locErr:null,
-  timer:null,
-  showAdmin:false,
-  adminAuth:false,
-  adminPinning:false
-};
+const avatarColors = [
+  { bg: "#e8e4fb", color: "#3b2f8f" },
+  { bg: "#e0f5ee", color: "#0e6b47" },
+  { bg: "#fce9f0", color: "#8b1a40" },
+  { bg: "#fff0d6", color: "#7a4800" },
+  { bg: "#e4eefb", color: "#1a4a8a" },
+  { bg: "#f0fce8", color: "#2a6b10" },
+];
 
-const ADMIN_PASS='admin1234'; // Default admin password - change in admin panel
-const MAX_DIST_FT=100; // 100 feet radius
+function normalize(p) { return String(p).replace(/\D/g, "").slice(-10); }
+function initials(name) { return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2); }
 
-const $=id=>document.getElementById(id);
-function toRad(v){return v*Math.PI/180;}
-function distFt(a,b,c,d){const R=3958.8,dL=toRad(c-a),dO=toRad(d-b),x=Math.sin(dL/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))*5280;}
-function fT(ts){return new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
-function fT2(ts){return new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});}
-function fD(ts){return new Date(ts).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});}
-function fDs(ts){return new Date(ts).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
-function fEl(ms){const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60;return`${h}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')}`;}
-function fHM(ms){const t=Math.floor(ms/60000),h=Math.floor(t/60),m=t%60;return`${h}h ${m}m`;}
-function ini(n){return(n||'?').trim().split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);}
-function todayS(){const t=new Date().toDateString();return data.sessions.filter(s=>new Date(s.inTime).toDateString()===t);}
-function weekS(){const now=new Date(),d=now.getDay(),st=new Date(now);st.setDate(now.getDate()-d);st.setHours(0,0,0,0);return data.sessions.filter(s=>new Date(s.inTime)>=st);}
-function totMs(arr){return arr.reduce((s,x)=>s+(x.outTime-x.inTime),0);}
-function setMsg(id,html,cls){const e=$(id);if(e){e.className='smsg '+cls;e.innerHTML=html;}}
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbxORxRQdFY3fUZGGVxWadIRBZB_IF5FKWBFFt3pGvBpv31kEEDTkuk480weZIGFlB91Qg/exec";
 
-function render(){
-  const app=$('app');app.innerHTML='';clearInterval(S.timer);
-  if(S.view==='admin_setup'){app.appendChild(bAdminSetup());return;}
-  if(S.showAdmin){app.appendChild(bAdminOverlay());}
-  app.appendChild(bHeader());
-  app.appendChild(bTabs());
-  if(S.tab==='clock'){app.appendChild(bClock());startTick();}
-  else if(S.tab==='log')app.appendChild(bLog());
-  else if(S.tab==='sheet')app.appendChild(bSheet());
+// Local cache so UI stays fast
+const statuses = JSON.parse(localStorage.getItem("rosterStatuses") || "{}");
+function getKey(date, name) { return `${date}__${name}`; }
+function getStatus(date, name) {
+  const normDate = normalizeDate(date);
+  const n = String(name).trim();
+  return statuses[getKey(normDate, n)]
+    || statuses[getKey(date, n)]
+    || statuses[getKey(normDate, n.toLowerCase())]
+    || statuses[getKey(date, n.toLowerCase())]
+    || "pending";
 }
 
-/* ── ADMIN SETUP (first time) ── */
-function bAdminSetup(){
-  const w=document.createElement('div');w.style.padding='1.5rem 0';
-  w.innerHTML=`
-  <div class="card">
-    <div style="text-align:center;margin-bottom:1.5rem">
-      <div style="width:60px;height:60px;border-radius:50%;background:var(--blue-l);display:flex;align-items:center;justify-content:center;margin:0 auto .875rem;font-size:26px">&#128274;</div>
-      <div style="font-size:22px;font-weight:700;color:var(--tx)">Supervisor Setup</div>
-      <div style="font-size:14px;color:var(--tx2);margin-top:4px">Configure Care Clock for your caregiver</div>
-    </div>
-    <div class="admin-badge">&#128274; Supervisor only</div>
-    <div class="fld"><label>Family / Client name</label><input id="af" placeholder="e.g. Brukeyey Family" autocomplete="off"></div>
-    <div class="fld"><label>Caregiver name</label><input id="ac" placeholder="e.g. Edwinia Roberson" autocomplete="off"></div>
-    <div class="fld"><label>Care address (for display)</label><input id="aa" placeholder="9304 Forest Lane, Dallas, TX 75243" autocomplete="off"></div>
-    <div class="fld"><label>Supervisor password</label><input id="ap" type="password" placeholder="Set a password to protect settings" autocomplete="off"><div class="hint">You will need this to access supervisor settings later. Default is: admin1234</div></div>
-    <div class="div"></div>
-    <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:.75rem">Pin the care location</div>
-    <div style="font-size:13px;color:var(--tx2);margin-bottom:.875rem;line-height:1.6;">Go to the care home address and tap the button below to save its exact GPS location. The caregiver must be within <strong>100 ft</strong> of this location to clock in.</div>
-    <div style="background:var(--bg);border:1px dashed var(--bdr2);border-radius:var(--rs);padding:1rem;margin-bottom:.75rem;text-align:center;">
-      <button class="btn bo" id="apin-btn" onclick="adminPin()" style="margin-bottom:8px">&#x1F4CD; Pin care location now</button>
-      <div id="apin-status" style="font-size:12px;min-height:18px;font-variant-numeric:tabular-nums;"></div>
-    </div>
-    <div id="as-msg" class="smsg mneu"></div>
-    <button class="btn bg" id="as-save" onclick="adminSave()">Save &amp; launch app</button>
-  </div>`;
-  return w;
+// Save to both local cache AND Google Sheets
+async function saveStatus(date, name, phone, status) {
+  statuses[getKey(date, name)] = status;
+  localStorage.setItem("rosterStatuses", JSON.stringify(statuses));
+  try {
+    fetch(SHEET_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ date, name, phone, status })
+    });
+  } catch(e) { console.log("Sheet sync failed", e); }
 }
 
-/* ── ADMIN OVERLAY (password protected) ── */
-function bAdminOverlay(){
-  const cfg=data.config||{};
-  const w=document.createElement('div');
-  w.className='admin-overlay';
-  w.onclick=e=>{if(e.target===w){S.showAdmin=false;S.adminAuth=false;render();}};
-
-  if(!S.adminAuth){
-    w.innerHTML=`<div class="admin-modal">
-      <div style="font-size:18px;font-weight:700;color:var(--tx);margin-bottom:4px">Supervisor access</div>
-      <div style="font-size:13px;color:var(--tx2);margin-bottom:1rem">Enter your supervisor password to continue.</div>
-      <div class="fld"><label>Password</label><input id="adm-pw" type="password" placeholder="Enter password" autocomplete="off"></div>
-      <div id="adm-msg" class="smsg merr" style="min-height:16px"></div>
-      <button class="btn bg" onclick="checkAdminPass()">Unlock</button>
-      <button class="btn bo" style="margin-top:.5rem" onclick="closeAdmin()">Cancel</button>
-    </div>`;
-  } else {
-    w.innerHTML=`<div class="admin-modal" style="max-height:90vh;overflow-y:auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <div>
-          <div class="admin-badge">&#128274; Supervisor panel</div>
-          <div style="font-size:18px;font-weight:700;color:var(--tx)">Settings</div>
-        </div>
-        <button style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--tx3)" onclick="closeAdmin()">&#x2715;</button>
-      </div>
-      <div class="fld"><label>Family / Client name</label><input id="cfg-f" value="${cfg.familyName||''}" autocomplete="off"></div>
-      <div class="fld"><label>Caregiver name</label><input id="cfg-c" value="${cfg.caregiverName||''}" autocomplete="off"></div>
-      <div class="fld"><label>Care address (display)</label><input id="cfg-a" value="${cfg.address||''}" autocomplete="off"></div>
-      <div class="fld"><label>New supervisor password</label><input id="cfg-p" type="password" placeholder="Leave blank to keep current" autocomplete="off"></div>
-      <div class="div"></div>
-      <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:.5rem">Care location (GPS)</div>
-      <div class="coord-display">
-        <strong>Current pinned location</strong>
-        ${cfg.lat ? `Lat: ${cfg.lat.toFixed(6)}<br>Lng: ${cfg.lng.toFixed(6)}<br>Radius: 100 ft` : 'No location pinned yet'}
-      </div>
-      <button class="btn bo" id="repin-btn" onclick="adminRepin()" style="margin-bottom:.75rem">&#x1F4CD; Re-pin care location</button>
-      <div id="repin-status" style="font-size:12px;min-height:16px;margin-bottom:.75rem;font-variant-numeric:tabular-nums;color:var(--green-t)"></div>
-      <div id="cfg-msg" class="smsg mneu"></div>
-      <button class="btn bg" style="margin-bottom:.5rem" onclick="adminUpdate()">Save changes</button>
-      <div class="div"></div>
-      <button class="bdel" onclick="adminClearSessions()">Clear all shift data</button>
-    </div>`;
+// Load all statuses from Google Sheets on startup
+// Convert any date format to "Mon D" format matching the roster
+function normalizeDate(dateStr) {
+  if (!dateStr) return "";
+  const s = String(dateStr).trim();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  // Already "May 3" format
+  if (/^[A-Za-z]+ \d+$/.test(s)) return s;
+  // "May 3, 2026" format
+  const m1 = s.match(/^([A-Za-z]+)\s+(\d+),?\s*\d*$/);
+  if (m1) return m1[1].charAt(0).toUpperCase() + m1[1].slice(1,3).toLowerCase() + " " + parseInt(m1[2]);
+  // "03/05/2026" DD/MM/YYYY format (Google Sheets default)
+  const m3 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m3) {
+    const day = parseInt(m3[1]);
+    const month = parseInt(m3[2]) - 1; // month is second part in DD/MM/YYYY
+    return months[month] + " " + day;
   }
-  return w;
+  // "5/3/2026" MM/DD/YYYY format fallback
+  const m2 = s.match(/^(\d+)\/(\d+)\/\d+$/);
+  if (m2) return months[parseInt(m2[1]) - 1] + " " + parseInt(m2[2]);
+  // Try JS Date
+  try {
+    const d = new Date(s);
+    if (!isNaN(d)) return months[d.getMonth()] + " " + d.getDate();
+  } catch(e) {}
+  return s;
 }
 
-/* ── MAIN HEADER ── */
-function bHeader(){
-  const cfg=data.config||{};
-  const d=document.createElement('div');d.className='hrow';d.style.position='relative';
-  d.innerHTML=`
-    <div>
-      <div style="font-size:20px;font-weight:700;color:var(--tx)">${cfg.familyName||'Care Clock'}</div>
-      <div style="font-size:13px;color:var(--tx2);margin-top:2px">${cfg.caregiverName||'Caregiver'}</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <button class="admin-lock" onclick="openAdmin()" title="Supervisor access" style="position:static">&#9881;&#65039;</button>
-      <div class="av">${ini(cfg.caregiverName)}</div>
-    </div>`;
-  return d;
+async function loadStatusesFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("Bad response");
+    const data = await res.json();
+    data.forEach(row => {
+      if (row.date && row.name && row.status) {
+        const normDate = normalizeDate(row.date);
+        const n = String(row.name).trim();
+        // Store all variants
+        statuses[getKey(normDate, n)] = row.status;
+        statuses[getKey(normDate, n.toLowerCase())] = row.status;
+        statuses[getKey(row.date, n)] = row.status;
+        statuses[getKey(row.date, n.toLowerCase())] = row.status;
+        // Also try alternate date interpretation (MM/DD vs DD/MM)
+        const s = String(row.date).trim();
+        const mAlt = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (mAlt) {
+          const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+          // Try MM/DD interpretation too
+          const altDate = months[parseInt(mAlt[1]) - 1] + " " + parseInt(mAlt[2]);
+          statuses[getKey(altDate, n)] = row.status;
+          statuses[getKey(altDate, n.toLowerCase())] = row.status;
+        }
+      }
+    });
+    localStorage.setItem("rosterStatuses", JSON.stringify(statuses));
+  } catch(e) { console.log("Could not load from sheet, using local cache"); }
 }
 
-/* ── TABS ── */
-function bTabs(){
-  const row=document.createElement('div');row.className='tabs';
-  [['clock','Clock'],['log','Today'],['sheet','Timesheet']].forEach(([id,lbl])=>{
-    const b=document.createElement('button');b.className='tab'+(S.tab===id?' on':'');b.textContent=lbl;b.onclick=()=>{S.tab=id;render();};row.appendChild(b);
+let myPhone = localStorage.getItem("myPhone") || "";
+let myName = "", myWeek = null, myParent = null, myPartner = null;
+
+// Load admin overrides — apply phones first, then pins, then names
+const customPins = JSON.parse(localStorage.getItem("customPins") || "{}");
+const customPhones = JSON.parse(localStorage.getItem("customPhones") || "{}");
+const customNames = JSON.parse(localStorage.getItem("customNames") || "{}");
+roster.forEach(week => {
+  week.parents.forEach(p => {
+    if (customPhones[p.name]) { p.h = customPhones[p.name].h; p.e = customPhones[p.name].e; }
+    if (customPins[p.name]) p.pin = customPins[p.name];
+    if (customNames[p.name]) p.name = customNames[p.name];
   });
-  return row;
-}
+});
 
-/* ── CLOCK TAB ── */
-function bClock(){
-  const elapsed=S.in&&S.inTime?Date.now()-S.inTime:0;
-  let gHtml='';
-  if(!S.locChecked){
-    gHtml=`<div class="geo g-neu"><div class="dot da" style="margin-top:3px;flex-shrink:0"></div><span>Tap below to verify your location</span></div>`;
-  } else if(S.locOk){
-    gHtml=`<div class="geo g-ok"><div class="dot dg" style="margin-top:3px;flex-shrink:0"></div><span>You are within range &mdash; ${Math.round(S.locDist)} ft from the care address</span></div>`;
-  } else {
-    const msg=S.locDist!==null
-      ?`You are too far away &mdash; ${Math.round(S.locDist)} ft from the care address. You must be within 100 ft to clock in. Please go to the care location.`
-      :(S.locErr||'Could not get your location. Please try again.');
-    gHtml=`<div class="geo g-fail"><div class="dot dr" style="margin-top:3px;flex-shrink:0"></div><span>${msg}</span></div>`;
+function findMe(phone) {
+  const norm = normalize(phone);
+  if (norm.length < 7) return null;
+  // Search hardcoded + merged roster
+  for (const week of roster) {
+    for (let i = 0; i < week.parents.length; i++) {
+      const p = week.parents[i];
+      if (normalize(p.h) === norm) {
+        const partner = week.parents.find((x, xi) => xi !== i) || null;
+        return { week, me: p, partner };
+      }
+    }
   }
-  const badge=S.in?`<div class="bdg bdg-in"><div class="dot dg"></div>Clocked in</div>`:`<div class="bdg bdg-out"><div class="dot dr"></div>Clocked out</div>`;
-  const mainBtn=S.in
-    ?`<button class="btn br" onclick="doClock()">Clock out</button>`
-    :S.locOk
-      ?`<button class="btn bg" onclick="doClock()">Clock in</button>`
-      :`<button class="btn" disabled>You must be within 100 ft to clock in</button>`;
-  const w=document.createElement('div');
-  w.innerHTML=`
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-      ${badge}
-      <div class="eld" id="eld" style="${S.in?'':'display:none'}">${fEl(elapsed)}</div>
-    </div>
-    <div class="tbig" id="cf">${fT(Date.now())}</div>
-    <div class="dsm">${fD(Date.now())}</div>
-    <div class="div"></div>
-    ${gHtml}
-    <button class="btn bo" style="margin-bottom:.75rem" id="geo-btn" onclick="checkGeo()">&#x1F4CD; Verify my location</button>
-    ${mainBtn}
-    <div class="noti">You must be within 100 ft of ${data.config?.address||'the care address'}</div>
-  </div>
-  <div class="card">
-    <div class="lbl">Today at a glance</div>
-    <div class="mgrid">
-      <div class="met"><div class="ml">Shifts today</div><div class="mv">${todayS().length}</div></div>
-      <div class="met"><div class="ml">Hours today</div><div class="mv">${fHM(totMs(todayS()))}</div></div>
-    </div>
-  </div>`;
-  return w;
+  // Also search newParentsFromSheet directly in case merge didn't happen
+  for (const p of newParentsFromSheet) {
+    if (normalize(p.h) === norm) {
+      // Find or create week
+      let week = roster.find(w => w.date === p.date);
+      if (!week) { week = { date: p.date, parents: [] }; roster.push(week); }
+      if (!week.parents.find(x => x.h === p.h)) week.parents.push({ name: p.name, h: p.h, e: p.e, pin: p.pin });
+      const partner = week.parents.find(x => x.h !== p.h) || null;
+      return { week, me: { name: p.name, h: p.h, e: p.e, pin: p.pin }, partner };
+    }
+  }
+  return null;
 }
 
-/* ── LOG TAB ── */
-function bLog(){
-  const sess=todayS(),total=totMs(sess);
-  const tRows=sess.length?sess.map((s,i)=>`<div class="lrow"><span class="ll">Shift ${i+1} &nbsp; ${fT2(s.inTime)} &ndash; ${fT2(s.outTime)}</span><span class="lv">${fHM(s.outTime-s.inTime)}</span></div>`).join(''):`<div class="emp">No shifts recorded today</div>`;
-  const totHtml=sess.length?`<div class="div"></div><div class="trow"><span style="font-size:14px;font-weight:600;color:var(--tx2)">Total today</span><span style="font-size:16px;font-weight:700;color:var(--tx)">${fHM(total)}</span></div>`:'';
-  const week=weekS(),wt=totMs(week),gr={};
-  week.forEach(s=>{const d=fDs(s.inTime);(gr[d]=gr[d]||[]).push(s);});
-  const wHtml=week.length?Object.entries(gr).map(([day,ss])=>`<div class="wdl">${day}</div>${ss.map((s,i)=>`<div class="lrow"><span class="ll">Shift ${i+1} &nbsp; ${fT2(s.inTime)} &ndash; ${fT2(s.outTime)}</span><span class="lv">${fHM(s.outTime-s.inTime)}</span></div>`).join('')}`).join(''):`<div class="emp">No shifts this week</div>`;
-  const w=document.createElement('div');
-  w.innerHTML=`
-  <div class="card"><div class="lbl">Today's log</div>${tRows}${totHtml}</div>
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-      <div class="lbl" style="margin:0">This week</div>
-      <span style="font-size:14px;font-weight:700;color:var(--green)">${fHM(wt)}</span>
-    </div>
-    ${wHtml}
-  </div>`;
-  return w;
-}
-
-/* ── SHEET TAB ── */
-function bSheet(){
-  const sess=data.sessions.slice().reverse(),total=totMs(data.sessions);
-  const rows=sess.length?sess.map(s=>`<tr><td>${fDs(s.inTime)}</td><td>${fT2(s.inTime)}</td><td>${fT2(s.outTime)}</td><td style="font-weight:700;color:var(--green)">${fHM(s.outTime-s.inTime)}</td></tr>`).join(''):`<tr><td colspan="4" style="text-align:center;color:var(--tx3);padding:2rem">No sessions yet</td></tr>`;
-  const w=document.createElement('div');
-  w.innerHTML=`
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.875rem">
-      <div class="lbl" style="margin:0">All shifts</div>
-      <button class="bsm" onclick="exportCSV()">Export CSV</button>
-    </div>
-    <div class="sscr">
-      <table class="stbl">
-        <thead><tr><th>Date</th><th>In</th><th>Out</th><th>Hours</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    ${sess.length?`<div class="div"></div><div class="trow"><span style="font-size:14px;font-weight:600;color:var(--tx2)">All-time total</span><span style="font-size:16px;font-weight:700;color:var(--tx)">${fHM(total)}</span></div>`:''}
-  </div>`;
-  return w;
-}
-
-/* ── TICK ── */
-function startTick(){
-  S.timer=setInterval(()=>{
-    const cf=$('cf');if(cf)cf.textContent=fT(Date.now());
-    const ed=$('eld');if(ed&&S.in&&S.inTime)ed.textContent=fEl(Date.now()-S.inTime);
-  },1000);
-}
-
-/* ── ADMIN FUNCTIONS ── */
-function openAdmin(){S.showAdmin=true;S.adminAuth=false;render();}
-function closeAdmin(){S.showAdmin=false;S.adminAuth=false;render();}
-
-function checkAdminPass(){
-  const pw=$('adm-pw').value;
-  const stored=data.config?.adminPass||ADMIN_PASS;
-  if(pw===stored){S.adminAuth=true;render();}
-  else{const m=$('adm-msg');if(m){m.textContent='Incorrect password. Try again.';}}
-}
-
-function adminPin(){
-  const btn=$('apin-btn'),st=$('apin-status');
-  if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>Getting GPS...';}
-  if(st){st.style.color='var(--tx3)';st.textContent='Locating...';}
-  if(!navigator.geolocation){
-    if(st){st.style.color='var(--red-t)';st.textContent='Geolocation not supported.';}
-    if(btn){btn.disabled=false;btn.innerHTML='&#x1F4CD; Pin care location now';}
+async function verifyPhone() {
+  const val = document.getElementById("phoneInput").value.trim();
+  const pinVal = document.getElementById("pinInput").value.trim();
+  // Load new parents from sheet first so manually added parents can log in
+  try { await loadNewParentsFromSheet(); } catch(e) {}
+  const found = findMe(val);
+  if (!found) {
+    document.getElementById("verifyError").style.display = "block";
+    document.getElementById("verifyError").textContent = "❌ Phone number not found on the roster.";
     return;
   }
-  navigator.geolocation.getCurrentPosition(pos=>{
-    window._adminPinLat=pos.coords.latitude;
-    window._adminPinLng=pos.coords.longitude;
-    if(st){st.style.color='var(--green-t)';st.textContent=`Pinned: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;}
-    if(btn){btn.disabled=false;btn.innerHTML='&#x2713; Location pinned! Tap again to update';}
-  },err=>{
-    const msg=err.code===1?'Permission denied. Allow location access.':'Could not get location. Try again.';
-    if(st){st.style.color='var(--red-t)';st.textContent=msg;}
-    if(btn){btn.disabled=false;btn.innerHTML='&#x1F4CD; Pin care location now';}
-  },{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+  if (found.me.pin !== pinVal) {
+    document.getElementById("verifyError").style.display = "block";
+    document.getElementById("verifyError").textContent = "❌ Phone number or PIN is incorrect.";
+    return;
+  }
+  myPhone = found.me.h;
+  myName = found.me.name;
+  myWeek = found.week;
+  myParent = found.me;
+  myPartner = found.partner;
+  localStorage.setItem("myPhone", myPhone);
+  showApp();
 }
 
-function adminRepin(){
-  const btn=$('repin-btn'),st=$('repin-status');
-  if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>Getting GPS...';}
-  navigator.geolocation.getCurrentPosition(pos=>{
-    if(data.config){data.config.lat=pos.coords.latitude;data.config.lng=pos.coords.longitude;save(data);}
-    S.locChecked=false;S.locOk=false;
-    if(st){st.textContent=`Updated: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;}
-    if(btn){btn.disabled=false;btn.innerHTML='&#x2713; Re-pinned! Tap again to update';}
-  },err=>{
-    if(st){st.style.color='var(--red-t)';st.textContent=err.code===1?'Permission denied.':'Could not get location.';}
-    if(btn){btn.disabled=false;btn.innerHTML='&#x1F4CD; Re-pin care location';}
-  },{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+function showApp() {
+  document.getElementById("verifyScreen").style.display = "none";
+  document.getElementById("mainApp").style.display = "none";
+  document.getElementById("childInfoScreen").style.display = "none";
+
+  // Check if child info already filled for this parent
+  const childKey = "childInfo__" + myPhone;
+  const existing = localStorage.getItem(childKey);
+
+  if (!existing) {
+    // First time — show child info screen
+    document.getElementById("childInfoScreen").style.display = "block";
+    document.getElementById("childNameInput").value = "";
+    selectedGrade = null;
+    document.getElementById("grade7btn").style.background = "white";
+    document.getElementById("grade7btn").style.color = "#7b7a90";
+    document.getElementById("grade7btn").style.borderColor = "#ddd8f8";
+    document.getElementById("grade8btn").style.background = "white";
+    document.getElementById("grade8btn").style.color = "#7b7a90";
+    document.getElementById("grade8btn").style.borderColor = "#ddd8f8";
+  } else {
+    // Already filled — go straight to main app
+    showMainApp();
+  }
 }
 
-function adminSave(){
-  const f=$('af').value.trim(),c=$('ac').value.trim(),a=$('aa').value.trim(),p=$('ap').value.trim();
-  if(!f||!c||!a){setMsg('as-msg','Please fill in all fields.','merr');return;}
-  if(!window._adminPinLat){setMsg('as-msg','Please pin the care location first.','merr');return;}
-  data.config={
-    familyName:f,caregiverName:c,address:a,
-    lat:window._adminPinLat,lng:window._adminPinLng,
-    adminPass:p||ADMIN_PASS
+const TEACHERS = { 7: "Bereket Isayas", 8: "Amanuel Habte" };
+let selectedGrade = null;
+
+function selectGrade(grade) {
+  selectedGrade = grade;
+  const active = "linear-gradient(135deg,#3b2f8f,#5c4ac7)";
+  const inactive = "white";
+  document.getElementById("grade7btn").style.background = grade === 7 ? active : inactive;
+  document.getElementById("grade7btn").style.color = grade === 7 ? "white" : "#7b7a90";
+  document.getElementById("grade7btn").style.borderColor = grade === 7 ? "#3b2f8f" : "#ddd8f8";
+  document.getElementById("grade8btn").style.background = grade === 8 ? active : inactive;
+  document.getElementById("grade8btn").style.color = grade === 8 ? "white" : "#7b7a90";
+  document.getElementById("grade8btn").style.borderColor = grade === 8 ? "#3b2f8f" : "#ddd8f8";
+
+  // Show teacher banner
+  const teacher = TEACHERS[grade];
+  const banner = document.getElementById("teacherBanner");
+  const teacherEl = document.getElementById("teacherName");
+  if (banner && teacherEl) {
+    teacherEl.textContent = "👨‍🏫 " + teacher;
+    banner.style.display = "block";
+    banner.style.background = grade === 7 ? "#e0f5ee" : "#ede9fb";
+    banner.style.color = grade === 7 ? "#0f6e56" : "#3b2f8f";
+    banner.style.border = "1.5px solid " + (grade === 7 ? "#9fe1cb" : "#c5baf5");
+  }
+}
+
+function saveChildInfo() {
+  const name = document.getElementById("childNameInput").value.trim();
+  if (!name || !selectedGrade) {
+    document.getElementById("childInfoError").style.display = "block";
+    return;
+  }
+  const teacher = TEACHERS[selectedGrade];
+  const childKey = "childInfo__" + myPhone;
+  localStorage.setItem(childKey, JSON.stringify({ name, grade: selectedGrade, teacher }));
+
+  // Sync to Google Sheets so admin can see it from any device
+  fetch(SHEET_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({
+      type: "childInfo",
+      phone: myPhone,
+      parentName: myName,
+      childName: name,
+      grade: selectedGrade,
+      teacher,
+      unassigned: false
+    })
+  }).catch(() => {});
+
+  showMainApp();
+  showToast("✅ " + name + " assigned to " + teacher + "!");
+}
+
+function skipChildInfo() {
+  // Save a placeholder so it doesn't show again this session
+  const childKey = "childInfo__" + myPhone;
+  localStorage.setItem(childKey, JSON.stringify({ name: "", grade: null, skipped: true }));
+  showMainApp();
+}
+
+function getChildInfo() {
+  const childKey = "childInfo__" + myPhone;
+  const raw = localStorage.getItem(childKey);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function showMainApp() {
+  document.getElementById("childInfoScreen").style.display = "none";
+  document.getElementById("mainApp").style.display = "block";
+  document.getElementById("youBadge").textContent = "👤 " + myName;
+  try { renderMyCard(); } catch(e) { console.log("renderMyCard error:", e); }
+  // Load sheet data in background then refresh
+  Promise.all([
+    loadStatusesFromSheet(),
+    loadTrackerFromSheet(myName),
+    loadNewParentsFromSheet()
+  ]).then(() => { try { renderMyCard(); } catch(e){} }).catch(() => {});
+}
+
+function resetChildInfo() {
+  localStorage.removeItem("childInfo__" + myPhone);
+  document.getElementById("mainApp").style.display = "none";
+  showApp();
+}
+
+function signOut() {
+  localStorage.removeItem("myPhone");
+  myPhone = ""; myName = ""; myWeek = null; myParent = null; myPartner = null;
+  document.getElementById("mainApp").style.display = "none";
+  document.getElementById("verifyScreen").style.display = "flex";
+  document.getElementById("phoneInput").value = "";
+  document.getElementById("verifyError").style.display = "none";
+}
+
+async function initTodayPairBanner() {
+  // Render immediately with cached statuses (no wait)
+  try { renderTodayPairBanner(0); } catch(e) {}
+  // Then load fresh statuses from sheet in background and re-render
+  try {
+    await loadStatusesFromSheet();
+    renderTodayPairBanner(bannerOffset);
+  } catch(e) {}
+  // Refresh every 60 seconds
+  setTimeout(() => initTodayPairBanner(), 60000);
+}
+
+let bannerOffset = 0; // 0 = current/next, 1 = 1 week back, 2 = 2 weeks back etc.
+
+function renderTodayPairBanner(offset) {
+  if (offset !== undefined) bannerOffset = offset;
+  const now = getMockNow();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const todayStr = `${months[now.getMonth()]} ${now.getDate()}`;
+  const isSunday = now.getDay() === 0;
+  const isPast12 = now.getHours() >= 12;
+
+  const banner = document.getElementById("todayPairBanner");
+  if (!banner) return;
+
+  // Build sorted list of all roster weeks
+  const sortedWeeks = roster.slice().sort((a, b) => {
+    const parse = d => { const [m,day] = d.split(" "); return new Date(2026, months.indexOf(m), parseInt(day)); };
+    return parse(a.date) - parse(b.date);
+  });
+
+  // Find current display index
+  let currentIndex;
+  if (isSunday && !isPast12) {
+    currentIndex = sortedWeeks.findIndex(w => w.date === todayStr);
+    if (currentIndex === -1) currentIndex = sortedWeeks.findIndex(w => {
+      const [m,d] = w.date.split(" ");
+      return new Date(2026, months.indexOf(m), parseInt(d)) >= now;
+    });
+  } else {
+    currentIndex = sortedWeeks.findIndex(w => {
+      const [m,d] = w.date.split(" ");
+      return new Date(2026, months.indexOf(m), parseInt(d)) > now;
+    });
+    if (currentIndex === -1) currentIndex = sortedWeeks.length - 1;
+  }
+
+  const displayIndex = currentIndex - bannerOffset;
+  if (displayIndex < 0 || !sortedWeeks[displayIndex]) { 
+    banner.innerHTML = ""; 
+    return; 
+  }
+
+  const displayWeek = sortedWeeks[displayIndex];
+  banner.style.display = "block";
+
+  const isCurrentWeek = displayIndex === currentIndex;
+  const isPastWeek = displayIndex < currentIndex;
+
+  const parentColors = [
+    { bg: "linear-gradient(135deg,#e05c8a,#993556)", light: "rgba(224,92,138,0.25)", border: "rgba(224,92,138,0.5)" },
+    { bg: "linear-gradient(135deg,#17b8d4,#0a6b7a)", light: "rgba(23,184,212,0.25)", border: "rgba(23,184,212,0.5)" },
+  ];
+
+  const label = isCurrentWeek && isSunday && !isPast12
+    ? `<span style="font-family:'Noto Serif Ethiopic',serif;font-size:13px;font-weight:800;color:#FFD700;text-shadow:0 0 12px rgba(255,215,0,0.5);">ሎሚ ዝተሓጋገዙ ወለዲ</span>`
+    : isPastWeek
+    ? `<span style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.7);">📅 ${displayWeek.date}</span>`
+    : `<div style="text-align:center;">
+        <div style="display:inline-block;background:linear-gradient(135deg,#FFD700,#ff9500);color:#0d0b1f;font-size:11px;font-weight:900;padding:4px 14px;border-radius:20px;letter-spacing:0.5px;box-shadow:0 0 16px rgba(255,215,0,0.5);margin-bottom:4px;">🔔 UPCOMING SUNDAY</div>
+        <div style="font-size:15px;font-weight:900;color:white;text-shadow:0 0 10px rgba(255,255,255,0.4);">📅 ${displayWeek.date}</div>
+      </div>`;
+
+  const canGoBack = displayIndex > 0;
+  const canGoForward = bannerOffset > 0;
+
+  const backBtn = canGoBack
+    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer;" onclick="renderTodayPairBanner(${bannerOffset + 1})">
+        <div style="color:#22a06b;font-size:22px;font-weight:900;line-height:1;">←</div>
+        <span style="font-family:'Noto Serif Ethiopic',serif;font-size:10px;font-weight:800;color:#ffffff;text-align:center;line-height:1.4;max-width:72px;">ዝሓለፈ ሰሙን ዝነበሩ ስድራ</span>
+      </div>`
+    : `<div style="width:32px;"></div>`;
+
+  const forwardBtn = canGoForward
+    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer;" onclick="renderTodayPairBanner(${bannerOffset - 1})">
+        <div style="color:#22a06b;font-size:22px;font-weight:900;line-height:1;">→</div>
+      </div>`
+    : `<div style="width:32px;"></div>`;
+
+  banner.innerHTML = `
+    <div style="background:linear-gradient(135deg,#0d0b1f,#1a1535,#2d2060);border-radius:20px;padding:16px;color:white;box-shadow:0 8px 32px rgba(13,11,31,0.4);border:1px solid rgba(255,255,255,0.1);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+        ${backBtn}
+        <div style="flex:1;text-align:center;">${label}</div>
+        ${forwardBtn}
+      </div>
+      ${isPastWeek ? `<div style="text-align:center;font-size:10px;font-weight:800;color:rgba(255,255,255,0.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:1.5px;">Past Sunday</div>` : ""}
+      <div style="display:flex;gap:10px;">
+        ${displayWeek.parents.map((p, i) => {
+          const s = getStatus(displayWeek.date, p.name);
+          const confirmed = s === "confirmed";
+          const c = parentColors[i % parentColors.length];
+          return `
+          <div style="flex:1;background:${confirmed ? "rgba(34,160,107,0.2)" : c.light};border:1.5px solid ${confirmed ? "rgba(34,160,107,0.5)" : c.border};border-radius:16px;padding:14px;text-align:center;">
+            <div style="width:48px;height:48px;border-radius:50%;background:${c.bg};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;margin:0 auto 10px;box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+              ${p.name.charAt(0)}
+            </div>
+            <div style="font-size:15px;font-weight:800;color:white;margin-bottom:6px;">${p.name}</div>
+            <div style="display:inline-block;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;
+              background:${confirmed ? "#22a06b" : isPastWeek ? "rgba(200,50,50,0.3)" : "rgba(0,87,183,0.08)"};
+              color:#ffffff;
+              border:${confirmed ? "none" : isPastWeek ? "2px solid rgba(255,100,100,0.6)" : "2px solid rgba(100,180,255,0.9)"};
+              text-shadow:${confirmed ? "none" : "0 0 10px rgba(100,180,255,0.5)"};">
+              ${confirmed ? "✅" : isPastWeek ? "❌ Did not serve" : "Not In Class Yet"}
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+      ${displayWeek.perf ? `<div style="text-align:center;margin-top:12px;font-size:12px;font-weight:800;color:rgba(255,215,0,0.9);background:rgba(255,215,0,0.1);border-radius:10px;padding:6px;">⭐ Performance Sunday</div>` : ""}
+    </div>`;
+
+  // Auto-refresh handled by initTodayPairBanner
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  // Load statuses from sheet then render banner — refreshes every 60s
+  try { initTodayPairBanner(); } catch(e) {}
+
+  // Load new parents first so manually added parents can auto-login
+  try { await loadNewParentsFromSheet(); } catch(e) {}
+
+  try {
+    if (myPhone) {
+      const found = findMe(myPhone);
+      if (found) {
+        myName = found.me.name;
+        myWeek = found.week;
+        myParent = found.me;
+        myPartner = found.partner;
+        showMainApp(); // returning user — skip child info screen
+      } else {
+        // Phone not found even after loading sheet — clear it
+        localStorage.removeItem("myPhone");
+        myPhone = "";
+      }
+    }
+  } catch(e) {
+    console.log("Auto-login failed:", e);
+    localStorage.removeItem("myPhone");
+  }
+  try {
+    document.getElementById("phoneInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") verifyPhone();
+    });
+    document.getElementById("pinInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") verifyPhone();
+    });
+  } catch(e) {}
+});
+
+// ── MOCK TESTING CONTROLS ──────────────────────────────
+let mockOverride = null;
+
+let mockStartReal = null;
+let mockStartTime = null;
+let rollCallInterval = null;
+
+function getMockNow() {
+  if (!mockOverride) return new Date();
+  // If mock was just set, start advancing from that point
+  if (!mockStartReal) {
+    mockStartReal = Date.now();
+    mockStartTime = new Date(mockOverride);
+  }
+  const elapsed = Date.now() - mockStartReal;
+  return new Date(mockStartTime.getTime() + elapsed);
+}
+
+function isAttendanceWindow() {
+  const now = getMockNow();
+  return now.getDay() === 0 && now.getHours() >= 10;
+}
+
+function isTodayMyDate() {
+  const now = getMockNow();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const todayStr = `${months[now.getMonth()]} ${now.getDate()}`;
+  return todayStr === myWeek.date;
+}
+
+function setMock(scenario) {
+  const parts = myWeek.date.split(" ");
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const monthIndex = monthNames.indexOf(parts[0]);
+  const day = parseInt(parts[1]);
+  const year = 2026;
+
+  if (scenario === "before") {
+    mockOverride = new Date(year, monthIndex, day - 1, 12, 0, 0);
+  } else if (scenario === "sunday_before10") {
+    mockOverride = new Date(year, monthIndex, day, 9, 0, 0);
+  } else if (scenario === "sunday_after10") {
+    mockOverride = new Date(year, monthIndex, day, 10, 30, 0);
+  } else if (scenario === "rollcall_before") {
+    mockOverride = new Date(year, monthIndex, day, 10, 14, 0);
+  } else if (scenario === "rollcall_open") {
+    mockOverride = new Date(year, monthIndex, day, 10, 16, 0);
+  } else if (scenario === "rollcall_closed") {
+    mockOverride = new Date(year, monthIndex, day, 10, 26, 0);
+  } else {
+    mockOverride = null;
+  }
+  renderMyCard();
+  const badge = document.getElementById("mockBadge");
+  const labels = {
+    before: "📅 Simulating: Day before (Saturday noon)",
+    sunday_before10: "⏰ Simulating: Sunday 9:00 AM (before class)",
+    sunday_after10: "✅ Simulating: Sunday 10:30 AM (class time)",
+    rollcall_before: "🔔 Simulating: Sunday 10:14 AM (1 min before roll call)",
+    rollcall_open: "📋 Simulating: Sunday 10:16 AM (roll call OPEN)",
+    rollcall_closed: "🔴 Simulating: Sunday 10:26 AM (roll call CLOSED)",
+    real: "🕐 Using real time"
   };
-  save(data);S.view='main';S.tab='clock';render();
+  badge.textContent = labels[scenario];
+  badge.style.display = "block";
 }
 
-function adminUpdate(){
-  const f=$('cfg-f').value.trim(),c=$('cfg-c').value.trim(),a=$('cfg-a').value.trim(),p=$('cfg-p').value.trim();
-  if(!f||!c||!a){setMsg('cfg-msg','Please fill in all fields.','merr');return;}
-  data.config={...data.config,familyName:f,caregiverName:c,address:a};
-  if(p)data.config.adminPass=p;
-  save(data);
-  S.locChecked=false;S.locOk=false;
-  setMsg('cfg-msg','Saved!','mok');
-  setTimeout(()=>{closeAdmin();},800);
+function renderMyCard() {
+  try {
+  const status = getStatus(myWeek.date, myParent.name);
+
+  let respondHTML = "";
+  const alreadyConfirmed = getStatus(myWeek.date, myParent.name) === "confirmed";
+
+  if (alreadyConfirmed) {
+    respondHTML = `
+      <div class="respond-section">
+        <div class="responded-banner responded-confirmed">
+          ✅ Attendance confirmed — Thank you! 🙏
+        </div>
+      </div>`;
+  } else if (isAttendanceWindow() && isTodayMyDate()) {
+    respondHTML = `
+      <div class="respond-section">
+        <div class="respond-label" style="font-family:'Noto Serif Ethiopic',serif;font-size:13px;margin-bottom:8px;">ምርካብኩም ኣረጋግጹ</div>
+        <div class="respond-btns">
+          <button class="respond-btn btn-confirm" onclick="quickRespond('confirmed')">✅ Confirm Attendance</button>
+        </div>
+      </div>`;
+  } else if (!isTodayMyDate()) {
+    // Calculate target date for countdown
+    const parts = myWeek.date.split(" ");
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const targetMonth = monthNames.indexOf(parts[0]);
+    const targetDay = parseInt(parts[1]);
+    const targetDate = new Date(2026, targetMonth, targetDay, 10, 0, 0);
+
+    respondHTML = `
+      <div class="respond-section">
+        <div style="text-align:center;margin-bottom:14px;">
+          <div style="display:inline-block;background:linear-gradient(135deg,#5c4ac7,#8b6de8);border-radius:20px;padding:12px 20px;">
+            <div style="font-size:15px;font-weight:800;color:#ffffff;letter-spacing:0.5px;margin-bottom:6px;font-family:'Noto Serif Ethiopic',serif;text-shadow:0 2px 8px rgba(0,0,0,0.25);">Attendance ናይዚ ቤተሰብ ዝኽፈተሉ መዓልቲ</div>
+            <div style="font-size:18px;font-weight:800;color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.2);">📅 ${myWeek.date} &nbsp;·&nbsp; 10:00 AM</div>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border-radius:16px;padding:18px 12px;">
+          <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase;text-align:center;margin-bottom:12px;">Countdown to class day</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="countdownGrid">
+            <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 4px;text-align:center;">
+              <div style="font-size:24px;font-weight:800;color:white;" id="cdDays">--</div>
+              <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.7);margin-top:2px;">DAYS</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 4px;text-align:center;">
+              <div style="font-size:24px;font-weight:800;color:white;" id="cdHours">--</div>
+              <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.7);margin-top:2px;">HOURS</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 4px;text-align:center;">
+              <div style="font-size:24px;font-weight:800;color:white;" id="cdMins">--</div>
+              <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.7);margin-top:2px;">MINS</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 4px;text-align:center;">
+              <div style="font-size:24px;font-weight:800;color:white;" id="cdSecs">--</div>
+              <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.7);margin-top:2px;">SECS</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    // Start countdown after render
+    setTimeout(() => {
+      const tick = () => {
+        const now = getMockNow();
+        const diff = targetDate - now;
+        if (diff <= 0) { renderMyCard(); return; }
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        const days = document.getElementById("cdDays");
+        const hours = document.getElementById("cdHours");
+        const mins = document.getElementById("cdMins");
+        const secs = document.getElementById("cdSecs");
+        if (days) days.textContent = String(d).padStart(2,"0");
+        if (hours) hours.textContent = String(h).padStart(2,"0");
+        if (mins) mins.textContent = String(m).padStart(2,"0");
+        if (secs) secs.textContent = String(s).padStart(2,"0");
+        if (days) setTimeout(tick, 1000);
+      };
+      tick();
+    }, 100);
+  } else {
+    respondHTML = `
+      <div class="respond-section">
+        <div style="text-align:center;font-size:13px;color:var(--muted);padding:10px 0;">
+          ⏰ Confirmation opens at <strong>10:00 AM</strong> on your Sunday
+        </div>
+      </div>`;
+  }
+
+  // Find week index for color
+  const wi = roster.findIndex(w => w.date === myWeek.date);
+  const weekColors = [
+    "linear-gradient(135deg,#5c4ac7,#8b6de8)",
+    "linear-gradient(135deg,#0f6e56,#1db88a)",
+    "linear-gradient(135deg,#993556,#e05c8a)",
+    "linear-gradient(135deg,#185fa5,#4a9de8)",
+    "linear-gradient(135deg,#b8860b,#f5a623)",
+    "linear-gradient(135deg,#a32d2d,#e85c5c)",
+    "linear-gradient(135deg,#3b6d11,#72c435)",
+    "linear-gradient(135deg,#5a3e8a,#a07de0)",
+    "linear-gradient(135deg,#b8860b,#f5a623)",
+    "linear-gradient(135deg,#0a6b7a,#17b8d4)",
+    "linear-gradient(135deg,#7a3b10,#d4702a)",
+    "linear-gradient(135deg,#2d6b4a,#52c48a)",
+    "linear-gradient(135deg,#b8860b,#f5a623)",
+  ];
+  const weekBg = myWeek.perf ? "linear-gradient(135deg,#b8860b,#f5a623)" : (weekColors[wi] || weekColors[0]);
+
+  document.getElementById("myCard").innerHTML = `
+    <div style="min-height:100vh;background:#f0eefb;padding:0 0 48px;">
+
+      <!-- TOP HERO -->
+      <div style="background:${weekBg};padding:40px 24px 60px;text-align:center;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-30px;left:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
+        <div style="position:absolute;bottom:-20px;right:-20px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
+
+        <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;">⛪ Sunday School</div>
+
+        <!-- Big avatar -->
+        <div style="width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,0.2);border:4px solid rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:38px;font-weight:800;color:white;">
+          ${initials(myParent.name)}
+        </div>
+        <div style="font-size:26px;font-weight:800;color:white;margin-bottom:4px;">${myParent.name}</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.85);margin-bottom:10px;">${dp(myParent.e)}</div>
+        ${(function(){ try {
+          const ci = getChildInfo();
+          if (ci && ci.name) return '<div style="display:inline-block;background:rgba(255,255,255,0.2);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;color:white;margin-bottom:6px;">👦 ' + ci.name + ' &nbsp;·&nbsp; Grade ' + ci.grade + ' &nbsp;<span style="opacity:0.7;cursor:pointer;" onclick="resetChildInfo()">✏️</span></div><div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:10px;margin-left:4px;">👨‍🏫 ' + (ci.teacher || TEACHERS[ci.grade] || "") + '</div>';
+          return '<div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:10px;cursor:pointer;" onclick="resetChildInfo()">+ Add child info</div>';
+        } catch(e){ return ""; } })()}
+
+        <!-- Date pill -->
+        <div style="display:inline-block;background:rgba(255,255,255,0.2);backdrop-filter:blur(8px);border:1.5px solid rgba(255,255,255,0.35);border-radius:30px;padding:10px 24px;">
+          <div style="font-size:12px;font-family:'Noto Serif Ethiopic',serif;color:#ffffff;font-weight:800;margin-bottom:2px;text-shadow:0 1px 4px rgba(0,0,0,0.2);">ዝተመደብኩምሉ መዓልቲ</div>
+          <div style="font-size:20px;font-weight:800;color:white;">📅 ${myWeek.date}</div>
+        </div>
+
+        ${myWeek.perf ? '<div style="margin-top:14px;display:inline-block;background:rgba(255,255,255,0.25);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;color:white;">⭐ Performance Sunday</div>' : ""}
+      </div>
+
+      <!-- PARTNER CARD -->
+      ${myPartner ? '<div style="margin:-28px 20px 0;background:white;border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,0.13);padding:20px;position:relative;z-index:2;"><div style="display:inline-block;background:linear-gradient(135deg,#5c4ac7,#8b6de8);border-radius:20px;padding:10px 20px;margin-bottom:14px;"><div style="font-size:14px;font-family:\'Noto Serif Ethiopic\',serif;font-weight:800;color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.2);letter-spacing:0.5px;">ምሳኻትኩም ዝተመደበት ስድራቤት</div></div><div style="display:flex;align-items:center;gap:14px;"><div style="width:58px;height:58px;border-radius:50%;background:' + weekBg + ';display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:white;flex-shrink:0;">' + initials(myPartner.name) + '</div><div><div style="font-size:18px;font-weight:800;color:#1a1535;">' + myPartner.name + '</div><div style="font-size:13px;color:#7b7a90;margin-top:2px;">' + dp(myPartner.e) + '</div></div></div></div>' : ""}
+
+      <!-- ATTENDANCE SECTION -->
+      <div style="margin:16px 20px 0;background:white;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.07);padding:20px;">
+        ${respondHTML}
+      </div>
+
+      ${(function(){ try { return renderParentTracker(); } catch(e) { return ""; } })()}
+
+    </div>`;
+  } catch(e) {
+    console.log("renderMyCard error:", e);
+    document.getElementById("myCard").innerHTML = "<p style='padding:20px;text-align:center;color:#7b7a90;'>Loading your assignment...</p>";
+  }
 }
 
-function adminClearSessions(){
-  if(!confirm('Delete ALL shift records? This cannot be undone.'))return;
-  data.sessions=[];save(data);
-  setMsg('cfg-msg','All shift data cleared.','mok');
-  setTimeout(()=>{closeAdmin();},800);
+async function quickRespond(status) {
+  await saveStatus(myWeek.date, myParent.name, myParent.h, status);
+  renderMyCard();
+  if (status === "confirmed") showToast("✅ Attendance confirmed! Thank you 🙏");
 }
 
-/* ── GEOLOCATION CHECK ── */
-function checkGeo(){
-  const btn=$('geo-btn');
-  if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>Getting location...';}
-  if(!navigator.geolocation){S.locChecked=true;S.locOk=false;S.locErr='Geolocation not supported on this device.';render();return;}
-  if(!data.config?.lat){S.locChecked=true;S.locOk=false;S.locErr='No care location set. Contact your supervisor.';render();return;}
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      const d=distFt(pos.coords.latitude,pos.coords.longitude,data.config.lat,data.config.lng);
-      S.locChecked=true;S.locDist=d;S.locOk=d<=MAX_DIST_FT;S.locErr=null;
-      render();
-    },
-    err=>{
-      S.locChecked=true;S.locOk=false;S.locDist=null;
-      S.locErr=err.code===1?'Location permission denied. Please allow location access in your browser settings.':'Could not get your location. Please try again.';
-      render();
-    },
-    {enableHighAccuracy:true,timeout:12000,maximumAge:30000}
-  );
+function renderRoster() {
+  const container = document.getElementById("roster");
+  container.innerHTML = "";
+
+  const cardColors = [
+    { bg: "linear-gradient(135deg,#5c4ac7,#8b6de8)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // purple - May 3
+    { bg: "linear-gradient(135deg,#0f6e56,#1db88a)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // teal - May 10
+    { bg: "linear-gradient(135deg,#993556,#e05c8a)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // pink - May 17
+    { bg: "linear-gradient(135deg,#185fa5,#4a9de8)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // blue - May 24
+    { bg: "linear-gradient(135deg,#b8860b,#f5a623)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // gold - May 31 perf
+    { bg: "linear-gradient(135deg,#a32d2d,#e85c5c)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // red - Jun 7
+    { bg: "linear-gradient(135deg,#3b6d11,#72c435)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // green - Jun 14
+    { bg: "linear-gradient(135deg,#5a3e8a,#a07de0)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // violet - Jun 21
+    { bg: "linear-gradient(135deg,#b8860b,#f5a623)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // gold - Jun 28 perf
+    { bg: "linear-gradient(135deg,#0a6b7a,#17b8d4)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // cyan - Jul 5
+    { bg: "linear-gradient(135deg,#7a3b10,#d4702a)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // burnt orange - Jul 12
+    { bg: "linear-gradient(135deg,#2d6b4a,#52c48a)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // emerald - Jul 19
+    { bg: "linear-gradient(135deg,#b8860b,#f5a623)", text: "#fff", sub: "rgba(255,255,255,0.75)", avatarBg: "rgba(255,255,255,0.2)", avatarColor: "#fff" },  // gold - Jul 26 perf
+  ];
+
+  roster.forEach((week, wi) => {
+    const isMine = myWeek && week.date === myWeek.date;
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "margin-bottom:18px;animation:fadeUp 0.4s ease both;";
+    wrapper.style.animationDelay = `${wi * 0.05}s`;
+
+    // Date header
+    const dateHeader = document.createElement("div");
+    dateHeader.style.cssText = `display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;`;
+    const perfTag = week.perf ? '<span style="font-size:11px;font-weight:800;background:linear-gradient(135deg,#b8860b,#f5a623);color:white;padding:3px 9px;border-radius:20px;">⭐ Performance</span>' : "";
+    dateHeader.innerHTML = `
+      <div style="font-size:14px;font-weight:800;color:${isMine ? "#3b2f8f" : week.perf ? "#b8860b" : "#7b7a90"};">
+        📅 ${week.date}${isMine ? " 👈 Your week" : ""}
+      </div>
+      ${perfTag}`;
+
+    // Parents grid
+    const grid = document.createElement("div");
+    grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:10px;";
+
+    week.parents.forEach((p, pi) => {
+      const isMe = p.h === myPhone;
+      const c = week.perf
+        ? { bg: "linear-gradient(135deg,#b8860b,#f5a623)", text: "#fff", sub: "rgba(255,255,255,0.8)", avatarBg: "rgba(255,255,255,0.25)", avatarColor: "#fff" }
+        : cardColors[wi];
+      const tile = document.createElement("div");
+      tile.style.cssText = `
+        background:${c.bg};
+        border-radius:16px;
+        padding:16px 14px;
+        position:relative;
+        box-shadow:0 4px 16px rgba(0,0,0,0.13);
+        ${isMe ? "box-shadow:0 4px 20px rgba(92,74,199,0.35),0 0 0 3px #fff,0 0 0 5px #5c4ac7;" : ""}
+        transition:transform 0.15s;
+      `;
+      tile.innerHTML = `
+        <div style="width:48px;height:48px;border-radius:50%;background:${c.avatarBg};display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:${c.avatarColor};margin-bottom:10px;border:2px solid rgba(255,255,255,0.3);">
+          ${initials(p.name)}
+        </div>
+        <div style="font-size:14px;font-weight:800;color:#ffffff;margin-bottom:3px;text-shadow:0 1px 3px rgba(0,0,0,0.2);">${p.name}${isMe ? " 👈" : ""}</div>
+        <div style="font-size:12px;font-weight:700;color:#ffffff;letter-spacing:0.3px;text-shadow:0 1px 3px rgba(0,0,0,0.2);">${dp(p.e)}</div>
+      `;
+      grid.appendChild(tile);
+    });
+
+    wrapper.appendChild(dateHeader);
+    wrapper.appendChild(grid);
+    container.appendChild(wrapper);
+  });
 }
 
-/* ── CLOCK IN / OUT ── */
-function doClock(){
-  if(S.in){data.sessions.push({inTime:S.inTime,outTime:Date.now()});save(data);S.in=false;S.inTime=null;}
-  else{S.in=true;S.inTime=Date.now();}
-  render();
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3000);
 }
 
-/* ── EXPORT CSV ── */
-function exportCSV(){
-  const hdr=['Date','Clock In','Clock Out','Duration (hrs)','Duration (min)'];
-  const rows=data.sessions.map(s=>{const ms=s.outTime-s.inTime;return[fDs(s.inTime),fT2(s.inTime),fT2(s.outTime),(ms/3600000).toFixed(2),Math.round(ms/60000)];});
-  const csv=[hdr,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=`${(data.config?.caregiverName||'caregiver').replace(/\s+/g,'_')}_timesheet.csv`;a.click();URL.revokeObjectURL(url);
+// ── ADMIN ─────────────────────────────────────────────
+const ADMIN_PASSWORD = "Jesusislord";
+const ADVOCATE_PASSWORD = "Jesusislord4Lemlem";
+const ROLL_CALL_PASSWORD = "JesusislordRollCall";
+
+function showAdminLogin() {
+  document.getElementById("verifyScreen").style.display = "none";
+  document.getElementById("mainApp").style.display = "none";
+  document.getElementById("adminDash").style.display = "none";
+  document.getElementById("adminLogin").style.display = "flex";
+}
+function showVerify() {
+  const ids = ["adminLogin","adminDash","advocateDash","mainApp","childInfoScreen","rollCallDash"];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
+  document.getElementById("verifyScreen").style.display = "flex";
+  try { localStorage.removeItem("myPhone"); } catch(e) {}
+  clearInterval(rollCallInterval);
+  myPhone = ""; myName = ""; myWeek = null; myParent = null; myPartner = null;
 }
 
-render();
+async function verifyAdmin() {
+  const pw = document.getElementById("adminPwInput").value;
+  if (pw === ADMIN_PASSWORD) {
+    document.getElementById("adminLogin").style.display = "none";
+    document.getElementById("adminDash").style.display = "block";
+    document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
+    await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
+    renderAdminDash();
+  } else if (pw === ADVOCATE_PASSWORD) {
+    document.getElementById("adminLogin").style.display = "none";
+    document.getElementById("advocateDash").style.display = "block";
+    document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">⏳ Loading data from server...</div>`;
+    await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
+    await renderAdvocateDash();
+  } else if (pw === ROLL_CALL_PASSWORD) {
+    document.getElementById("adminLogin").style.display = "none";
+    showRollCallDash();
+  } else {
+    document.getElementById("adminError").style.display = "block";
+  }
+}
+
+// ── ADVOCATE PORTAL ───────────────────────────────────
+function getAdvocateNotes(parentName) {
+  const raw = localStorage.getItem("advocateNotes__" + parentName);
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveAdvocateNotes(parentName, notes) {
+  localStorage.setItem("advocateNotes__" + parentName, JSON.stringify(notes));
+}
+
+function getStrikeCount(parentName) {
+  // Count Sundays where any category is below 5
+  let strikes = 0;
+  ALL_SUNDAYS.forEach(date => {
+    const data = getTrackerData(parentName, date);
+    if (!data) return;
+    const hasBelow5 = TRACKER_CATEGORIES.some(cat => (data[cat.key] || {}).stars < 5);
+    if (hasBelow5) strikes++;
+  });
+  return strikes;
+}
+
+function getCategoryStrikes(parentName) {
+  // Per category — count Sundays below 5
+  const catStrikes = {};
+  TRACKER_CATEGORIES.forEach(cat => { catStrikes[cat.key] = { count: 0, sundays: [], comments: [] }; });
+  ALL_SUNDAYS.forEach(date => {
+    const data = getTrackerData(parentName, date);
+    if (!data) return;
+    TRACKER_CATEGORIES.forEach(cat => {
+      const entry = data[cat.key] || {};
+      if (entry.stars && entry.stars < 5) {
+        catStrikes[cat.key].count++;
+        catStrikes[cat.key].sundays.push(date);
+        if (entry.comment) catStrikes[cat.key].comments.push({ date, comment: entry.comment });
+      }
+    });
+  });
+  return catStrikes;
+}
+
+async function renderAdvocateDash() {
+  // Clear all local tracker cache and reload fresh from Sheets
+  try {
+    const res = await fetch(SHEET_URL + "?type=tracker&nocache=" + Date.now(), { mode: "cors" });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) {
+        // Clear ALL local tracker data first
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("tracker__")) keysToRemove.push(key);
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        // Now save only what's in Sheets
+        const byParent = {};
+        rows.forEach(r => {
+          if (!byParent[r.parentName]) byParent[r.parentName] = {};
+          if (!byParent[r.parentName][r.date]) byParent[r.parentName][r.date] = {};
+          byParent[r.parentName][r.date][r.category] = { stars: r.stars, comment: r.comment };
+        });
+        Object.entries(byParent).forEach(([parentName, dates]) => {
+          Object.entries(dates).forEach(([date, data]) => {
+            saveTrackerData(parentName, date, data);
+          });
+        });
+      }
+    }
+  } catch(e) { console.log("Could not load tracker for advocate"); }
+
+  const container = document.getElementById("advocateContent");
+
+  // Find all parents with any below-5 ratings
+  const flaggedKids = [];
+  const allParents = [];
+  roster.forEach(week => week.parents.forEach(p => {
+    if (!allParents.find(x => x.name === p.name)) allParents.push(p);
+  }));
+
+  allParents.forEach(p => {
+    const ci = getChildInfoByParent(p.name);
+    if (!ci || !ci.name) return;
+    const strikes = getStrikeCount(p.name);
+    if (strikes === 0) return;
+    const catStrikes = getCategoryStrikes(p.name);
+    const needsEscalation = strikes >= 2;
+    flaggedKids.push({ parent: p, ci, strikes, catStrikes, needsEscalation });
+  });
+
+  if (flaggedKids.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">🌟</div>
+        <div style="font-size:16px;font-weight:800;color:#0f6e56;">All students are doing great!</div>
+        <div style="font-size:13px;color:#7b7a90;margin-top:6px;">No below-5 ratings recorded yet.</div>
+      </div>`;
+    return;
+  }
+
+  // Sort — escalation cases first
+  flaggedKids.sort((a,b) => b.strikes - a.strikes);
+
+  let html = `
+    <div style="background:#e0f5ee;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#0f6e56;font-weight:700;">
+      💚 ${flaggedKids.length} student${flaggedKids.length !== 1 ? "s" : ""} with ratings below 5 stars. ${flaggedKids.filter(k=>k.needsEscalation).length} need${flaggedKids.filter(k=>k.needsEscalation).length === 1 ? "s" : ""} follow-up.
+    </div>`;
+
+  flaggedKids.forEach(({ parent: p, ci, strikes, catStrikes, needsEscalation }) => {
+    const notes = getAdvocateNotes(p.name);
+    const hasSpoken = notes.some(n => n.type === "spoken");
+    const escalated = notes.some(n => n.type === "escalate");
+    const statusColor = escalated ? "#a32d2d" : needsEscalation ? "#854f0b" : "#0f6e56";
+    const statusBg = escalated ? "#fdeaea" : needsEscalation ? "#fff4e0" : "#e0f5ee";
+    const statusLabel = escalated ? "🚨 Escalated to Leadership" : needsEscalation ? "⚠️ Needs Follow-up" : "👁️ Monitoring";
+
+    html += `
+      <div style="background:white;border-radius:18px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.08);">
+
+        <!-- Child Header -->
+        <div style="background:linear-gradient(135deg,#0d3b2e,#0f6e56);padding:14px 16px;display:flex;align-items:center;gap:12px;">
+          <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:white;flex-shrink:0;">
+            ${ci.name.charAt(0)}
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:16px;font-weight:800;color:white;">${ci.name}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.75);">Grade ${ci.grade} &nbsp;·&nbsp; Parent: ${p.name}</div>
+            <div style="font-size:12px;color:#7effd4;font-weight:800;margin-top:3px;">📞 ${(function(){ let ph=""; roster.forEach(function(w){ w.parents.forEach(function(r){ if(r.name===p.name) ph=r.h; }); }); return ph ? "+1"+ph : "No phone on file"; })()}</div>
+          </div>
+          <div style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;">${statusLabel}</div>
+        </div>
+
+        <div style="padding:14px 16px;">
+
+          <!-- Strike Summary -->
+          <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">
+            📊 ${strikes} Sunday${strikes !== 1 ? "s" : ""} with below-5 ratings
+          </div>
+
+          <!-- Category Breakdown -->
+          ${TRACKER_CATEGORIES.map(cat => {
+            const cs = catStrikes[cat.key];
+            if (cs.count === 0) return "";
+            const flagged = cs.count >= 2;
+            return `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:10px;margin-bottom:6px;background:${flagged ? "#fff4e0" : "#f4f3f8"};">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#1a1535;">${cat.label}</div>
+                ${cs.sundays.length > 0 ? `<div style="font-size:11px;color:#7b7a90;margin-top:2px;">📅 ${cs.sundays.join(" · ")}</div>` : ""}
+                ${cs.comments.map(c => `<div style="font-size:11px;color:#7b7a90;font-style:italic;margin-top:2px;">💬 ${c.date}: ${c.comment}</div>`).join("")}
+              </div>
+              <div style="font-size:12px;font-weight:800;padding:3px 10px;border-radius:20px;background:${flagged ? "#f5a623" : "#ede9fb"};color:${flagged ? "white" : "#3b2f8f"};white-space:nowrap;margin-left:8px;">
+                ${cs.count} strike${cs.count !== 1 ? "s" : ""}${flagged ? " ⚠️" : ""}
+              </div>
+            </div>`;
+          }).join("")}
+
+          <!-- Notes Section -->
+          ${notes.length > 0 ? `
+          <div style="margin-top:12px;border-top:0.5px solid #f0eefb;padding-top:12px;">
+            <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">📝 Notes</div>
+            ${notes.map(n => `
+              <div style="background:${n.type === "escalate" ? "#fdeaea" : n.type === "spoken" ? "#e0f5ee" : "#f4f3f8"};border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                  <div style="font-size:11px;font-weight:800;color:${n.type === "escalate" ? "#a32d2d" : n.type === "spoken" ? "#0f6e56" : "#3b2f8f"};">
+                    ${n.type === "escalate" ? "🚨 Escalated" : n.type === "spoken" ? "💬 Spoke with Parent" : "📝 Note"}
+                  </div>
+                  <div style="font-size:10px;color:#7b7a90;">${n.date}</div>
+                </div>
+                <div style="font-size:13px;color:#1a1535;">${n.text}</div>
+              </div>`).join("")}
+          </div>` : ""}
+
+          <!-- Action Buttons -->
+          <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">
+            <textarea id="note_${p.name.replace(/\s/g,'_')}" placeholder="Add a note or conversation summary..." rows="2"
+              style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;border:2px solid #ddd8f8;border-radius:10px;outline:none;resize:none;color:#1a1535;"></textarea>
+            <div style="display:flex;gap:8px;">
+              <button onclick="addAdvocateNote('${p.name}','spoken')"
+                style="flex:1;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;cursor:pointer;background:#e0f5ee;color:#0f6e56;">
+                💬 Spoke with Parent
+              </button>
+              <button onclick="addAdvocateNote('${p.name}','note')"
+                style="flex:1;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;cursor:pointer;background:#ede9fb;color:#3b2f8f;">
+                📝 Add Note
+              </button>
+              ${!escalated && needsEscalation && hasSpoken ? `
+              <button onclick="addAdvocateNote('${p.name}','escalate')"
+                style="flex:1;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;cursor:pointer;background:#fdeaea;color:#a32d2d;">
+                🚨 Escalate
+              </button>` : ""}
+            </div>
+          </div>
+
+        </div>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function addAdvocateNote(parentName, type) {
+  const safeId = parentName.replace(/\s/g,'_');
+  const textarea = document.getElementById("note_" + safeId);
+  const text = textarea ? textarea.value.trim() : "";
+  if (!text && type !== "escalate") { showToast("❌ Please write a note first."); return; }
+  const notes = getAdvocateNotes(parentName);
+  const now = new Date();
+  notes.push({
+    type,
+    text: text || "Escalated to church leadership.",
+    date: now.toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" })
+  });
+  saveAdvocateNotes(parentName, notes);
+  showToast(type === "escalate" ? "🚨 Escalated to church leadership" : type === "spoken" ? "💬 Conversation logged" : "📝 Note saved");
+  renderAdvocateDash();
+}
+
+function getTodayRosterWeeks() {
+  const now = getMockNow();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const todayStr = `${months[now.getMonth()]} ${now.getDate()}`;
+  return roster.filter(w => w.date === todayStr);
+}
+
+function renderAdminTodayHero() {
+  const now = getMockNow();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const todayStr = `${months[now.getMonth()]} ${now.getDate()}`;
+  const isSunday = now.getDay() === 0;
+
+  // Update date display
+  const dateEl = document.getElementById("adminTodayDate");
+  if (dateEl) dateEl.textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, 2026`;
+
+  const heroEl = document.getElementById("adminTodayHero");
+  if (!heroEl) return;
+
+  // Find today's week
+  const todayWeek = roster.find(w => w.date === todayStr);
+
+  if (!isSunday || !todayWeek) {
+    // Find next upcoming Sunday
+    const upcomingWeeks = roster.filter(w => {
+      const parts = w.date.split(" ");
+      const mIdx = months.indexOf(parts[0]);
+      const d = parseInt(parts[1]);
+      const wDate = new Date(2026, mIdx, d);
+      return wDate >= now;
+    });
+    const next = upcomingWeeks[0];
+    if (!next) { heroEl.innerHTML = ""; return; }
+
+    heroEl.innerHTML = `
+      <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Next Sunday — ${next.date}</div>
+        <div style="display:flex;gap:10px;">
+          ${next.parents.map((p,i) => {
+            const s = getStatus(next.date, p.name);
+            const icon = s === "confirmed" ? "✅" : "⏳";
+            return `<div style="flex:1;background:rgba(255,255,255,0.1);border-radius:12px;padding:10px 12px;">
+              <div style="font-size:14px;font-weight:800;color:white;">${p.name}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;">${icon} ${s === "confirmed" ? "Confirmed" : "Pending"}</div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+    return;
+  }
+
+  // It IS today's Sunday — show full hero
+  const parents = todayWeek.parents;
+  heroEl.innerHTML = `
+    <div style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.2);border-radius:16px;padding:16px;backdrop-filter:blur(8px);">
+      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">
+        🗓️ Today's Volunteer Pair
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        ${parents.map((p,i) => {
+          const s = getStatus(todayWeek.date, p.name);
+          const confirmed = s === "confirmed";
+          return `
+          <div style="flex:1;background:${confirmed ? "rgba(34,160,107,0.25)" : "rgba(255,255,255,0.08)"};border:1.5px solid ${confirmed ? "rgba(34,160,107,0.5)" : "rgba(255,255,255,0.15)"};border-radius:14px;padding:12px;text-align:center;">
+            <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:white;margin:0 auto 8px;">
+              ${p.name.charAt(0)}
+            </div>
+            <div style="font-size:14px;font-weight:800;color:white;">${p.name}</div>
+            <div style="margin-top:6px;display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;background:${confirmed ? "#22a06b" : "rgba(255,255,255,0.15)"};color:white;">
+              ${confirmed ? "✅ Confirmed" : "⏳ Pending"}
+            </div>
+            ${!confirmed ? `<div style="margin-top:8px;">
+              <a href="sms:+1${p.h}&body=${encodeURIComponent("Hi " + p.name + ", reminder that you are volunteering at Sunday School today. Please confirm your attendance. Thank you 🙏")}"
+                style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-decoration:none;background:rgba(255,255,255,0.1);padding:4px 10px;border-radius:20px;">
+                📲 Remind
+              </a>
+            </div>` : ""}
+          </div>`;
+        }).join("")}
+      </div>
+      ${todayWeek.perf ? `<div style="text-align:center;font-size:12px;font-weight:800;color:rgba(255,212,100,0.9);">⭐ Performance Sunday — remind parents to help arrange</div>` : ""}
+    </div>`;
+}
+
+function renderAdminDash() {
+  const now = getMockNow();
+  const hour = now.getHours();
+  const isSunday = now.getDay() === 0;
+  const isPastCheck = hour >= 11;
+  const container = document.getElementById("adminContent");
+
+  container.innerHTML = `
+    <!-- TABS -->
+    <div style="display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap;">
+      <button id="tabAttendance" onclick="showAdminTab('attendance')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#3b2f8f;color:white;cursor:pointer;">📋 Attendance</button>
+      <button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔄 Swap</button>
+      <button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔐 PIN</button>
+      <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⭐ Tracker</button>
+      <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🎓 Classes</button>
+      <button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">➕ Parents</button>
+    </div>
+    <div id="tabAttendanceContent"></div>
+    <div id="tabSwapContent" style="display:none;"></div>
+    <div id="tabPinContent" style="display:none;"></div>
+    <div id="tabTrackerContent" style="display:none;"></div>
+    <div id="tabClassesContent" style="display:none;"></div>
+    <div id="tabParentsContent" style="display:none;"></div>
+  `;
+
+  renderAttendanceTab(isSunday, isPastCheck);
+  renderSwapTab();
+  renderPinTab();
+  renderTrackerTab();
+  renderClassesTab();
+  renderParentsTab();
+  renderAdminTodayHero();
+}
+
+function showAdminTab(tab) {
+  ["attendance","swap","pin","tracker","classes","parents"].forEach(t => {
+    const content = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1) + "Content");
+    if (content) content.style.display = tab === t ? "block" : "none";
+    const btn = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1));
+    if (btn) { btn.style.background = tab === t ? "#3b2f8f" : "#ede9fb"; btn.style.color = tab === t ? "white" : "#3b2f8f"; }
+  });
+  // Reload children from sheet when Classes or Tracker tab opened
+  if (tab === "classes" || tab === "tracker") {
+    loadChildrenFromSheet().then(() => {
+      if (tab === "classes") renderClassesTab();
+      if (tab === "tracker") renderTrackerTab();
+    }).catch(() => {
+      if (tab === "classes") renderClassesTab();
+    });
+  }
+}
+
+function renderAttendanceTab(isSunday, isPastCheck) {
+  let html = "";
+  const todayWeeks = getTodayRosterWeeks();
+  if (isSunday && isPastCheck && todayWeeks.length > 0) {
+    const noShows = [];
+    todayWeeks.forEach(week => {
+      week.parents.forEach(p => {
+        if (getStatus(week.date, p.name) !== "confirmed") noShows.push({ ...p, date: week.date });
+      });
+    });
+    if (noShows.length > 0) {
+      html += `<div style="background:#fdeaea;border:1.5px solid #f7bfbf;border-radius:16px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:14px;font-weight:800;color:#a32d2d;margin-bottom:10px;">⚠️ Did not confirm attendance today</div>`;
+      noShows.forEach(p => {
+        const msg = encodeURIComponent(`Hello ${p.name}, we noticed you did not attend Sunday school class today (${p.date}). As a parent volunteer this is an obligation. Please reach out to us if there was an issue. Thank you 🙏`);
+        html += `<div style="background:white;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div><div style="font-size:14px;font-weight:800;">${p.name}</div><div style="font-size:12px;color:#7b7a90;">+1${p.h}</div></div>
+          <a href="sms:+1${p.h}&body=${msg}" style="background:#e03e3e;color:white;font-size:12px;font-weight:800;padding:8px 12px;border-radius:10px;text-decoration:none;white-space:nowrap;">📲 Text</a>
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div style="background:#e4f7ef;border:1.5px solid #a8ecd3;border-radius:16px;padding:16px;margin-bottom:16px;text-align:center;font-size:14px;font-weight:800;color:#0e6b47;">✅ All parents confirmed today!</div>`;
+    }
+  } else if (isSunday && !isPastCheck) {
+    html += `<div style="background:#fff4e0;border:1.5px solid #f5d98a;border-radius:16px;padding:14px;margin-bottom:16px;text-align:center;font-size:13px;font-weight:700;color:#7a4800;">⏰ No-show check activates at <strong>11:00 AM</strong> today</div>`;
+  } else {
+    html += `<div style="background:#f4f3f8;border-radius:16px;padding:14px;margin-bottom:16px;text-align:center;font-size:13px;font-weight:700;color:#7b7a90;">📅 No-show check runs every Sunday at 11:00 AM</div>`;
+  }
+
+  html += `<div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Full Roster Status</div>`;
+  roster.forEach(week => {
+    html += `<div style="background:white;border-radius:14px;margin-bottom:10px;overflow:hidden;box-shadow:0 2px 10px rgba(92,74,199,0.08);">
+      <div style="background:#ede9fb;padding:9px 14px;font-size:13px;font-weight:800;color:#3b2f8f;">📅 ${week.date}${week.perf ? " ⭐" : ""}</div>`;
+    week.parents.forEach(p => {
+      const s = getStatus(week.date, p.name);
+      const icon = s === "confirmed" ? "✅" : "⏳";
+      const label = s === "confirmed" ? "Confirmed" : "Pending";
+      const labelColor = s === "confirmed" ? "#0e6b47" : "#7b7a90";
+      const cancelBtn = s === "confirmed"
+        ? '<button onclick="cancelConfirmation(\'' + week.date + '\',\'' + p.name + '\')" style="margin-left:6px;padding:4px 10px;font-family:\'Nunito\',sans-serif;font-size:11px;font-weight:800;background:#fdeaea;color:#a32d2d;border:1px solid #f7bfbf;border-radius:8px;cursor:pointer;">✕ Cancel</button>'
+        : '<button onclick="adminMarkAttended(\'' + week.date + '\',\'' + p.name + '\',\'' + p.h + '\')" style="margin-left:6px;padding:4px 10px;font-family:\'Nunito\',sans-serif;font-size:11px;font-weight:800;background:#e4f7ef;color:#0e6b47;border:1px solid #a8ecd3;border-radius:8px;cursor:pointer;">✅ Mark Attended</button>';
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
+        <div style="font-size:13px;font-weight:700;">${p.name}</div>
+        <div style="display:flex;align-items:center;"><span style="font-size:12px;font-weight:800;color:${labelColor};">${icon} ${label}</span>${cancelBtn}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  document.getElementById("tabAttendanceContent").innerHTML = html;
+}
+
+function renderSwapTab() {
+  let html = `
+    <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
+      🔄 Select a parent to move them to a different date
+    </div>`;
+
+  html += `<div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Select parent to reassign</div>`;
+
+  let parentOptions = `<select id="swapParentSelect" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;margin-bottom:12px;">
+    <option value="">-- Select a parent --</option>`;
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      parentOptions += `<option value="${week.date}|${p.name}">${p.name} — currently ${week.date}</option>`;
+    });
+  });
+  parentOptions += `</select>`;
+
+  let dateOptions = `<select id="swapDateSelect" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;margin-bottom:16px;">
+    <option value="">-- Move to which date? --</option>`;
+  roster.forEach(week => {
+    dateOptions += `<option value="${week.date}">${week.date}${week.perf ? " ⭐" : ""}</option>`;
+  });
+  dateOptions += `</select>`;
+
+  html += parentOptions;
+  html += `<div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Move to new date</div>`;
+  html += dateOptions;
+  html += `<button onclick="executeSwap()" style="width:100%;padding:14px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);color:white;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;">🔄 Confirm Swap</button>`;
+  html += `<div id="swapResult" style="margin-top:14px;display:none;"></div>`;
+
+  // ── MAKE SOLE CONTACT SECTION ──
+  const pairs = roster.filter(w => w.parents.length === 2);
+  if (pairs.length > 0) {
+    html += `
+    <div style="margin-top:20px;">
+      <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">👤 Make Sole Contact — Remove One from a Pair</div>
+      ${pairs.map(week => `
+        <div style="background:white;border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(92,74,199,0.08);">
+          <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:8px;">📅 ${week.date}</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            ${week.parents.map((p, i) => `
+              <div style="flex:1;min-width:120px;background:#f4f3f8;border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-size:13px;font-weight:800;color:#1a1535;">${p.name}</div>
+                <button onclick="makeSoleContact('${week.date}','${p.h}','${p.name}','${week.parents.find((_,j)=>j!==i).name}','${week.parents.find((_,j)=>j!==i).h}')"
+                  style="margin-top:6px;padding:5px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">
+                  ✕ Remove & keep ${week.parents.find((_,j)=>j!==i).name}
+                </button>
+              </div>`).join('<div style="font-size:16px;color:#bbb;font-weight:700;">↔</div>')}
+          </div>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  // Swap history
+  const history = JSON.parse(localStorage.getItem("swapHistory") || "[]");
+  if (history.length > 0) {
+    html += `<div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px;">Swap History</div>`;
+    history.slice().reverse().forEach(s => {
+      html += `<div style="background:white;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);font-size:13px;">
+        <span style="font-weight:800;">${s.name}</span> moved from <span style="color:#5c4ac7;font-weight:700;">${s.from}</span> → <span style="color:#22a06b;font-weight:700;">${s.to}</span>
+        <div style="font-size:11px;color:#bbb;margin-top:2px;">${s.time}</div>
+      </div>`;
+    });
+  }
+
+  document.getElementById("tabSwapContent").innerHTML = html;
+}
+
+function makeSoleContact(date, removeH, removeName, keepName, keepH) {
+  if (!confirm("Remove " + removeName + " from " + date + "? " + keepName + " will be the sole contact for that Sunday.")) return;
+  // Remove from roster
+  const week = roster.find(w => w.date === date);
+  if (week) week.parents = week.parents.filter(p => p.h !== removeH);
+  // Clean up localStorage
+  localStorage.removeItem("childInfo__" + removeH);
+  childrenSheetData = childrenSheetData.filter(r => r.phone !== removeH);
+  newParentsFromSheet = newParentsFromSheet.filter(p => p.h !== removeH);
+  // Wipe from sheet
+  fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ type:"childInfo", phone: removeH, parentName: removeName, childName:"", grade:0, teacher:"", unassigned:false })
+  }).catch(()=>{});
+  showToast("✅ " + keepName + " is now the sole contact for " + date);
+  renderSwapTab();
+  renderClassesTab();
+}
+
+function adminMarkAttended(date, name, phone) {
+  saveStatus(date, name, phone, "confirmed");
+  showToast("✅ " + name + " marked as attended for " + date);
+  // Re-render attendance tab
+  const now = getMockNow();
+  const isSunday = now.getDay() === 0;
+  const isPastCheck = now.getHours() >= 11;
+  renderAttendanceTab(isSunday, isPastCheck);
+}
+
+function cancelConfirmation(date, name) {
+  statuses[getKey(date, name)] = "pending";
+  localStorage.setItem("rosterStatuses", JSON.stringify(statuses));
+  // Also update Google Sheet
+  const p = roster.flatMap(w => w.parents).find(x => x.name === name);
+  if (p) saveStatus(date, name, p.h, "pending");
+  showToast(`↩️ ${name}'s attendance cancelled`);
+  renderAdminDash();
+}
+
+function renderPinTab() {
+  // Load any custom PINs from localStorage
+  const customPins = JSON.parse(localStorage.getItem("customPins") || "{}");
+
+  let html = `
+    <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
+      🔐 Change any parent's PIN or phone number. Send updates to them privately in Viber.
+    </div>`;
+
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      const currentPin = customPins[p.name] || p.pin;
+      const safeId = p.name.replace(/\s|\./g,'_');
+      html += `
+        <div style="background:white;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 10px rgba(92,74,199,0.08);">
+          <div style="font-size:14px;font-weight:800;color:#1a1535;margin-bottom:2px;">${p.name}</div>
+          <div style="font-size:12px;color:#7b7a90;margin-bottom:10px;">📅 ${week.date}</div>
+
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:800;color:#7b7a90;width:60px;text-transform:uppercase;letter-spacing:0.5px;">Name</div>
+            <input type="text" id="name_${safeId}" value="${p.name}"
+              style="flex:1;padding:8px 10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #ddd8f8;border-radius:10px;outline:none;color:#1a1535;" />
+            <button onclick="updateName('${p.name}','${safeId}')"
+              style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#993556,#e05c8a);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+              Save
+            </button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:800;color:#7b7a90;width:60px;text-transform:uppercase;letter-spacing:0.5px;">Phone</div>
+            <input type="tel" id="phone_${safeId}" value="${dp(p.e)}"
+              style="flex:1;padding:8px 10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #ddd8f8;border-radius:10px;outline:none;color:#3b2f8f;" />
+            <button onclick="updatePhone('${p.name}','${safeId}')"
+              style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#0f6e56,#1db88a);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+              Save
+            </button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:11px;font-weight:800;color:#7b7a90;width:60px;text-transform:uppercase;letter-spacing:0.5px;">PIN</div>
+            <input type="text" id="pin_${safeId}" value="${currentPin}" maxlength="6"
+              style="flex:1;padding:8px 10px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:2px solid #ddd8f8;border-radius:10px;outline:none;text-align:center;color:#3b2f8f;letter-spacing:3px;" />
+            <button onclick="updatePin('${p.name}','${safeId}')"
+              style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+              Save
+            </button>
+          </div>
+
+          <div style="margin-top:10px;border-top:0.5px solid #f0eefb;padding-top:10px;">
+            <button onclick="fullRemoveParent('${p.name}','${p.h}','${week.date}')"
+              style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:#fdeaea;color:#a32d2d;border:1.5px solid #f7bfbf;border-radius:10px;cursor:pointer;">
+              🗑️ Fully Remove ${p.name} from System
+            </button>
+          </div>
+        </div>`;
+    });
+  });
+
+  document.getElementById("tabPinContent").innerHTML = html;
+}
+
+function fullRemoveParent(name, ph, date) {
+  if (!confirm("Fully remove " + name + " from the entire system? This deletes their PIN, child info, tracker ratings, attendance, and advocate notes. They can be added fresh again.")) return;
+
+  // 1. Remove from roster array
+  roster.forEach(week => {
+    week.parents = week.parents.filter(p => p.h !== ph);
+  });
+  // Remove empty weeks
+  for (let i = roster.length - 1; i >= 0; i--) {
+    if (roster[i].parents.length === 0) roster.splice(i, 1);
+  }
+
+  // 2. Remove all localStorage data for this parent
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    if (key.includes("childInfo__" + ph) ||
+        key.includes("tracker__" + name + "__") ||
+        key.includes("advocateNotes__" + name) ||
+        key.includes("rollcall__")) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // 3. Remove custom overrides
+  ["customPins","customNames","customPhones"].forEach(store => {
+    const obj = JSON.parse(localStorage.getItem(store) || "{}");
+    delete obj[name];
+    localStorage.setItem(store, JSON.stringify(obj));
+  });
+
+  // 4. Remove from newParentsFromSheet cache
+  newParentsFromSheet = newParentsFromSheet.filter(p => p.h !== ph);
+  childrenSheetData = childrenSheetData.filter(r => r.phone !== ph);
+
+  // 5. Wipe from Google Sheets (child info + tracker)
+  fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ type:"childInfo", phone: ph, parentName: name, childName:"", grade:0, teacher:"", unassigned:false })
+  }).catch(()=>{});
+
+  showToast("🗑️ " + name + " fully removed from system.");
+  renderPinTab();
+}
+
+function updateName(oldName, inputId) {
+  const newName = document.getElementById("name_" + inputId).value.trim();
+  if (!newName) { showToast("❌ Name cannot be empty"); return; }
+
+  // Save to localStorage
+  const customNames = JSON.parse(localStorage.getItem("customNames") || "{}");
+  customNames[oldName] = newName;
+  localStorage.setItem("customNames", JSON.stringify(customNames));
+
+  // Update in roster array
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      if (p.name === oldName) p.name = newName;
+    });
+  });
+
+  // Update statuses keys
+  const oldKey = getKey(roster.find(w => w.parents.some(p => p.name === newName))?.date || "", oldName);
+  if (statuses[oldKey]) {
+    const week = roster.find(w => w.parents.some(p => p.name === newName));
+    if (week) { statuses[getKey(week.date, newName)] = statuses[oldKey]; delete statuses[oldKey]; }
+    localStorage.setItem("rosterStatuses", JSON.stringify(statuses));
+  }
+
+  showToast("✅ Name updated: " + oldName + " → " + newName);
+  renderPinTab();
+}
+
+function updatePhone(parentName, inputId) {
+  const newPhone = document.getElementById("phone_" + inputId).value.trim();
+  if (!newPhone || newPhone.length < 10) {
+    showToast("❌ Please enter a valid phone number");
+    return;
+  }
+  const newH = newPhone.replace(/\D/g, "").slice(-10);
+  const newE = btoa(newPhone.startsWith("+") ? newPhone : "+" + newPhone.replace(/\D/g,"").slice(-11));
+
+  // Save to localStorage
+  const customPhones = JSON.parse(localStorage.getItem("customPhones") || "{}");
+  customPhones[parentName] = { h: newH, e: newE, display: newPhone };
+  localStorage.setItem("customPhones", JSON.stringify(customPhones));
+
+  // Update in roster array
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      if (p.name === parentName) { p.h = newH; p.e = newE; }
+    });
+  });
+
+  showToast("✅ Phone updated for " + parentName + "!");
+  renderPinTab();
+}
+
+function updatePin(parentName, inputId) {
+  const newPin = document.getElementById("pin_" + inputId).value.trim();
+  if (!newPin || newPin.length < 4) {
+    showToast("❌ PIN must be at least 4 characters");
+    return;
+  }
+  // Save to localStorage
+  const customPins = JSON.parse(localStorage.getItem("customPins") || "{}");
+  customPins[parentName] = newPin;
+  localStorage.setItem("customPins", JSON.stringify(customPins));
+
+  // Update in roster array
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      if (p.name === parentName) p.pin = newPin;
+    });
+  });
+
+  showToast(`✅ PIN updated for ${parentName}! Send them their new PIN: ${newPin}`);
+}
+
+function executeSwap() {
+  const parentVal = document.getElementById("swapParentSelect").value;
+  const newDate = document.getElementById("swapDateSelect").value;
+  const resultDiv = document.getElementById("swapResult");
+
+  if (!parentVal || !newDate) {
+    resultDiv.style.display = "block";
+    resultDiv.innerHTML = `<div style="background:#fdeaea;border-radius:10px;padding:12px;color:#a32d2d;font-weight:700;font-size:13px;">❌ Please select both a parent and a new date.</div>`;
+    return;
+  }
+
+  const [fromDate, parentName] = parentVal.split("|");
+
+  if (fromDate === newDate) {
+    resultDiv.style.display = "block";
+    resultDiv.innerHTML = `<div style="background:#fff4e0;border-radius:10px;padding:12px;color:#7a4800;font-weight:700;font-size:13px;">⚠️ That's already their assigned date!</div>`;
+    return;
+  }
+
+  // Find parent in roster and move them
+  let parentObj = null;
+  let fromWeek = null;
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      if (week.date === fromDate && p.name === parentName) {
+        parentObj = p;
+        fromWeek = week;
+      }
+    });
+  });
+
+  const toWeek = roster.find(w => w.date === newDate);
+  if (!parentObj || !toWeek) return;
+
+  // Remove from old week, add to new week
+  fromWeek.parents = fromWeek.parents.filter(p => p.name !== parentName);
+  toWeek.parents.push(parentObj);
+
+  // Save swap to history
+  const history = JSON.parse(localStorage.getItem("swapHistory") || "[]");
+  history.push({ name: parentName, from: fromDate, to: newDate, time: new Date().toLocaleString() });
+  localStorage.setItem("swapHistory", JSON.stringify(history));
+
+  resultDiv.style.display = "block";
+  resultDiv.innerHTML = `<div style="background:#e4f7ef;border-radius:10px;padding:12px;color:#0e6b47;font-weight:800;font-size:13px;">✅ ${parentName} moved from ${fromDate} to ${newDate}!</div>`;
+
+  // Refresh swap tab after short delay
+  setTimeout(() => renderSwapTab(), 1200);
+}
+
+// Allow admin to also use mock time for testing
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("adminPwInput")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") verifyAdmin();
+  });
+});
+
+// ── BEHAVIOR TRACKER ──────────────────────────────────
+const TRACKER_CATEGORIES = [
+  { key: "bible",         label: "📖 Bible",            desc: "Brought their Bible" },
+  { key: "notebook",      label: "📓 Notebook",          desc: "Brought their notebook" },
+  { key: "participation", label: "🙏 Participation",     desc: "Actively participated" },
+  { key: "chatter",       label: "🗣️ Chatter",           desc: "Appropriate talking level" },
+  { key: "character",     label: "✝️ Godly Character",   desc: "Showed godly behavior" },
+  { key: "punctuality",   label: "⏰ Late to Class",      desc: "Arrived on time to class" },
+];
+
+function getTrackerKey(parentName, date) { return "tracker__" + parentName + "__" + date; }
+
+function getTrackerData(parentName, date) {
+  const raw = localStorage.getItem(getTrackerKey(parentName, date));
+  return raw ? JSON.parse(raw) : null;
+}
+
+function saveTrackerData(parentName, date, data) {
+  localStorage.setItem(getTrackerKey(parentName, date), JSON.stringify(data));
+}
+
+function getAllTrackerDates(parentName) {
+  const dates = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("tracker__" + parentName + "__")) {
+        dates.push(key.replace("tracker__" + parentName + "__", ""));
+      }
+    }
+  } catch(e) {}
+  return dates.sort();
+}
+
+// New parents added via admin — loaded from Sheets and merged into roster
+let newParentsFromSheet = [];
+
+async function loadNewParentsFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?type=newParents&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("Bad");
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    newParentsFromSheet = data;
+    // Merge into roster without touching existing hardcoded entries
+    data.forEach(p => {
+      // Check not already in roster
+      const alreadyIn = roster.some(w => w.parents.some(x => x.h === p.h));
+      if (alreadyIn) return;
+      // Find the week
+      const week = roster.find(w => w.date === p.date);
+      if (week) {
+        if (week.parents.length < 2) week.parents.push({ name: p.name, h: p.h, e: p.e, pin: p.pin });
+      } else {
+        // Create new week
+        roster.push({ date: p.date, parents: [{ name: p.name, h: p.h, e: p.e, pin: p.pin }] });
+      }
+    });
+  } catch(e) { console.log("Could not load new parents from sheet"); }
+}
+
+// Cache of children data loaded from Sheets
+let childrenSheetData = [];
+
+async function loadChildrenFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?type=children&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("Bad response");
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      childrenSheetData = data;
+      // Also save to local cache
+      data.forEach(row => {
+        if (row.phone) {
+          const key = "childInfo__" + row.phone;
+          const existing = localStorage.getItem(key);
+          // Only update if not already set locally
+          if (!existing || JSON.parse(existing).skipped) {
+            localStorage.setItem(key, JSON.stringify({ name: row.childName, grade: row.grade, teacher: row.teacher, unassigned: row.unassigned }));
+          }
+        }
+      });
+    }
+  } catch(e) { console.log("Could not load children from sheet"); }
+}
+
+// Helper to get child info for a parent by their phone hash
+function getChildInfoByParent(parentName) {
+  // First check Sheets data (admin view — cross-device)
+  const fromSheet = childrenSheetData.find(r => r.parentName === parentName);
+  if (fromSheet) return { name: fromSheet.childName, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned };
+
+  // Fallback to localStorage
+  let ph = null;
+  roster.forEach(week => {
+    week.parents.forEach(p => { if (p.name === parentName) ph = p.h; });
+  });
+  if (!ph) return null;
+  const raw = localStorage.getItem("childInfo__" + ph);
+  return raw ? JSON.parse(raw) : null;
+}
+
+// ── ADMIN TRACKER TAB ─────────────────────────────────
+const ALL_SUNDAYS = [
+  "May 3","May 10","May 17","May 24","May 31",
+  "Jun 7","Jun 14","Jun 21","Jun 28",
+  "Jul 5","Jul 12","Jul 19","Jul 26",
+  "Aug 2","Aug 9","Aug 16","Aug 23","Aug 30"
+];
+
+// ── PARENTS TAB ───────────────────────────────────────
+function renderParentsTab() {
+  // Find dates with only 1 parent (open slot)
+  const openSlots = roster.filter(w => w.parents.length < 2).map(w => w.date);
+  const openSlotsHTML = openSlots.length > 0
+    ? openSlots.map(d => `<option value="${d}">📅 ${d} — open slot</option>`).join("")
+    : "";
+
+  // All dates for manual override
+  const allDatesHTML = roster.map(w => `<option value="${w.date}">📅 ${w.date} (${w.parents.length}/2 parents)</option>`).join("") +
+    `<option value="new_aug16">📅 Aug 16 — new date</option>` +
+    `<option value="new_aug23">📅 Aug 23 — new date</option>` +
+    `<option value="new_aug30">📅 Aug 30 — new date</option>`;
+
+  let html = `
+    <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
+      ➕ Add a new parent to the roster. The system will suggest the best available slot automatically.
+    </div>
+
+    <div style="background:white;border-radius:16px;padding:18px;box-shadow:0 4px 16px rgba(92,74,199,0.08);margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:800;color:#1a1535;margin-bottom:14px;">New Parent Details</div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Full Name</div>
+        <input type="text" id="newParentName" placeholder="e.g. Miriam Tesfaye"
+          style="width:100%;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;" />
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Phone Number</div>
+        <input type="tel" id="newParentPhone" placeholder="+1 (000) 000-0000"
+          style="width:100%;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;" />
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Assign to Date</div>
+        <select id="newParentDate" style="width:100%;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;">
+          <option value="auto">🤖 Auto — best available slot</option>
+          <option disabled>── Open slots (1 parent only) ──</option>
+          ${openSlotsHTML || '<option disabled>No open slots currently</option>'}
+          <option disabled>── All dates ──</option>
+          ${allDatesHTML}
+        </select>
+      </div>
+
+      <div id="newParentError" style="display:none;font-size:13px;color:#e03e3e;font-weight:700;margin-bottom:10px;"></div>
+
+      <button onclick="addNewParent()"
+        style="width:100%;padding:14px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);color:white;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;">
+        ➕ Add Parent
+      </button>
+      <div id="newParentResult" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Current Roster Overview -->
+    <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Current Roster</div>
+    ${roster.map(w => `
+      <div style="background:white;border-radius:12px;padding:11px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(92,74,199,0.06);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:800;color:#1a1535;">📅 ${w.date}${w.perf ? " ⭐" : ""}</div>
+          <div style="font-size:12px;color:#7b7a90;margin-top:2px;">${w.parents.map(p => p.name).join(" & ")}</div>
+        </div>
+        <div style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:20px;background:${w.parents.length < 2 ? "#fff4e0" : "#e4f7ef"};color:${w.parents.length < 2 ? "#854f0b" : "#0e6b47"};">
+          ${w.parents.length}/2
+        </div>
+      </div>`).join("")}
+  `;
+
+  document.getElementById("tabParentsContent").innerHTML = html;
+}
+
+function addNewParent() {
+  const name = document.getElementById("newParentName").value.trim();
+  const phone = document.getElementById("newParentPhone").value.trim();
+  const dateChoice = document.getElementById("newParentDate").value;
+  const errEl = document.getElementById("newParentError");
+  const resEl = document.getElementById("newParentResult");
+
+  errEl.style.display = "none";
+  resEl.innerHTML = "";
+
+  if (!name) { errEl.textContent = "❌ Please enter a name."; errEl.style.display = "block"; return; }
+  if (!phone || phone.replace(/\D/g,"").length < 10) { errEl.textContent = "❌ Please enter a valid phone number."; errEl.style.display = "block"; return; }
+
+  // Generate PIN
+  const usedPins = new Set(roster.flatMap(w => w.parents.map(p => p.pin)));
+  let newPin = "";
+  while (!newPin || usedPins.has(newPin)) { newPin = String(Math.floor(1000 + Math.random() * 9000)); }
+
+  // Encode phone
+  const norm = phone.replace(/\D/g,"").slice(-10);
+  const fullPhone = "+" + (phone.replace(/\D/g,"").length === 10 ? "1" + norm : phone.replace(/\D/g,""));
+  const encoded = btoa(fullPhone);
+
+  const newParent = { name, h: norm, e: encoded, pin: newPin };
+
+  // Determine which date to assign
+  let assignedDate = "";
+  let assignedWeek = null;
+
+  if (dateChoice === "auto") {
+    // Find first date with < 2 parents
+    assignedWeek = roster.find(w => w.parents.length < 2);
+    if (!assignedWeek) {
+      // All full — create new Aug date
+      const newDates = ["Aug 16","Aug 23","Aug 30"];
+      for (const d of newDates) {
+        if (!roster.find(w => w.date === d)) { assignedDate = d; break; }
+      }
+      if (assignedDate) {
+        roster.push({ date: assignedDate, parents: [newParent] });
+      } else {
+        errEl.textContent = "❌ All slots are full. Please add a new date manually.";
+        errEl.style.display = "block";
+        return;
+      }
+    } else {
+      assignedWeek.parents.push(newParent);
+      assignedDate = assignedWeek.date;
+    }
+  } else if (dateChoice.startsWith("new_")) {
+    // New date
+    assignedDate = dateChoice.replace("new_","").replace("aug","Aug ");
+    const existing = roster.find(w => w.date === assignedDate);
+    if (existing) { existing.parents.push(newParent); }
+    else { roster.push({ date: assignedDate, parents: [newParent] }); }
+  } else {
+    // Specific existing date
+    assignedDate = dateChoice;
+    const week = roster.find(w => w.date === assignedDate);
+    if (!week) { errEl.textContent = "❌ Date not found."; errEl.style.display = "block"; return; }
+    if (week.parents.length >= 2) {
+      errEl.textContent = "⚠️ That date already has 2 parents. Use Swap tab to rearrange, or choose another date.";
+      errEl.style.display = "block"; return;
+    }
+    week.parents.push(newParent);
+  }
+
+  resEl.innerHTML = `
+    <div style="background:#e4f7ef;border-radius:12px;padding:14px;color:#0e6b47;font-weight:800;font-size:13px;">
+      ✅ ${name} added to <strong>${assignedDate}</strong>!<br>
+      <span style="font-size:12px;font-weight:600;margin-top:4px;display:block;">📱 ${fullPhone} &nbsp;·&nbsp; PIN: <strong>${newPin}</strong></span>
+      <span style="font-size:11px;color:#7b7a90;margin-top:4px;display:block;">Send this PIN to ${name} privately in Viber.</span>
+    </div>`;
+
+  // Save to Google Sheets so it persists across refreshes
+  fetch(SHEET_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "newParent", name, phone: fullPhone, h: norm, e: encoded, pin: newPin, date: assignedDate })
+  }).catch(() => {});
+
+  showToast("✅ " + name + " added — PIN: " + newPin);
+
+  // Clear form
+  document.getElementById("newParentName").value = "";
+  document.getElementById("newParentPhone").value = "";
+
+  // Refresh tab
+  setTimeout(() => renderParentsTab(), 1500);
+}
+function renderClassesTab() {
+  const el = document.getElementById("tabClassesContent");
+  if (!el) return;
+
+  const grade7 = [], grade8 = [], pending = [], unassigned = [];
+  const seen = new Set();
+
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      const ci = getChildInfoByParent(p.name);
+      if (!ci || !ci.name) {
+        if (!seen.has(p.name)) { seen.add(p.name); pending.push({ parent: p.name, h: p.h }); }
+        return;
+      }
+      const key = p.name;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const entry = { child: ci.name, parent: p.name, teacher: ci.teacher || TEACHERS[ci.grade] || "", grade: ci.grade, h: p.h };
+      if (ci.unassigned) { unassigned.push(entry); return; }
+      if (ci.grade === 7) grade7.push(entry);
+      else if (ci.grade === 8) grade8.push(entry);
+    });
+  });
+
+  const rowHTML = (e, color) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
+      <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">${e.child.charAt(0).toUpperCase()}</div>
+      <div style="flex:1;min-width:100px;">
+        <div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div>
+        <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
+        <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${e.grade===7?8:7})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#ede9fb;color:#3b2f8f;">→ ${e.grade===7?"Gr.8":"Gr.7"}</button>
+        <button onclick="unassignStudent('${e.h}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;">⏸ Unassign</button>
+        <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
+      </div>
+    </div>`;
+
+  let html = `<div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">🎓 Children grouped by class. Swap, unassign, or remove as needed.</div>`;
+
+  html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
+    <div style="background:linear-gradient(135deg,#0f6e56,#1db88a);padding:14px 16px;">
+      <div style="font-size:16px;font-weight:800;color:white;">Grade 7</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.85);">👨‍🏫 Bereket Isayas · ${grade7.length} student${grade7.length!==1?"s":""}</div>
+    </div>
+    ${grade7.length>0 ? grade7.map(e=>rowHTML(e,"linear-gradient(135deg,#0f6e56,#1db88a)")).join("") : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No children registered yet.</div>'}
+  </div>`;
+
+  html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
+    <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);padding:14px 16px;">
+      <div style="font-size:16px;font-weight:800;color:white;">Grade 8</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.85);">👨‍🏫 Amanuel Habte · ${grade8.length} student${grade8.length!==1?"s":""}</div>
+    </div>
+    ${grade8.length>0 ? grade8.map(e=>rowHTML(e,"linear-gradient(135deg,#3b2f8f,#5c4ac7)")).join("") : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No children registered yet.</div>'}
+  </div>`;
+
+  if (unassigned.length > 0) {
+    html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+      <div style="background:linear-gradient(135deg,#5a3e8a,#a07de0);padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:white;">⏸ Unassigned — Admin Hold</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.85);">${unassigned.length} student${unassigned.length!==1?"s":""} on hold</div>
+      </div>
+      ${unassigned.map(e=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
+          <div style="flex:1;"><div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div><div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent} · Was Grade ${e.grade}</div></div>
+          <div style="display:flex;gap:5px;">
+            <button onclick="reassignStudent('${e.h}','${e.child}',${e.grade})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e4f7ef;color:#0e6b47;">✅ Reassign</button>
+            <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
+          </div>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  if (pending.length > 0) {
+    html += `<div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+      <div style="background:linear-gradient(135deg,#854f0b,#f5a623);padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:white;">⏳ Pending — No child info yet</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.85);">${pending.length} parent${pending.length!==1?"s":""} haven't filled in child info</div>
+      </div>
+      ${pending.map(p=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
+          <div style="font-size:13px;font-weight:700;color:#7b7a90;">👤 ${p.parent}</div>
+          <button onclick="removeStudent('${p.h}','${p.parent}','')" style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+  // Find duplicates — same child name (case-insensitive) registered under multiple parents
+  const childCount = {};
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      const ci = getChildInfoByParent(p.name);
+      if (!ci || !ci.name) return;
+      const key = ci.name.trim().toLowerCase();
+      if (!childCount[key]) childCount[key] = [];
+      childCount[key].push({ parent: p.name, h: p.h, grade: ci.grade, teacher: ci.teacher, displayName: ci.name });
+    });
+  });
+  const duplicates = Object.entries(childCount).filter(([,entries]) => entries.length > 1);
+
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      const ci = getChildInfoByParent(p.name);
+      if (!ci || !ci.name) { pending.push({ parent: p.name, h: p.h }); return; }
+      const entry = { child: ci.name, parent: p.name, teacher: ci.teacher || TEACHERS[ci.grade] || "Unknown", grade: ci.grade, h: p.h };
+      if (ci.unassigned) { unassigned.push(entry); return; }
+      if (ci.grade === 7) grade7.push(entry);
+      else if (ci.grade === 8) grade8.push(entry);
+    });
+  });
+
+  const renderClass = (entries, color) => {
+    if (entries.length === 0) return `<div style="font-size:13px;color:#7b7a90;padding:12px 14px;">No children registered yet.</div>`;
+    return entries.map(e => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
+        <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">
+          ${e.child.charAt(0).toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:100px;">
+          <div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div>
+          <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
+          <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${e.grade === 7 ? 8 : 7})"
+            style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#ede9fb;color:#3b2f8f;white-space:nowrap;">
+            → ${e.grade === 7 ? "Gr.8" : "Gr.7"}
+          </button>
+          <button onclick="unassignStudent('${e.h}','${e.child}')"
+            style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;white-space:nowrap;">
+            ⏸ Unassign
+          </button>
+          <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')"
+            style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;white-space:nowrap;">
+            ✕ Remove
+          </button>
+        </div>
+      </div>`).join("");
+  };
+
+function keepThisEntry(keepPh, keepParent, childName, removePhs) {
+  if (!confirm("Keep " + childName + " under " + keepParent + " and remove the other " + removePhs.length + " duplicate(s)?")) return;
+  removePhs.forEach(ph => {
+    localStorage.removeItem("childInfo__" + ph);
+    childrenSheetData = childrenSheetData.filter(r => r.phone !== ph);
+    fetch(SHEET_URL, {
+      method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ type: "childInfo", phone: ph, parentName: "", childName: "", grade: 0, teacher: "", unassigned: false })
+    }).catch(() => {});
+  });
+  showToast("✅ Kept " + childName + " under " + keepParent + ". Duplicates removed.");
+  renderClassesTab();
+}
+
+function syncChildUpdate(ph, parentName, ci) {
+  fetch(SHEET_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({
+      type: "childInfo",
+      phone: ph,
+      parentName,
+      childName: ci.name,
+      grade: ci.grade,
+      teacher: ci.teacher,
+      unassigned: ci.unassigned || false
+    })
+  }).catch(() => {});
+}
+
+function unassignStudent(ph, childName) {
+  const childKey = "childInfo__" + ph;
+  const raw = localStorage.getItem(childKey);
+  if (!raw) return;
+  const ci = JSON.parse(raw);
+  ci.unassigned = true;
+  localStorage.setItem(childKey, JSON.stringify(ci));
+  // Update sheet data cache
+  const row = childrenSheetData.find(r => r.phone === ph);
+  if (row) row.unassigned = true;
+  // Find parent name
+  let parentName = "";
+  roster.forEach(w => w.parents.forEach(p => { if (p.h === ph) parentName = p.name; }));
+  syncChildUpdate(ph, parentName, ci);
+  showToast("⏸ " + childName + " unassigned — held in admin view only.");
+  renderClassesTab();
+}
+
+function reassignStudent(ph, childName, grade) {
+  const childKey = "childInfo__" + ph;
+  const raw = localStorage.getItem(childKey);
+  if (!raw) return;
+  const ci = JSON.parse(raw);
+  ci.unassigned = false;
+  ci.teacher = TEACHERS[grade];
+  localStorage.setItem(childKey, JSON.stringify(ci));
+  const row = childrenSheetData.find(r => r.phone === ph);
+  if (row) { row.unassigned = false; row.teacher = TEACHERS[grade]; }
+  let parentName = "";
+  roster.forEach(w => w.parents.forEach(p => { if (p.h === ph) parentName = p.name; }));
+  syncChildUpdate(ph, parentName, ci);
+  showToast("✅ " + childName + " reassigned to Grade " + grade + " — " + TEACHERS[grade]);
+  renderClassesTab();
+}
+
+function swapStudentTeacher(ph, parentName, childName, newGrade) {
+  const childKey = "childInfo__" + ph;
+  const raw = localStorage.getItem(childKey);
+  if (!raw) return;
+  const ci = JSON.parse(raw);
+  ci.grade = newGrade;
+  ci.teacher = TEACHERS[newGrade];
+  ci.unassigned = false;
+  localStorage.setItem(childKey, JSON.stringify(ci));
+  const row = childrenSheetData.find(r => r.phone === ph);
+  if (row) { row.grade = newGrade; row.teacher = TEACHERS[newGrade]; row.unassigned = false; }
+  syncChildUpdate(ph, parentName, ci);
+  showToast("✅ " + childName + " moved to Grade " + newGrade + " — " + TEACHERS[newGrade]);
+  renderClassesTab();
+}
+
+function removeStudent(ph, parentName, childName) {
+  const confirmed = window.confirm("Remove " + (childName || parentName) + " from the class roster? The parent can re-enter their child's info when they next log in.");
+  if (!confirmed) return;
+  localStorage.removeItem("childInfo__" + ph);
+  childrenSheetData = childrenSheetData.filter(r => r.phone !== ph);
+  // Mark as removed in sheet
+  fetch(SHEET_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "childInfo", phone: ph, parentName, childName: "", grade: 0, teacher: "", unassigned: false })
+  }).catch(() => {});
+  showToast("🗑️ " + (childName || parentName) + " removed from roster.");
+  renderClassesTab();
+}
+
+function renderTrackerTab() {
+  // Get all unique parents from roster
+  const allParents = [];
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      if (!allParents.find(x => x.name === p.name)) allParents.push(p);
+    });
+  });
+
+  let html = `
+    <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
+      ⭐ Rate each child's participation every Sunday. Select a parent and the Sunday to log the report.
+    </div>
+    <div style="margin-bottom:10px;">
+      <select id="trackerParentSelect" onchange="loadTrackerForm()" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;margin-bottom:10px;">
+        <option value="">-- Select a parent --</option>`;
+
+  allParents.forEach(p => {
+    const ci = getChildInfoByParent(p.name);
+    const childLabel = ci && ci.name ? " · Child: " + ci.name + " (Gr." + ci.grade + ")" : " · child info pending";
+    html += `<option value="${p.name}">${p.name}${childLabel}</option>`;
+  });
+
+  html += `</select>
+      <select id="trackerDateSelect" onchange="loadTrackerForm()" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;">
+        <option value="">-- Select Sunday --</option>`;
+
+  ALL_SUNDAYS.forEach(d => {
+    html += `<option value="${d}">📅 ${d}</option>`;
+  });
+
+  html += `</select>
+    </div>
+    <div id="trackerForm"></div>`;
+
+  document.getElementById("tabTrackerContent").innerHTML = html;
+}
+
+function loadTrackerForm() {
+  const parentName = document.getElementById("trackerParentSelect")?.value;
+  const date = document.getElementById("trackerDateSelect")?.value;
+  if (!parentName || !date) { document.getElementById("trackerForm").innerHTML = ""; return; }
+  const existing = getTrackerData(parentName, date) || {};
+  const ci = getChildInfoByParent(parentName);
+
+  // Child info banner
+  let childBanner = "";
+  if (ci && ci.name) {
+    childBanner = `
+      <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border-radius:14px;padding:14px 16px;margin-bottom:16px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:white;flex-shrink:0;">
+          ${ci.name.charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <div style="font-size:16px;font-weight:800;color:white;">${ci.name}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.8);">Grade ${ci.grade} &nbsp;·&nbsp; Parent: ${parentName} &nbsp;·&nbsp; 📅 ${date}</div>
+        </div>
+      </div>`;
+  } else {
+    childBanner = `
+      <div style="background:#fff4e0;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#7a4800;font-weight:700;">
+        ⚠️ ${parentName} has not filled in their child's info yet. Rating by parent name for now.
+        <div style="font-size:12px;font-weight:600;margin-top:2px;">📅 ${date}</div>
+      </div>`;
+  }
+
+  let html = `<div style="background:white;border-radius:16px;padding:16px;box-shadow:0 4px 16px rgba(92,74,199,0.1);">
+    ${childBanner}`;
+
+  TRACKER_CATEGORIES.forEach(cat => {
+    const current = existing[cat.key] || { stars: 5, comment: "" };
+    html += `
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:0.5px solid #f0eefb;">
+        <div style="font-size:13px;font-weight:800;color:#1a1535;margin-bottom:2px;">${cat.label}</div>
+        <div style="font-size:11px;color:#7b7a90;margin-bottom:8px;">${cat.desc}</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;">`;
+
+    for (let s = 1; s <= 5; s++) {
+      const filled = s <= current.stars;
+      html += `<span onclick="setStar('${parentName}','${date}','${cat.key}',${s})" id="star_${cat.key}_${s}"
+        style="font-size:28px;cursor:pointer;opacity:${filled ? 1 : 0.25};transition:opacity 0.15s;">⭐</span>`;
+    }
+
+    html += `</div>
+        <textarea id="comment_${cat.key}" placeholder="Add a comment..." rows="2"
+          style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;border:2px solid #ddd8f8;border-radius:10px;outline:none;resize:none;${current.stars < 5 ? "display:block;" : "display:none;"}"
+        >${current.comment || ""}</textarea>
+      </div>`;
+  });
+
+  html += `
+    <button onclick="saveTrackerForm('${parentName}','${date}')"
+      style="width:100%;padding:14px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);color:white;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;margin-top:4px;">
+      💾 Save Report for ${ci && ci.name ? ci.name : parentName}
+    </button>
+    <div id="trackerSaveResult" style="margin-top:10px;"></div>
+  </div>`;
+
+  document.getElementById("trackerForm").innerHTML = html;
+
+  const existing2 = getTrackerData(parentName, date) || {};
+  TRACKER_CATEGORIES.forEach(cat => {
+    const stars = (existing2[cat.key] || {}).stars || 5;
+    updateStarDisplay(cat.key, stars);
+  });
+}
+
+function setStar(parentName, date, catKey, stars) {
+  // Update visual immediately
+  updateStarDisplay(catKey, stars);
+  // Show/hide comment box
+  const commentBox = document.getElementById("comment_" + catKey);
+  if (commentBox) commentBox.style.display = stars < 5 ? "block" : "none";
+}
+
+function updateStarDisplay(catKey, stars) {
+  for (let s = 1; s <= 5; s++) {
+    const el = document.getElementById("star_" + catKey + "_" + s);
+    if (el) el.style.opacity = s <= stars ? "1" : "0.25";
+  }
+}
+
+function getCurrentStars(catKey) {
+  for (let s = 5; s >= 1; s--) {
+    const el = document.getElementById("star_" + catKey + "_" + s);
+    if (el && el.style.opacity === "1") return s;
+  }
+  return 5;
+}
+
+function saveTrackerForm(parentName, date) {
+  const data = {};
+  TRACKER_CATEGORIES.forEach(cat => {
+    const stars = getCurrentStars(cat.key);
+    const commentEl = document.getElementById("comment_" + cat.key);
+    const comment = commentEl ? commentEl.value.trim() : "";
+    data[cat.key] = { stars, comment };
+
+    // Sync each category to Google Sheets
+    fetch(SHEET_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ type: "tracker", parentName, date, category: cat.key, stars, comment })
+    }).catch(() => {});
+  });
+  saveTrackerData(parentName, date, data);
+  const ci = getChildInfoByParent(parentName);
+  const displayName = ci && ci.name ? ci.name : parentName;
+  const res = document.getElementById("trackerSaveResult");
+  if (res) res.innerHTML = `<div style="background:#e4f7ef;border-radius:10px;padding:12px;color:#0e6b47;font-weight:800;font-size:13px;text-align:center;">✅ Report saved for ${displayName} — ${date}</div>`;
+  showToast("✅ Report saved for " + displayName + "!");
+}
+
+// ── PARENT TRACKER VIEW ───────────────────────────────
+async function loadTrackerFromSheet(parentName) {
+  try {
+    const res = await fetch(SHEET_URL + "?type=tracker&parentName=" + encodeURIComponent(parentName) + "&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("Bad");
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return;
+    // Group by date
+    const byDate = {};
+    rows.forEach(r => {
+      if (!byDate[r.date]) byDate[r.date] = {};
+      byDate[r.date][r.category] = { stars: r.stars, comment: r.comment };
+    });
+    // Save to localStorage
+    Object.entries(byDate).forEach(([date, catData]) => {
+      saveTrackerData(parentName, date, catData);
+    });
+  } catch(e) { console.log("Could not load tracker from sheet"); }
+}
+
+function renderParentTracker() {
+  const dates = getAllTrackerDates(myName);
+  if (dates.length === 0) return "";
+
+  const ci = getChildInfo();
+  const childName = ci && ci.name ? ci.name : null;
+  const childGrade = ci && ci.grade ? "Grade " + ci.grade : "";
+
+  let html = `<div style="margin:16px 20px 0;background:white;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.07);padding:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+      <div style="font-size:15px;font-weight:800;color:#1a1535;">📊 Behavior Report</div>
+      ${childName ? '<div style="background:#ede9fb;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:#3b2f8f;">' + childName + ' · ' + childGrade + '</div>' : ""}
+    </div>
+    <div style="font-size:12px;color:#7b7a90;margin-bottom:16px;">Weekly participation progress</div>`;
+
+  dates.slice().reverse().forEach(date => {
+    const data = getTrackerData(myName, date);
+    if (!data) return;
+
+    const avgStars = Math.round(TRACKER_CATEGORIES.reduce((sum, cat) => sum + ((data[cat.key] || {}).stars || 5), 0) / TRACKER_CATEGORIES.length);
+    const allPerfect = TRACKER_CATEGORIES.every(cat => ((data[cat.key] || {}).stars || 5) === 5);
+    const headerBg = allPerfect ? "linear-gradient(135deg,#0f6e56,#1db88a)" : avgStars >= 4 ? "linear-gradient(135deg,#185fa5,#4a9de8)" : avgStars >= 3 ? "linear-gradient(135deg,#b8860b,#f5a623)" : "linear-gradient(135deg,#a32d2d,#e85c5c)";
+
+    html += `<div style="margin-bottom:14px;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08);">
+      <div style="background:${headerBg};padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:13px;font-weight:800;color:white;">📅 ${date}</div>
+        <div style="font-size:13px;color:white;font-weight:700;">${"⭐".repeat(avgStars)}</div>
+      </div>`;
+
+    TRACKER_CATEGORIES.forEach(cat => {
+      const entry = data[cat.key] || { stars: 5, comment: "" };
+      const filledStars = "⭐".repeat(entry.stars);
+      const emptyStars = entry.stars < 5
+        ? `<span style="color:#e03e3e;font-size:16px;line-height:1;">${"★".repeat(5 - entry.stars)}</span>`
+        : "";
+      html += `<div style="padding:10px 14px;border-top:0.5px solid #f0eefb;${entry.stars < 5 ? "background:#fff8f8;" : ""}">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:13px;font-weight:700;color:#1a1535;">${cat.label}</div>
+          <div style="font-size:14px;">${filledStars}${emptyStars}</div>
+        </div>
+        ${entry.comment ? `<div style="font-size:12px;color:#7b7a90;margin-top:4px;padding:6px 10px;background:#f4f3f8;border-radius:8px;border-left:3px solid #5c4ac7;">💬 ${entry.comment}</div>` : ""}
+      </div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  html += `</div>`;
+  return html;
+}
+
+// ── ROLL CALL SYSTEM ─────────────────────────────────────
+
+function getParentPhone(parentName) {
+  let phone = "";
+  roster.forEach(week => week.parents.forEach(p => {
+    if (p.name === parentName) phone = p.h;
+  }));
+  return phone;
+}
+
+function getRollCallStudents() {
+  const students = [];
+  const seen = new Set(); // stores lowercase names
+  childrenSheetData.forEach(row => {
+    if (!row.childName || !row.grade || row.unassigned) return;
+    const key = row.childName.trim().toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    students.push({
+      childName: row.childName,
+      parentName: row.parentName,
+      grade: Number(row.grade),
+      phone: getParentPhone(row.parentName)
+    });
+  });
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      const ci = getChildInfoByParent(p.name);
+      if (!ci || !ci.name || ci.unassigned) return;
+      const key = ci.name.trim().toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      students.push({ childName: ci.name, parentName: p.name, grade: ci.grade, phone: p.h });
+    });
+  });
+  return students.sort((a,b) => a.grade - b.grade || a.childName.localeCompare(b.childName));
+}
+
+function getRollCallKey(date) { return "rollcall__" + date; }
+function getRollCallData(date) {
+  const raw = localStorage.getItem(getRollCallKey(date));
+  return raw ? JSON.parse(raw) : {};
+}
+function saveRollCallEntry(date, childName, status) {
+  const data = getRollCallData(date);
+  data[childName] = status;
+  localStorage.setItem(getRollCallKey(date), JSON.stringify(data));
+}
+
+function showRollCallDash() {
+  document.getElementById("rollCallDash").style.display = "block";
+  renderRollCallScreen();
+  // Silently refresh from sheet in background
+  Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
+    .then(() => renderRollCallScreen())
+    .catch(() => {});
+}
+
+function setRollCallMock(scenario) {
+  if (scenario === "before") mockOverride = new Date(2026, 4, 10, 10, 14, 0);
+  else if (scenario === "open")   mockOverride = new Date(2026, 4, 10, 10, 16, 0);
+  else if (scenario === "closed") {
+    mockOverride = new Date(2026, 4, 10, 10, 26, 0);
+    localStorage.removeItem("rollCallAutoDeduct__May 10");
+  }
+  else mockOverride = null;
+  // Reset advancing clock
+  mockStartReal = null;
+  mockStartTime = null;
+  clearInterval(rollCallInterval);
+  rollCallInterval = null;
+  renderRollCallScreen();
+  window.scrollTo(0, 0);
+  Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
+    .then(() => renderRollCallScreen())
+    .catch(() => {});
+}
+
+function renderRollCallScreen() {
+  const now = getMockNow();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const todayStr = months[now.getMonth()] + " " + now.getDate();
+  const h = now.getHours(), m = now.getMinutes();
+  const startMin = 10 * 60 + 15; // 10:15 AM
+  const endMin   = 10 * 60 + 25; // 10:25 AM
+  const nowMin   = h * 60 + m;
+  const isOpen   = nowMin >= startMin && nowMin < endMin;
+  const isTooEarly = nowMin < startMin;
+  const isClosed = nowMin >= endMin;
+
+  const students = getRollCallStudents();
+  const rollData = getRollCallData(todayStr);
+  const container = document.getElementById("rollCallContent");
+
+  // Countdown timer
+  let timerHtml = "";
+  if (isTooEarly) {
+    const secsLeft = (startMin - nowMin) * 60 - now.getSeconds();
+    const mm = Math.floor(secsLeft / 60), ss = secsLeft % 60;
+    timerHtml = `<div style="background:rgba(255,255,255,0.1);border-radius:14px;padding:14px;text-align:center;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:6px;">Roll call opens at 10:15 AM</div>
+      <div style="font-size:28px;font-weight:900;color:#FFD700;">${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}</div>
+    </div>`;
+  } else if (isOpen) {
+    const secsLeft = (endMin - nowMin) * 60 - now.getSeconds();
+    const mm = Math.floor(secsLeft / 60), ss = secsLeft % 60;
+    timerHtml = `<div style="background:rgba(34,160,107,0.3);border:1.5px solid rgba(34,160,107,0.5);border-radius:14px;padding:14px;text-align:center;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:6px;">🟢 Roll Call is OPEN — closes in</div>
+      <div style="font-size:28px;font-weight:900;color:#FFD700;" id="rcTimer">${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}</div>
+    </div>`;
+  } else {
+    timerHtml = `<div style="background:rgba(200,50,50,0.3);border:1.5px solid rgba(200,50,50,0.5);border-radius:14px;padding:14px;text-align:center;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);">🔴 Roll call closed at 10:25 AM</div>
+    </div>`;
+  }
+
+  const grade7 = students.filter(s => s.grade === 7);
+  const grade8 = students.filter(s => s.grade === 8);
+
+  const renderGroup = (list, color) => list.map(s => {
+    const status = rollData[s.childName];
+    const isPresent = status === "present";
+    return `
+    <div style="background:${isPresent ? "linear-gradient(135deg,rgba(34,160,107,0.3),rgba(34,160,107,0.1))" : "rgba(255,255,255,0.07)"};
+      border:2px solid ${isPresent ? "rgba(34,160,107,0.6)" : "rgba(255,255,255,0.15)"};
+      border-radius:18px;padding:16px 18px;margin-bottom:12px;
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      transition:all 0.3s;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="width:52px;height:52px;border-radius:50%;background:${color};
+          display:flex;align-items:center;justify-content:center;
+          font-size:22px;font-weight:900;color:white;
+          box-shadow:0 4px 14px rgba(0,0,0,0.3);flex-shrink:0;">
+          ${isPresent ? "✅" : s.childName.charAt(0)}
+        </div>
+        <div>
+          <div style="font-size:18px;font-weight:900;color:white;">${s.childName}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">Parent: ${s.parentName}${s.phone ? ' · +1' + s.phone : ''}</div>
+        </div>
+      </div>
+      ${isOpen ? `
+        <button onclick="markRollCall('${s.childName}','${todayStr}',${isPresent})"
+          style="padding:12px 18px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;border:none;border-radius:14px;cursor:pointer;
+          background:${isPresent ? "#a32d2d" : "#22a06b"};color:white;white-space:nowrap;
+          box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:all 0.2s;flex-shrink:0;">
+          ${isPresent ? "✕ Undo" : "✅ Present"}
+        </button>` : `
+        <div style="font-size:13px;font-weight:800;color:${isPresent ? "#22a06b" : "rgba(255,255,255,0.4)"};">
+          ${isPresent ? "✅ Present" : "—"}
+        </div>`}
+    </div>`;
+  }).join("");
+
+  container.innerHTML = `
+    ${timerHtml}
+    <div style="margin-bottom:20px;">
+      <div style="background:linear-gradient(135deg,#0f6e56,#1db88a);border-radius:14px;padding:10px 16px;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:800;color:white;">📗 Grade 7 — Bereket Isayas</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.7);">${grade7.filter(s=>rollData[s.childName]==="present").length}/${grade7.length} present</div>
+      </div>
+      ${grade7.length > 0 ? renderGroup(grade7,"linear-gradient(135deg,#0f6e56,#1db88a)") : '<div style="color:rgba(255,255,255,0.4);font-size:13px;padding:10px;">No Grade 7 students yet</div>'}
+    </div>
+    <div>
+      <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border-radius:14px;padding:10px 16px;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:800;color:white;">📘 Grade 8 — Amanuel Habte</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.7);">${grade8.filter(s=>rollData[s.childName]==="present").length}/${grade8.length} present</div>
+      </div>
+      ${grade8.length > 0 ? renderGroup(grade8,"linear-gradient(135deg,#3b2f8f,#5c4ac7)") : '<div style="color:rgba(255,255,255,0.4);font-size:13px;padding:10px;">No Grade 8 students yet</div>'}
+    </div>
+    ${now.getDay() !== 0 || mockOverride ? `
+    <div style="margin-top:20px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;">
+      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🧪 Test Controls</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="setRollCallMock('before')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.1);color:white;">⏳ 10:14 AM</button>
+        <button onclick="setRollCallMock('open')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(34,160,107,0.4);color:white;">🟢 10:16 AM</button>
+        <button onclick="setRollCallMock('closed')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(200,50,50,0.4);color:white;">🔴 10:26 AM</button>
+        <button onclick="setRollCallMock('real')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);">Real Time</button>
+      </div>
+    </div>` : ""}
+    `;
+
+  // Auto-refresh every second for countdown
+  clearInterval(rollCallInterval);
+  if (isTooEarly || isOpen) {
+    rollCallInterval = setInterval(() => {
+      const n = getMockNow();
+      const nm = n.getHours() * 60 + n.getMinutes();
+      if (nm >= endMin) {
+        clearInterval(rollCallInterval);
+        autoDeductLateStars(todayStr);
+        renderRollCallScreen();
+      } else {
+        renderRollCallScreen();
+      }
+    }, 1000);
+  }
+
+  // If already closed and we haven't auto-deducted yet, do it now
+  if (isClosed) {
+    const alreadyRan = localStorage.getItem("rollCallAutoDeduct__" + todayStr);
+    if (!alreadyRan) autoDeductLateStars(todayStr);
+  }
+}
+
+function autoDeductLateStars(todayStr) {
+  // Only run once per day
+  if (localStorage.getItem("rollCallAutoDeduct__" + todayStr)) {
+    console.log("autoDeductLateStars: already ran for", todayStr);
+    return;
+  }
+  localStorage.setItem("rollCallAutoDeduct__" + todayStr, "done");
+
+  const students = getRollCallStudents();
+  const rollData = getRollCallData(todayStr);
+  console.log("autoDeductLateStars:", todayStr, "students:", students.length, "rollData:", rollData);
+  let count = 0;
+
+  students.forEach(s => {
+    const isPresent = rollData[s.childName] === "present";
+    console.log(s.childName, "present:", isPresent);
+    if (!isPresent) {
+      const existing = getTrackerData(s.parentName, todayStr) || {};
+      existing["punctuality"] = { stars: 1, comment: "Auto: not present at 10:15 AM roll call" };
+      saveTrackerData(s.parentName, todayStr, existing);
+      fetch(SHEET_URL, {
+        method: "POST", mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          type: "tracker",
+          parentName: s.parentName,
+          date: todayStr,
+          category: "punctuality",
+          stars: 1,
+          comment: "Auto: not present at 10:15 AM roll call"
+        })
+      }).catch(() => {});
+      count++;
+    }
+  });
+
+  console.log("autoDeductLateStars: deducted for", count, "students");
+  if (count > 0) {
+    showToast("⏰ " + count + " student" + (count !== 1 ? "s" : "") + " marked late automatically.");
+  }
+}
+
+function markRollCall(childName, date, isPresent) {
+  saveRollCallEntry(date, childName, isPresent ? null : "present");
+  renderRollCallScreen();
+  if (!isPresent) showToast("✅ " + childName + " marked present!");
+}
 </script>
+
+<div id="rollCallDash" style="display:none;min-height:100vh;background:linear-gradient(160deg,#0d0b1f,#1a1535,#0d3b2e);padding-bottom:48px;">
+  <div style="padding:28px 20px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="font-size:24px;">📋</div>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:white;">Roll Call</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);">Sunday School — Grade 7 & 8</div>
+      </div>
+    </div>
+    <button onclick="showVerify()" style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:white;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:7px 14px;cursor:pointer;">Sign out</button>
+  </div>
+  <div style="max-width:480px;margin:0 auto;padding:0 16px;">
+    <div id="rollCallContent"></div>
+  </div>
+</div>
+
 </body>
 </html>
