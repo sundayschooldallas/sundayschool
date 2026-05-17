@@ -614,6 +614,8 @@ async function verifyPhone() {
     document.getElementById("verifyError").textContent = "❌ Phone number not found on the roster.";
     return;
   }
+  // Normalize date immediately
+  found.week.date = normalizeRosterDate(found.week.date);
   if (found.me.pin !== pinVal) {
     document.getElementById("verifyError").style.display = "block";
     document.getElementById("verifyError").textContent = "❌ Phone number or PIN is incorrect.";
@@ -887,6 +889,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (myPhone) {
       const found = findMe(myPhone);
       if (found) {
+        found.week.date = normalizeRosterDate(found.week.date);
         myName = found.me.name;
         myWeek = found.week;
         myParent = found.me;
@@ -981,6 +984,8 @@ function setMock(scenario) {
 
 function renderMyCard() {
   try {
+  // Normalize date in case it came from sheet as full timestamp
+  if (myWeek && myWeek.date) myWeek.date = normalizeRosterDate(myWeek.date);
   const status = getStatus(myWeek.date, myParent.name);
 
   let respondHTML = "";
@@ -1003,7 +1008,9 @@ function renderMyCard() {
       </div>`;
   } else if (!isTodayMyDate()) {
     // Calculate target date for countdown
-    const parts = myWeek.date.split(" ");
+    const cleanDate = normalizeRosterDate(myWeek.date);
+    myWeek.date = cleanDate; // fix it permanently
+    const parts = cleanDate.split(" ");
     const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const targetMonth = monthNames.indexOf(parts[0]);
     const targetDay = parseInt(parts[1]);
@@ -1014,7 +1021,7 @@ function renderMyCard() {
         <div style="text-align:center;margin-bottom:14px;">
           <div style="display:inline-block;background:linear-gradient(135deg,#5c4ac7,#8b6de8);border-radius:20px;padding:12px 20px;">
             <div style="font-size:15px;font-weight:800;color:#ffffff;letter-spacing:0.5px;margin-bottom:6px;font-family:'Noto Serif Ethiopic',serif;text-shadow:0 2px 8px rgba(0,0,0,0.25);">Attendance ናይዚ ቤተሰብ ዝኽፈተሉ መዓልቲ</div>
-            <div style="font-size:18px;font-weight:800;color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.2);">📅 ${myWeek.date} &nbsp;·&nbsp; 10:00 AM</div>
+            <div style="font-size:18px;font-weight:800;color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.2);">📅 ${cleanDate} &nbsp;·&nbsp; 10:00 AM</div>
           </div>
         </div>
         <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border-radius:16px;padding:18px 12px;">
@@ -2839,6 +2846,7 @@ function setRollCallMock(scenario) {
 
 function renderRollCallScreen() {
   const now = getMockNow();
+  const realNow = new Date(); // Always use real time for Sunday detection
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const todayStr = months[now.getMonth()] + " " + now.getDate();
   const h = now.getHours(), m = now.getMinutes();
@@ -2848,6 +2856,7 @@ function renderRollCallScreen() {
   const isOpen   = nowMin >= startMin && nowMin < endMin;
   const isTooEarly = nowMin < startMin;
   const isClosed = nowMin >= endMin;
+  const isRealSunday = realNow.getDay() === 0 && !mockOverride;
 
   const students = getRollCallStudents();
   const rollData = getRollCallData(todayStr);
@@ -2928,7 +2937,7 @@ function renderRollCallScreen() {
       </div>
       ${grade8.length > 0 ? renderGroup(grade8,"linear-gradient(135deg,#3b2f8f,#5c4ac7)") : '<div style="color:rgba(255,255,255,0.4);font-size:13px;padding:10px;">No Grade 8 students yet</div>'}
     </div>
-    ${now.getDay() !== 0 || mockOverride ? `
+    ${!isRealSunday ? `
     <div style="margin-top:20px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;">
       <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🧪 Test Controls</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
