@@ -1589,6 +1589,7 @@ function renderAdminDash() {
       <button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔐 PIN</button>
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🎓 Classes</button>
+      <button id="tabStudents" onclick="showAdminTab('students')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">👦 Students</button>
       <button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">➕ Parents</button>
     </div>
     <div id="tabAttendanceContent"></div>
@@ -1596,6 +1597,7 @@ function renderAdminDash() {
     <div id="tabPinContent" style="display:none;"></div>
     <div id="tabTrackerContent" style="display:none;"></div>
     <div id="tabClassesContent" style="display:none;"></div>
+    <div id="tabStudentsContent" style="display:none;"></div>
     <div id="tabParentsContent" style="display:none;"></div>
   `;
 
@@ -1609,13 +1611,12 @@ function renderAdminDash() {
 }
 
 function showAdminTab(tab) {
-  ["attendance","swap","pin","tracker","classes","parents"].forEach(t => {
+  ["attendance","swap","pin","tracker","classes","students","parents"].forEach(t => {
     const content = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1) + "Content");
     if (content) content.style.display = tab === t ? "block" : "none";
     const btn = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1));
     if (btn) { btn.style.background = tab === t ? "#3b2f8f" : "#ede9fb"; btn.style.color = tab === t ? "white" : "#3b2f8f"; }
   });
-  // Reload children from sheet when Classes or Tracker tab opened
   if (tab === "classes" || tab === "tracker") {
     loadChildrenFromSheet().then(() => {
       if (tab === "classes") renderClassesTab();
@@ -1624,6 +1625,103 @@ function showAdminTab(tab) {
       if (tab === "classes") renderClassesTab();
     });
   }
+  if (tab === "students") {
+    loadChildrenFromSheet().then(() => renderStudentsTab()).catch(() => renderStudentsTab());
+  }
+}
+
+function renderStudentsTab() {
+  const el = document.getElementById("tabStudentsContent");
+  if (!el) return;
+
+  // Get all students from childrenSheetData + roster
+  const all = [];
+  const seen = new Set();
+  childrenSheetData.forEach(row => {
+    if (!row.childName || seen.has(row.childName.toLowerCase())) return;
+    seen.add(row.childName.toLowerCase());
+    all.push({ childName: row.childName, parentName: row.parentName, grade: row.grade, phone: row.phone });
+  });
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      const ci = getChildInfoByParent(p.name);
+      if (!ci || !ci.name || seen.has(ci.name.toLowerCase())) return;
+      seen.add(ci.name.toLowerCase());
+      all.push({ childName: ci.name, parentName: p.name, grade: ci.grade, phone: p.h });
+    });
+  });
+
+  all.sort((a,b) => (a.grade||0) - (b.grade||0) || a.childName.localeCompare(b.childName));
+
+  if (all.length === 0) {
+    el.innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">No students registered yet.</div>`;
+    return;
+  }
+
+  const gradeColor = g => g === 7 ? "linear-gradient(135deg,#0f6e56,#1db88a)" : "linear-gradient(135deg,#3b2f8f,#5c4ac7)";
+
+  let html = `<div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">👦 Edit student names — changes update roll call immediately.</div>`;
+
+  all.forEach((s, idx) => {
+    const safeId = "student_" + idx;
+    html += `
+    <div style="background:white;border-radius:16px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(92,74,199,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:38px;height:38px;border-radius:50%;background:${gradeColor(s.grade)};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:white;flex-shrink:0;">${s.childName.charAt(0)}</div>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:#7b7a90;">Grade ${s.grade||"?"} · Parent: ${s.parentName}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="${safeId}" type="text" value="${s.childName}"
+          style="flex:1;padding:10px 12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:2px solid #ddd8f8;border-radius:10px;outline:none;color:#1a1535;" />
+        <button onclick="updateStudentName('${safeId}','${s.childName}','${s.parentName}','${s.phone}')"
+          style="padding:10px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+          💾 Save
+        </button>
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+function updateStudentName(inputId, oldName, parentName, phone) {
+  const newName = document.getElementById(inputId).value.trim();
+  if (!newName || newName === oldName) { showToast("No change made."); return; }
+  if (!confirm("Rename " + oldName + " to " + newName + "?")) return;
+
+  // Update in childrenSheetData
+  childrenSheetData.forEach(row => {
+    if (row.childName && row.childName.toLowerCase() === oldName.toLowerCase()) row.childName = newName;
+  });
+
+  // Update in localStorage
+  const ci = JSON.parse(localStorage.getItem("childInfo__" + phone) || "null");
+  if (ci) { ci.name = newName; localStorage.setItem("childInfo__" + phone, JSON.stringify(ci)); }
+
+  // Update tracker keys in localStorage
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.includes("rollcall__")) {
+      const data = JSON.parse(localStorage.getItem(key) || "{}");
+      if (data[oldName] !== undefined) {
+        data[newName] = data[oldName];
+        delete data[oldName];
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+    }
+  }
+
+  // Save to Google Sheets
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "childInfo", phone, parentName, childName: newName, grade: ci ? ci.grade : 0, teacher: ci ? ci.teacher : "", unassigned: false })
+  }).catch(() => {});
+
+  showToast("✅ " + oldName + " renamed to " + newName);
+  loadChildrenFromSheet().then(() => renderStudentsTab()).catch(() => renderStudentsTab());
 }
 
 function renderAttendanceTab(isSunday, isPastCheck) {
