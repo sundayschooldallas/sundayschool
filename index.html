@@ -3050,12 +3050,12 @@ function renderRollCallScreen() {
   // Auto-refresh every second for countdown
   clearInterval(rollCallInterval);
   if (isTooEarly || isOpen) {
-    rollCallInterval = setInterval(() => {
+    rollCallInterval = setInterval(async () => {
       const n = getMockNow();
       const nm = n.getHours() * 60 + n.getMinutes();
       if (nm >= endMin) {
         clearInterval(rollCallInterval);
-        autoDeductLateStars(todayStr);
+        await autoDeductLateStars(todayStr);
         renderRollCallScreen();
       } else {
         renderRollCallScreen();
@@ -3063,15 +3063,13 @@ function renderRollCallScreen() {
     }, 1000);
   }
 
-  // If already closed and we haven't auto-deducted yet, do it now
   if (isClosed) {
     const alreadyRan = localStorage.getItem("rollCallAutoDeduct__" + todayStr);
     if (!alreadyRan) autoDeductLateStars(todayStr);
   }
 }
 
-function autoDeductLateStars(todayStr) {
-  // Only run once per day
+async function autoDeductLateStars(todayStr) {
   if (localStorage.getItem("rollCallAutoDeduct__" + todayStr)) {
     console.log("autoDeductLateStars: already ran for", todayStr);
     return;
@@ -3080,35 +3078,46 @@ function autoDeductLateStars(todayStr) {
 
   const students = getRollCallStudents();
   const rollData = getRollCallData(todayStr);
-  console.log("autoDeductLateStars:", todayStr, "students:", students.length, "rollData:", rollData);
+  console.log("autoDeductLateStars:", todayStr, "students:", students.length, "rollData:", JSON.stringify(rollData));
+
   let count = 0;
+  const promises = [];
 
   students.forEach(s => {
     const isPresent = rollData[s.childName] === "present";
     console.log(s.childName, "present:", isPresent);
     if (!isPresent) {
+      // Save to localStorage
       const existing = getTrackerData(s.parentName, todayStr) || {};
       existing["punctuality"] = { stars: 1, comment: "Auto: not present at 10:15 AM roll call" };
       saveTrackerData(s.parentName, todayStr, existing);
-      fetch(SHEET_URL, {
-        method: "POST", mode: "no-cors",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          type: "tracker",
-          parentName: s.parentName,
-          date: todayStr,
-          category: "punctuality",
-          stars: 1,
-          comment: "Auto: not present at 10:15 AM roll call"
-        })
-      }).catch(() => {});
+
+      // Save to Google Sheets
+      const p = promises.push(
+        fetch(SHEET_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            type: "tracker",
+            parentName: s.parentName,
+            date: todayStr,
+            category: "punctuality",
+            stars: 1,
+            comment: "Auto: not present at 10:15 AM roll call"
+          })
+        }).catch(err => console.log("Failed to save tracker for", s.parentName, err))
+      );
       count++;
     }
   });
 
-  console.log("autoDeductLateStars: deducted for", count, "students");
+  // Wait for all saves to complete
+  await Promise.allSettled(promises);
+
+  console.log("autoDeductLateStars: saved", count, "records to sheet");
   if (count > 0) {
-    showToast("⏰ " + count + " student" + (count !== 1 ? "s" : "") + " marked late automatically.");
+    showToast("⏰ " + count + " student" + (count !== 1 ? "s" : "") + " marked late — saved to sheet.");
   }
 }
 
