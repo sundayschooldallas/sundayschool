@@ -2954,7 +2954,8 @@ function renderRollCallScreen() {
   const isOpen   = nowMin >= startMin && nowMin < endMin;
   const isTooEarly = nowMin < startMin;
   const isClosed = nowMin >= endMin;
-  const isRealSunday = realNow.getDay() === 0 && !mockOverride;
+  const forceTest = window.location.search.includes("test=1");
+  const isRealSunday = realNow.getDay() === 0 && !mockOverride && !forceTest;
 
   const students = getRollCallStudents();
   const rollData = getRollCallData(todayStr);
