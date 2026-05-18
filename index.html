@@ -2645,6 +2645,15 @@ function removeStudent(ph, parentName, childName) {
 }
 
 function renderTrackerTab() {
+  const now = getMockNow();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const todayStr = months[now.getMonth()] + " " + now.getDate();
+  const isSunday = now.getDay() === 0;
+
+  // Get present students from today's roll call
+  const rollData = getRollCallData(todayStr);
+  const presentStudents = getRollCallStudents().filter(s => rollData[s.childName] === "present");
+
   // Get all unique parents from roster
   const allParents = [];
   roster.forEach(week => {
@@ -2653,33 +2662,87 @@ function renderTrackerTab() {
     });
   });
 
-  let html = `
-    <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
-      ⭐ Rate each child's participation every Sunday. Select a parent and the Sunday to log the report.
-    </div>
-    <div style="margin-bottom:10px;">
-      <select id="trackerParentSelect" onchange="loadTrackerForm()" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;margin-bottom:10px;">
-        <option value="">-- Select a parent --</option>`;
+  let html = `<div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
+    ⭐ Rate each child's participation. ${isSunday && presentStudents.length > 0 ? "Students present today shown first." : "Select a parent and Sunday to log."}
+  </div>`;
+
+  // Show present students as quick-rate cards on Sundays
+  if (isSunday && presentStudents.length > 0) {
+    html += `<div style="background:linear-gradient(135deg,#0f6e56,#1db88a);border-radius:14px;padding:10px 16px;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:800;color:white;">✅ Present today — ${todayStr}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.8);">Tap a student to rate them</div>
+    </div>`;
+
+    presentStudents.forEach(s => {
+      const existing = getTrackerData(s.parentName, todayStr) || {};
+      const hasRating = Object.keys(existing).length > 0;
+      html += `
+      <div onclick="quickRateStudent('${s.parentName}','${todayStr}')"
+        style="background:white;border-radius:14px;padding:14px 16px;margin-bottom:10px;
+        box-shadow:0 2px 8px rgba(92,74,199,0.1);cursor:pointer;
+        border:2px solid ${hasRating ? "#22a06b" : "#ede9fb"};
+        display:flex;align-items:center;gap:12px;">
+        <div style="width:42px;height:42px;border-radius:50%;
+          background:linear-gradient(135deg,#3b2f8f,#5c4ac7);
+          display:flex;align-items:center;justify-content:center;
+          font-size:18px;font-weight:900;color:white;flex-shrink:0;">
+          ${s.childName.charAt(0)}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:800;color:#1a1535;">${s.childName}</div>
+          <div style="font-size:12px;color:#7b7a90;">Parent: ${s.parentName}</div>
+        </div>
+        <div style="font-size:12px;font-weight:800;color:${hasRating ? "#22a06b" : "#bbb"};">
+          ${hasRating ? "✅ Rated" : "Tap to rate →"}
+        </div>
+      </div>`;
+    });
+
+    html += `<div style="height:1px;background:#f0eefb;margin:16px 0;"></div>
+    <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Or search any parent</div>`;
+  }
+
+  html += `<div style="margin-bottom:10px;">
+    <select id="trackerParentSelect" onchange="loadTrackerForm()" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;margin-bottom:10px;">
+      <option value="">-- Select a parent --</option>`;
 
   allParents.forEach(p => {
     const ci = getChildInfoByParent(p.name);
-    const childLabel = ci && ci.name ? " · Child: " + ci.name + " (Gr." + ci.grade + ")" : " · child info pending";
+    const childLabel = ci && ci.name ? " · " + ci.name + " (Gr." + ci.grade + ")" : "";
     html += `<option value="${p.name}">${p.name}${childLabel}</option>`;
   });
 
   html += `</select>
-      <select id="trackerDateSelect" onchange="loadTrackerForm()" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;">
-        <option value="">-- Select Sunday --</option>`;
+    <select id="trackerDateSelect" onchange="loadTrackerForm()" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;">
+      <option value="">-- Select Sunday --</option>`;
 
   ALL_SUNDAYS.forEach(d => {
-    html += `<option value="${d}">📅 ${d}</option>`;
+    html += `<option value="${d}" ${d === todayStr ? "selected" : ""}>📅 ${d}</option>`;
   });
 
   html += `</select>
-    </div>
-    <div id="trackerForm"></div>`;
+  </div>
+  <div id="trackerForm"></div>`;
 
   document.getElementById("tabTrackerContent").innerHTML = html;
+  // Auto-load if today's date is pre-selected
+  if (isSunday) {
+    const dateSelect = document.getElementById("trackerDateSelect");
+    if (dateSelect) dateSelect.value = todayStr;
+  }
+}
+
+function quickRateStudent(parentName, date) {
+  // Pre-select in dropdowns and scroll to form
+  const parentSelect = document.getElementById("trackerParentSelect");
+  const dateSelect = document.getElementById("trackerDateSelect");
+  if (parentSelect) parentSelect.value = parentName;
+  if (dateSelect) dateSelect.value = date;
+  loadTrackerForm();
+  setTimeout(() => {
+    const form = document.getElementById("trackerForm");
+    if (form) form.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 100);
 }
 
 function loadTrackerForm() {
