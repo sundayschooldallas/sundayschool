@@ -1325,12 +1325,17 @@ async function renderAdvocateDash() {
           if (key && key.startsWith("tracker__")) keysToRemove.push(key);
         }
         keysToRemove.forEach(k => localStorage.removeItem(k));
-        // Now save only what's in Sheets
+        // Now save only what's in Sheets — normalize dates
         const byParent = {};
         rows.forEach(r => {
+          const normDate = normalizeDate(String(r.date));
           if (!byParent[r.parentName]) byParent[r.parentName] = {};
-          if (!byParent[r.parentName][r.date]) byParent[r.parentName][r.date] = {};
-          byParent[r.parentName][r.date][r.category] = { stars: r.stars, comment: r.comment };
+          if (!byParent[r.parentName][normDate]) byParent[r.parentName][normDate] = {};
+          const existing = byParent[r.parentName][normDate][r.category];
+          // Keep lowest stars
+          if (!existing || Number(r.stars) < existing.stars) {
+            byParent[r.parentName][normDate][r.category] = { stars: Number(r.stars), comment: r.comment };
+          }
         });
         Object.entries(byParent).forEach(([parentName, dates]) => {
           Object.entries(dates).forEach(([date, data]) => {
@@ -3071,15 +3076,19 @@ function renderRollCallScreen() {
 }
 
 async function autoDeductLateStars(todayStr) {
-  if (localStorage.getItem("rollCallAutoDeduct__" + todayStr)) {
-    console.log("autoDeductLateStars: already ran for", todayStr);
+  const now = getMockNow();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const cleanDate = months[now.getMonth()] + " " + now.getDate();
+
+  if (localStorage.getItem("rollCallAutoDeduct__" + cleanDate)) {
+    console.log("autoDeductLateStars: already ran for", cleanDate);
     return;
   }
-  localStorage.setItem("rollCallAutoDeduct__" + todayStr, "done");
+  localStorage.setItem("rollCallAutoDeduct__" + cleanDate, "done");
 
   const students = getRollCallStudents();
-  const rollData = getRollCallData(todayStr);
-  console.log("autoDeductLateStars:", todayStr, "students:", students.length, "rollData:", JSON.stringify(rollData));
+  const rollData = getRollCallData(cleanDate);
+  console.log("autoDeductLateStars:", cleanDate, "students:", students.length, "rollData:", JSON.stringify(rollData));
 
   let count = 0;
   const promises = [];
@@ -3088,13 +3097,11 @@ async function autoDeductLateStars(todayStr) {
     const isPresent = rollData[s.childName] === "present";
     console.log(s.childName, "present:", isPresent);
     if (!isPresent) {
-      // Save to localStorage
-      const existing = getTrackerData(s.parentName, todayStr) || {};
+      const existing = getTrackerData(s.parentName, cleanDate) || {};
       existing["punctuality"] = { stars: 1, comment: "Auto: not present at 10:15 AM roll call" };
-      saveTrackerData(s.parentName, todayStr, existing);
+      saveTrackerData(s.parentName, cleanDate, existing);
 
-      // Save to Google Sheets
-      const p = promises.push(
+      promises.push(
         fetch(SHEET_URL, {
           method: "POST",
           mode: "no-cors",
@@ -3102,7 +3109,7 @@ async function autoDeductLateStars(todayStr) {
           body: JSON.stringify({
             type: "tracker",
             parentName: s.parentName,
-            date: todayStr,
+            date: cleanDate,
             category: "punctuality",
             stars: 1,
             comment: "Auto: not present at 10:15 AM roll call"
@@ -3113,9 +3120,7 @@ async function autoDeductLateStars(todayStr) {
     }
   });
 
-  // Wait for all saves to complete
   await Promise.allSettled(promises);
-
   console.log("autoDeductLateStars: saved", count, "records to sheet");
   if (count > 0) {
     showToast("⏰ " + count + " student" + (count !== 1 ? "s" : "") + " marked late — saved to sheet.");
