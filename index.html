@@ -3021,6 +3021,16 @@ function renderRollCallScreen() {
 
   container.innerHTML = `
     ${timerHtml}
+    ${!isRealSunday ? `
+    <div style="margin-bottom:16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;">
+      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🧪 Test Controls</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="setRollCallMock('before')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.1);color:white;">⏳ 10:14 AM</button>
+        <button onclick="setRollCallMock('open')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(34,160,107,0.4);color:white;">🟢 10:16 AM</button>
+        <button onclick="setRollCallMock('closed')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(200,50,50,0.4);color:white;">🔴 10:26 AM</button>
+        <button onclick="setRollCallMock('real')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);">Real Time</button>
+      </div>
+    </div>` : ""}
     <div style="margin-bottom:20px;">
       <div style="background:linear-gradient(135deg,#0f6e56,#1db88a);border-radius:14px;padding:10px 16px;margin-bottom:10px;">
         <div style="font-size:14px;font-weight:800;color:white;">📗 Grade 7 — Bereket Isayas</div>
@@ -3035,16 +3045,6 @@ function renderRollCallScreen() {
       </div>
       ${grade8.length > 0 ? renderGroup(grade8,"linear-gradient(135deg,#3b2f8f,#5c4ac7)") : '<div style="color:rgba(255,255,255,0.4);font-size:13px;padding:10px;">No Grade 8 students yet</div>'}
     </div>
-    ${!isRealSunday ? `
-    <div style="margin-top:20px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;">
-      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🧪 Test Controls</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="setRollCallMock('before')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.1);color:white;">⏳ 10:14 AM</button>
-        <button onclick="setRollCallMock('open')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(34,160,107,0.4);color:white;">🟢 10:16 AM</button>
-        <button onclick="setRollCallMock('closed')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(200,50,50,0.4);color:white;">🔴 10:26 AM</button>
-        <button onclick="setRollCallMock('real')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);">Real Time</button>
-      </div>
-    </div>` : ""}
     `;
 
   // Auto-refresh every second for countdown
