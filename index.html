@@ -451,7 +451,7 @@ const avatarColors = [
 function normalize(p) { return String(p).replace(/\D/g, "").slice(-10); }
 function initials(name) { return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2); }
 
-const SHEET_URL = "https://script.google.com/macros/s/AKfycbxORxRQdFY3fUZGGVxWadIRBZB_IF5FKWBFFt3pGvBpv31kEEDTkuk480weZIGFlB91Qg/exec";
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbwGjkGjhHsGoq602mumDk9MqMzQKBnMkL55LXa5SsUyYrLu5py5kn_f6s_OBXPTmh4uLw/exec";
 
 // Local cache so UI stays fast
 const statuses = JSON.parse(localStorage.getItem("rosterStatuses") || "{}");
