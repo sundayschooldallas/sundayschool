@@ -1301,7 +1301,8 @@ const GRADE_ADMIN_PASSWORDS = {
   8: "JesusislordAdmin8",
   9: "JesusislordAdmin9"
 };
-let adminRole = "admin"; // "admin" or "superadmin"
+let adminRole = "admin"; // "admin", "superadmin", or "gradeadmin"
+let adminGrade = null; // null = all grades, 6/7/8/9 = specific grade
 
 function showAdminLogin() {
   document.getElementById("verifyScreen").style.display = "none";
@@ -1315,6 +1316,8 @@ function showVerify() {
   document.getElementById("verifyScreen").style.display = "flex";
   try { localStorage.removeItem("myPhone"); } catch(e) {}
   clearInterval(rollCallInterval);
+  adminRole = "admin";
+  adminGrade = null;
   myPhone = ""; myName = ""; myWeek = null; myParent = null; myPartner = null;
 }
 
@@ -1342,6 +1345,7 @@ async function verifyAdmin() {
     });
     if (gradeMatch !== null) {
       adminRole = "gradeadmin";
+      adminGrade = gradeMatch === 7 || gradeMatch === 8 ? 78 : gradeMatch;
       document.getElementById("adminLogin").style.display = "none";
       document.getElementById("adminDash").style.display = "block";
       document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
@@ -1697,22 +1701,25 @@ function renderAdminDash() {
   const roleTitle = document.getElementById("adminRoleTitle");
   const roleSub = document.getElementById("adminRoleSubtitle");
   if (roleIcon) roleIcon.textContent = isSuperAdmin ? "👑" : isGradeAdmin ? "📚" : "🛡️";
-  if (roleTitle) roleTitle.textContent = isSuperAdmin ? "Super Admin" : isGradeAdmin ? "Teacher Dashboard" : "Admin Dashboard";
+  if (roleTitle) roleTitle.textContent = isSuperAdmin ? "Super Admin" : isGradeAdmin ? "Grade " + (adminGrade === 78 ? "7 & 8" : adminGrade) + " Dashboard" : "Admin Dashboard";
   if (roleSub) roleSub.style.color = isSuperAdmin ? "rgba(255,215,0,0.8)" : "rgba(255,255,255,0.6)";
 
   // Super admin gets Students tab, regular admin doesn't
   const studentsTab = isSuperAdmin ? `<button id="tabStudents" onclick="showAdminTab('students')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">👦 Students</button>` : "";
+  const pinTab = !isGradeAdmin ? `<button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔐 PIN</button>` : "";
+  const swapTab = !isGradeAdmin ? `<button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔄 Swap</button>` : "";
+  const parentsTab = !isGradeAdmin ? `<button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">➕ Parents</button>` : "";
 
   container.innerHTML = `
     <div style="display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap;">
       <button id="tabAttendance" onclick="showAdminTab('attendance')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#3b2f8f;color:white;cursor:pointer;">📋 Attendance</button>
-      <button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔄 Swap</button>
-      <button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔐 PIN</button>
+      ${swapTab}
+      ${pinTab}
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🎓 Classes</button>
       ${studentsTab}
       ${isSuperAdmin ? `<button id="tabSuperAdmin" onclick="showAdminTab('superadmin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⚙️ Super</button>` : ""}
-      <button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">➕ Parents</button>
+      ${parentsTab}
     </div>
     <div id="tabAttendanceContent"></div>
     <div id="tabSwapContent" style="display:none;"></div>
@@ -2753,6 +2760,9 @@ function renderClassesTab() {
       const key = p.name;
       if (seen.has(key)) return;
       seen.add(key);
+      // Filter by adminGrade if grade admin
+      if (adminGrade && adminGrade !== 78 && ci.grade !== adminGrade) return;
+      if (adminGrade === 78 && ci.grade !== 7 && ci.grade !== 8) return;
       const entry = { child: ci.name, parent: p.name, teacher: ci.teacher || TEACHERS[ci.grade] || "", grade: ci.grade, h: p.h };
       if (ci.unassigned) { unassigned.push(entry); return; }
       if (ci.grade === 6) grade6.push(entry);
@@ -3004,13 +3014,25 @@ function renderTrackerTab() {
 
   // Get present students from today's roll call
   const rollData = getRollCallData(todayStr);
-  const presentStudents = getRollCallStudents().filter(s => rollData[s.childName] === "present");
+  const presentStudents = getRollCallStudents().filter(s => {
+    if (rollData[s.childName] !== "present") return false;
+    if (!adminGrade) return true;
+    if (adminGrade === 78) return s.grade === 7 || s.grade === 8;
+    return s.grade === adminGrade;
+  });
 
-  // Get all unique parents from roster
+  // Get all unique parents from roster — filtered by grade if grade admin
   const allParents = [];
   roster.forEach(week => {
     week.parents.forEach(p => {
-      if (!allParents.find(x => x.name === p.name)) allParents.push(p);
+      if (allParents.find(x => x.name === p.name)) return;
+      if (adminGrade) {
+        const ci = getChildInfoByParent(p.name);
+        const g = ci ? Number(ci.grade) : null;
+        if (adminGrade === 78 && g !== 7 && g !== 8) return;
+        if (adminGrade !== 78 && g !== adminGrade) return;
+      }
+      allParents.push(p);
     });
   });
 
