@@ -1730,7 +1730,7 @@ function renderAdminDash() {
       ${swapTab}
       ${pinTab}
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⭐ Tracker</button>
-      <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🎓 Classes</button>
+      <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🎓 Class</button>
       ${studentsTab}
       ${isSuperAdmin ? `<button id="tabSuperAdmin" onclick="showAdminTab('superadmin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⚙️ Super</button>` : ""}
       ${parentsTab}
@@ -2842,7 +2842,8 @@ function renderClassesTab() {
     week.parents.forEach(p => {
       const ci = getChildInfoByParent(p.name);
       if (!ci || !ci.name) {
-        if (!seen.has(p.name)) { seen.add(p.name); pending.push({ parent: p.name, h: p.h }); }
+        // Only add to pending if no grade filter OR parent has no grade yet
+        if (!adminGrade && !seen.has(p.name)) { seen.add(p.name); pending.push({ parent: p.name, h: p.h }); }
         return;
       }
       const key = p.name;
@@ -2926,7 +2927,8 @@ function renderClassesTab() {
     </div>`;
   }
 
-  if (pending.length > 0) {
+  // Only show pending section to super admin and regular admin — not grade admins
+  if (pending.length > 0 && !adminGrade) {
     html += `<div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
       <div style="background:linear-gradient(135deg,#854f0b,#f5a623);padding:14px 16px;">
         <div style="font-size:15px;font-weight:800;color:white;">⏳ Pending — No child info yet</div>
