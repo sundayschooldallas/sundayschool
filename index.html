@@ -2835,33 +2835,50 @@ function renderClassesTab() {
   const el = document.getElementById("tabClassesContent");
   if (!el) return;
 
-  const grade6 = [], grade7 = [], grade8 = [], grade9 = [], pending = [], unassigned = [];
+  // Collect ALL students regardless of adminGrade
+  const allGrades = { 6: [], 7: [], 8: [], 9: [] };
+  const pending = [], unassigned = [];
   const seen = new Set();
 
   roster.forEach(week => {
     week.parents.forEach(p => {
-      const ci = getChildInfoByParent(p.name);
+      // For childInfo, bypass adminGrade filter by reading directly
+      const fromSheet = childrenSheetData.find(r => r.parentName === p.name);
+      let ci = fromSheet ? { name: fromSheet.childName, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned } : null;
+      if (!ci) {
+        let ph = null;
+        roster.forEach(w => w.parents.forEach(x => { if (x.name === p.name) ph = x.h; }));
+        if (ph) { const raw = localStorage.getItem("childInfo__" + ph); if (raw) ci = JSON.parse(raw); }
+      }
+
       if (!ci || !ci.name) {
-        // Only add to pending if no grade filter OR parent has no grade yet
-        if (!adminGrade && !seen.has(p.name)) { seen.add(p.name); pending.push({ parent: p.name, h: p.h }); }
+        if (!seen.has(p.name) && !adminGrade) { seen.add(p.name); pending.push({ parent: p.name, h: p.h }); }
         return;
       }
-      const key = p.name;
-      if (seen.has(key)) return;
-      seen.add(key);
-      // Filter by adminGrade if grade admin
-      if (adminGrade && adminGrade !== 78 && ci.grade !== adminGrade) return;
-      if (adminGrade === 78 && ci.grade !== 7 && ci.grade !== 8) return;
-      const entry = { child: ci.name, parent: p.name, teacher: ci.teacher || TEACHERS[ci.grade] || "", grade: ci.grade, h: p.h };
+      if (seen.has(p.name)) return;
+      seen.add(p.name);
+      const g = Number(ci.grade);
+      const entry = { child: ci.name, parent: p.name, teacher: ci.teacher || TEACHERS[g] || "", grade: g, h: p.h };
       if (ci.unassigned) { unassigned.push(entry); return; }
-      if (ci.grade === 6) grade6.push(entry);
-      else if (ci.grade === 7) grade7.push(entry);
-      else if (ci.grade === 8) grade8.push(entry);
-      else if (ci.grade === 9) grade9.push(entry);
+      if (allGrades[g]) allGrades[g].push(entry);
     });
   });
 
-  const rowHTML = (e, color) => `
+  const gradeConfig = {
+    6:  { color: "linear-gradient(135deg,#854f0b,#f5a623)", label: "Grade 6", teacher: TEACHERS[6] || "Yemane Tsegay & Amots Michael" },
+    7:  { color: "linear-gradient(135deg,#0f6e56,#1db88a)", label: "Grade 7", teacher: TEACHERS[7] || "Bereket Isayas" },
+    8:  { color: "linear-gradient(135deg,#3b2f8f,#5c4ac7)", label: "Grade 8", teacher: TEACHERS[8] || "Amanuel Habte" },
+    9:  { color: "linear-gradient(135deg,#993556,#e05c8a)", label: "Grade 9", teacher: TEACHERS[9] || "Ruth" }
+  };
+
+  // Determine which grades this admin "owns"
+  const isMyGrade = (g) => {
+    if (!adminGrade || adminRole === "admin" || adminRole === "superadmin") return true;
+    if (adminGrade === 78) return g === 7 || g === 8;
+    return g === adminGrade;
+  };
+
+  const editRowHTML = (e, color) => `
     <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
       <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">${e.child.charAt(0).toUpperCase()}</div>
       <div style="flex:1;min-width:100px;">
@@ -2873,52 +2890,53 @@ function renderClassesTab() {
         <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${e.grade===7?8:e.grade===6?7:e.grade===8?9:8})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#ede9fb;color:#3b2f8f;">→ Gr.${e.grade===7?8:e.grade===6?7:e.grade===8?9:8}</button>
         <button onclick="unassignStudent('${e.h}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;">⏸ Unassign</button>
         <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
-      </div>` : `<div style="font-size:11px;color:#bbb;font-weight:700;">Grade ${e.grade}</div>`}
+      </div>` : `<div style="font-size:11px;color:#22a06b;font-weight:700;">✅ Your class</div>`}
     </div>`;
 
-  let html = `<div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">🎓 Children grouped by class. Swap, unassign, or remove as needed.</div>`;
+  const readRowHTML = (e, color) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:0.5px solid #f0eefb;">
+      <div style="width:30px;height:30px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;flex-shrink:0;opacity:0.7;">${e.child.charAt(0).toUpperCase()}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;color:#1a1535;">${e.child}</div>
+        <div style="font-size:11px;color:#bbb;">Parent: ${e.parent}</div>
+      </div>
+      <div style="font-size:10px;color:#bbb;font-weight:700;">👁 Read only</div>
+    </div>`;
 
-  html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
-    <div style="background:linear-gradient(135deg,#854f0b,#f5a623);padding:14px 16px;">
-      <div style="font-size:16px;font-weight:800;color:white;">Grade 6</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.85);">👨‍🏫 Yemane Tsegay & Amots Michael · ${grade6.length} student${grade6.length!==1?"s":""}</div>
-    </div>
-    ${grade6.length>0 ? grade6.map(e=>rowHTML(e,"linear-gradient(135deg,#854f0b,#f5a623)")).join("") : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No children registered yet.</div>'}
-  </div>`;
+  let html = `<div style="background:#e8e4fb;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">🎓 Your class has full edit rights. Other classes are read-only and collapsible.</div>`;
 
-  html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
-    <div style="background:linear-gradient(135deg,#0f6e56,#1db88a);padding:14px 16px;">
-      <div style="font-size:16px;font-weight:800;color:white;">Grade 7</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.85);">👨‍🏫 Bereket Isayas · ${grade7.length} student${grade7.length!==1?"s":""}</div>
-    </div>
-    ${grade7.length>0 ? grade7.map(e=>rowHTML(e,"linear-gradient(135deg,#0f6e56,#1db88a)")).join("") : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No children registered yet.</div>'}
-  </div>`;
+  [6, 7, 8, 9].forEach(g => {
+    const cfg = gradeConfig[g];
+    const students = allGrades[g];
+    const mine = isMyGrade(g);
+    const sectionId = "classSection_" + g;
 
-  html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
-    <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);padding:14px 16px;">
-      <div style="font-size:16px;font-weight:800;color:white;">Grade 8</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.85);">👨‍🏫 Amanuel Habte · ${grade8.length} student${grade8.length!==1?"s":""}</div>
-    </div>
-    ${grade8.length>0 ? grade8.map(e=>rowHTML(e,"linear-gradient(135deg,#3b2f8f,#5c4ac7)")).join("") : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No children registered yet.</div>'}
-  </div>`;
+    html += `
+    <div style="background:white;border-radius:16px;margin-bottom:12px;overflow:hidden;box-shadow:0 2px 10px rgba(92,74,199,0.08);">
+      <div onclick="toggleClassSection('${sectionId}')" style="background:${cfg.color};padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:15px;font-weight:800;color:white;">${cfg.label} ${mine && adminGrade ? "⭐ Your Class" : ""}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.85);">👨‍🏫 ${cfg.teacher} · ${students.length} student${students.length!==1?"s":""}</div>
+        </div>
+        <div id="${sectionId}_arrow" style="font-size:18px;color:white;transition:transform 0.2s;">${mine ? "▼" : "▶"}</div>
+      </div>
+      <div id="${sectionId}" style="display:${mine ? "block" : "none"};">
+        ${students.length > 0
+          ? students.map(e => mine ? editRowHTML(e, cfg.color) : readRowHTML(e, cfg.color)).join("")
+          : `<div style="padding:12px 14px;font-size:13px;color:#bbb;">${mine ? "No students registered yet." : "No students in this class yet."}</div>`}
+      </div>
+    </div>`;
+  });
 
-  html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
-    <div style="background:linear-gradient(135deg,#993556,#e05c8a);padding:14px 16px;">
-      <div style="font-size:16px;font-weight:800;color:white;">Grade 9</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.85);">👨‍🏫 Ruth · ${grade9.length} student${grade9.length!==1?"s":""}</div>
-    </div>
-    ${grade9.length>0 ? grade9.map(e=>rowHTML(e,"linear-gradient(135deg,#993556,#e05c8a)")).join("") : '<div style="padding:12px 14px;font-size:13px;color:#7b7a90;">No children registered yet.</div>'}
-  </div>`;
-
-  if (unassigned.length > 0) {
+  if (unassigned.length > 0 && !adminGrade) {
     html += `<div style="background:white;border-radius:16px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
       <div style="background:linear-gradient(135deg,#5a3e8a,#a07de0);padding:14px 16px;">
-        <div style="font-size:15px;font-weight:800;color:white;">⏸ Unassigned — Admin Hold</div>
+        <div style="font-size:15px;font-weight:800;color:white;">⏸ Unassigned</div>
         <div style="font-size:12px;color:rgba(255,255,255,0.85);">${unassigned.length} student${unassigned.length!==1?"s":""} on hold</div>
       </div>
       ${unassigned.map(e=>`
         <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
-          <div style="flex:1;"><div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div><div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent} · Was Grade ${e.grade}</div></div>
+          <div style="flex:1;"><div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div><div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div></div>
           <div style="display:flex;gap:5px;">
             <button onclick="reassignStudent('${e.h}','${e.child}',${e.grade})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e4f7ef;color:#0e6b47;">✅ Reassign</button>
             <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
@@ -2927,7 +2945,6 @@ function renderClassesTab() {
     </div>`;
   }
 
-  // Only show pending section to super admin and regular admin — not grade admins
   if (pending.length > 0 && !adminGrade) {
     html += `<div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
       <div style="background:linear-gradient(135deg,#854f0b,#f5a623);padding:14px 16px;">
@@ -2943,6 +2960,15 @@ function renderClassesTab() {
   }
 
   el.innerHTML = html;
+}
+
+function toggleClassSection(id) {
+  const section = document.getElementById(id);
+  const arrow = document.getElementById(id + "_arrow");
+  if (!section) return;
+  const isOpen = section.style.display !== "none";
+  section.style.display = isOpen ? "none" : "block";
+  if (arrow) arrow.textContent = isOpen ? "▶" : "▼";
 }
 
   // Find duplicates — same child name (case-insensitive) registered under multiple parents
