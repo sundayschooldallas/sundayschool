@@ -1603,17 +1603,31 @@ function getTodayRosterWeeks() {
 }
 
 function renderAdminTodayHero() {
+  const heroEl = document.getElementById("adminTodayHero");
+  const dateEl = document.getElementById("adminTodayDate");
+
+  // Grade admins don't see volunteer pair info — not their responsibility
+  if (adminGrade) {
+    const now = getMockNow();
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    if (dateEl) dateEl.textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, 2026`;
+    if (heroEl) heroEl.innerHTML = `
+      <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:12px 16px;text-align:center;">
+        <div style="font-size:13px;font-weight:800;color:rgba(255,255,255,0.7);">📚 Grade ${adminGrade === 78 ? "7 & 8" : adminGrade} Teacher Dashboard</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;">Use the tabs below to manage your class</div>
+      </div>`;
+    return;
+  }
+
   const now = getMockNow();
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const todayStr = `${months[now.getMonth()]} ${now.getDate()}`;
   const isSunday = now.getDay() === 0;
 
-  // Update date display
-  const dateEl = document.getElementById("adminTodayDate");
   if (dateEl) dateEl.textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, 2026`;
 
-  const heroEl = document.getElementById("adminTodayHero");
   if (!heroEl) return;
 
   // Find today's week
