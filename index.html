@@ -327,10 +327,10 @@
     <div style="position:absolute;bottom:-30px;left:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:24px;">🛡️</div>
+        <div style="font-size:24px;" id="adminRoleIcon">🛡️</div>
         <div>
-          <div style="font-size:17px;font-weight:800;">Admin Dashboard</div>
-          <div style="font-size:11px;opacity:0.6;margin-top:1px;">Sunday School — Grade 7 & 8</div>
+          <div style="font-size:17px;font-weight:800;" id="adminRoleTitle">Admin Dashboard</div>
+          <div style="font-size:11px;opacity:0.6;margin-top:1px;" id="adminRoleSubtitle">Sunday School — All Grades</div>
         </div>
       </div>
       <button onclick="showVerify()" style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:white;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:7px 14px;cursor:pointer;position:relative;z-index:10;">Sign out</button>
@@ -1290,10 +1290,12 @@ function showToast(msg) {
 
 // ── ADMIN ─────────────────────────────────────────────
 const ADMIN_PASSWORD = "Jesusislord";
+const SUPER_ADMIN_PASSWORD = "Jesusislord4SuperAdmin";
 const ADVOCATE_PASSWORD = "Jesusislord4Lemlem";
 const ROLL_CALL_PASSWORD = "JesusislordRollCall";
 const ROLL_CALL_PASSWORD_G6 = "JesusislordForGrade6";
 const ROLL_CALL_PASSWORD_G9 = "JesusislordForGrade9";
+let adminRole = "admin"; // "admin" or "superadmin"
 
 function showAdminLogin() {
   document.getElementById("verifyScreen").style.display = "none";
@@ -1312,7 +1314,15 @@ function showVerify() {
 
 async function verifyAdmin() {
   const pw = document.getElementById("adminPwInput").value;
-  if (pw === ADMIN_PASSWORD) {
+  if (pw === SUPER_ADMIN_PASSWORD) {
+    adminRole = "superadmin";
+    document.getElementById("adminLogin").style.display = "none";
+    document.getElementById("adminDash").style.display = "block";
+    document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
+    await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
+    renderAdminDash();
+  } else if (pw === ADMIN_PASSWORD) {
+    adminRole = "admin";
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("adminDash").style.display = "block";
     document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
@@ -1326,7 +1336,7 @@ async function verifyAdmin() {
     await renderAdvocateDash();
   } else if (pw === ROLL_CALL_PASSWORD) {
     document.getElementById("adminLogin").style.display = "none";
-    showRollCallDash(7); // Grade 7 & 8
+    showRollCallDash(7);
   } else if (pw === ROLL_CALL_PASSWORD_G6) {
     document.getElementById("adminLogin").style.display = "none";
     showRollCallDash(6);
@@ -1653,16 +1663,27 @@ function renderAdminDash() {
   const isSunday = now.getDay() === 0;
   const isPastCheck = hour >= 11;
   const container = document.getElementById("adminContent");
+  const isSuperAdmin = adminRole === "superadmin";
+
+  // Update header based on role
+  const roleIcon = document.getElementById("adminRoleIcon");
+  const roleTitle = document.getElementById("adminRoleTitle");
+  const roleSub = document.getElementById("adminRoleSubtitle");
+  if (roleIcon) roleIcon.textContent = isSuperAdmin ? "👑" : "🛡️";
+  if (roleTitle) roleTitle.textContent = isSuperAdmin ? "Super Admin" : "Admin Dashboard";
+  if (roleSub) roleSub.style.color = isSuperAdmin ? "rgba(255,215,0,0.8)" : "rgba(255,255,255,0.6)";
+
+  // Super admin gets Students tab, regular admin doesn't
+  const studentsTab = isSuperAdmin ? `<button id="tabStudents" onclick="showAdminTab('students')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">👦 Students</button>` : "";
 
   container.innerHTML = `
-    <!-- TABS -->
     <div style="display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap;">
       <button id="tabAttendance" onclick="showAdminTab('attendance')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#3b2f8f;color:white;cursor:pointer;">📋 Attendance</button>
       <button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔄 Swap</button>
       <button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔐 PIN</button>
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🎓 Classes</button>
-      <button id="tabStudents" onclick="showAdminTab('students')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">👦 Students</button>
+      ${studentsTab}
       <button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">➕ Parents</button>
     </div>
     <div id="tabAttendanceContent"></div>
@@ -2038,10 +2059,10 @@ function renderPinTab() {
           </div>
 
           <div style="margin-top:10px;border-top:0.5px solid #f0eefb;padding-top:10px;">
-            <button onclick="fullRemoveParent('${p.name}','${p.h}','${week.date}')"
+            ${adminRole === "superadmin" ? `<button onclick="fullRemoveParent('${p.name}','${p.h}','${week.date}')"
               style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:#fdeaea;color:#a32d2d;border:1.5px solid #f7bfbf;border-radius:10px;cursor:pointer;">
               🗑️ Fully Remove ${p.name} from System
-            </button>
+            </button>` : `<div style="font-size:11px;color:#bbb;text-align:center;">🔒 Full removal — Super Admin only</div>`}
           </div>
         </div>`;
     });
@@ -2537,11 +2558,12 @@ function renderClassesTab() {
         <div style="font-size:14px;font-weight:800;color:#1a1535;">${e.child}</div>
         <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div>
       </div>
+      ${adminRole === "superadmin" ? `
       <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
-        <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${e.grade===7?8:7})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#ede9fb;color:#3b2f8f;">→ ${e.grade===7?"Gr.8":"Gr.7"}</button>
+        <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${e.grade===7?8:e.grade===6?7:e.grade===8?9:8})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#ede9fb;color:#3b2f8f;">→ Gr.${e.grade===7?8:e.grade===6?7:e.grade===8?9:8}</button>
         <button onclick="unassignStudent('${e.h}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;">⏸ Unassign</button>
         <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">✕ Remove</button>
-      </div>
+      </div>` : `<div style="font-size:11px;color:#bbb;font-weight:700;">Grade ${e.grade}</div>`}
     </div>`;
 
   let html = `<div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">🎓 Children grouped by class. Swap, unassign, or remove as needed.</div>`;
