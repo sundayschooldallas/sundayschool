@@ -1295,6 +1295,12 @@ const ADVOCATE_PASSWORD = "Jesusislord4Lemlem";
 const ROLL_CALL_PASSWORD = "JesusislordRollCall";
 const ROLL_CALL_PASSWORD_G6 = "JesusislordForGrade6";
 const ROLL_CALL_PASSWORD_G9 = "JesusislordForGrade9";
+const GRADE_ADMIN_PASSWORDS = {
+  6: "JesusislordAdmin6",
+  7: "JesusislordAdmin7",
+  8: "JesusislordAdmin8",
+  9: "JesusislordAdmin9"
+};
 let adminRole = "admin"; // "admin" or "superadmin"
 
 function showAdminLogin() {
@@ -1328,23 +1334,37 @@ async function verifyAdmin() {
     document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
     await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
     renderAdminDash();
-  } else if (pw === ADVOCATE_PASSWORD) {
-    document.getElementById("adminLogin").style.display = "none";
-    document.getElementById("advocateDash").style.display = "block";
-    document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">⏳ Loading data from server...</div>`;
-    await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
-    await renderAdvocateDash();
-  } else if (pw === ROLL_CALL_PASSWORD) {
-    document.getElementById("adminLogin").style.display = "none";
-    showRollCallDash(7);
-  } else if (pw === ROLL_CALL_PASSWORD_G6) {
-    document.getElementById("adminLogin").style.display = "none";
-    showRollCallDash(6);
-  } else if (pw === ROLL_CALL_PASSWORD_G9) {
-    document.getElementById("adminLogin").style.display = "none";
-    showRollCallDash(9);
   } else {
-    document.getElementById("adminError").style.display = "block";
+    // Check grade admin passwords
+    let gradeMatch = null;
+    Object.entries(GRADE_ADMIN_PASSWORDS).forEach(([grade, gpw]) => {
+      if (pw === gpw) gradeMatch = Number(grade);
+    });
+    if (gradeMatch !== null) {
+      adminRole = "gradeadmin";
+      document.getElementById("adminLogin").style.display = "none";
+      document.getElementById("adminDash").style.display = "block";
+      document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
+      await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
+      renderAdminDash();
+    } else if (pw === ADVOCATE_PASSWORD) {
+      document.getElementById("adminLogin").style.display = "none";
+      document.getElementById("advocateDash").style.display = "block";
+      document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">⏳ Loading data from server...</div>`;
+      await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
+      await renderAdvocateDash();
+    } else if (pw === ROLL_CALL_PASSWORD) {
+      document.getElementById("adminLogin").style.display = "none";
+      showRollCallDash(7);
+    } else if (pw === ROLL_CALL_PASSWORD_G6) {
+      document.getElementById("adminLogin").style.display = "none";
+      showRollCallDash(6);
+    } else if (pw === ROLL_CALL_PASSWORD_G9) {
+      document.getElementById("adminLogin").style.display = "none";
+      showRollCallDash(9);
+    } else {
+      document.getElementById("adminError").style.display = "block";
+    }
   }
 }
 
@@ -1670,13 +1690,14 @@ function renderAdminDash() {
   const isPastCheck = hour >= 11;
   const container = document.getElementById("adminContent");
   const isSuperAdmin = adminRole === "superadmin";
+  const isGradeAdmin = adminRole === "gradeadmin";
 
   // Update header based on role
   const roleIcon = document.getElementById("adminRoleIcon");
   const roleTitle = document.getElementById("adminRoleTitle");
   const roleSub = document.getElementById("adminRoleSubtitle");
-  if (roleIcon) roleIcon.textContent = isSuperAdmin ? "👑" : "🛡️";
-  if (roleTitle) roleTitle.textContent = isSuperAdmin ? "Super Admin" : "Admin Dashboard";
+  if (roleIcon) roleIcon.textContent = isSuperAdmin ? "👑" : isGradeAdmin ? "📚" : "🛡️";
+  if (roleTitle) roleTitle.textContent = isSuperAdmin ? "Super Admin" : isGradeAdmin ? "Teacher Dashboard" : "Admin Dashboard";
   if (roleSub) roleSub.style.color = isSuperAdmin ? "rgba(255,215,0,0.8)" : "rgba(255,255,255,0.6)";
 
   // Super admin gets Students tab, regular admin doesn't
@@ -1837,6 +1858,10 @@ function renderSuperAdminTab() {
       ${[
         { label: "👑 Super Admin", pw: "Jesusislord4SuperAdmin" },
         { label: "🛡️ Admin", pw: adminPw },
+        { label: "📚 Grade 6 Teacher", pw: "JesusislordAdmin6" },
+        { label: "📚 Grade 7 Teacher", pw: "JesusislordAdmin7" },
+        { label: "📚 Grade 8 Teacher", pw: "JesusislordAdmin8" },
+        { label: "📚 Grade 9 Teacher", pw: "JesusislordAdmin9" },
         { label: "💚 Advocate (Lemlem)", pw: "Jesusislord4Lemlem" },
         { label: "📋 Roll Call — Grade 7 & 8", pw: "JesusislordRollCall" },
         { label: "📋 Roll Call — Grade 6", pw: "JesusislordForGrade6" },
