@@ -1763,13 +1763,19 @@ function showAdminTab(tab) {
     const btn = document.getElementById("tab" + idSuffix);
     if (btn) { btn.style.background = tab === t ? "#3b2f8f" : "#ede9fb"; btn.style.color = tab === t ? "white" : "#3b2f8f"; }
   });
-  if (tab === "classes" || tab === "tracker") {
+  if (tab === "classes") {
+    // Load ALL children for the class tab (read-only view of all grades)
+    const savedGrade = adminGrade;
+    adminGrade = null; // temporarily clear so all grades load
     loadChildrenFromSheet().then(() => {
-      if (tab === "classes") renderClassesTab();
-      if (tab === "tracker") renderTrackerTab();
+      adminGrade = savedGrade; // restore
+      renderClassesTab();
     }).catch(() => {
-      if (tab === "classes") renderClassesTab();
+      adminGrade = savedGrade;
+      renderClassesTab();
     });
+  } else if (tab === "tracker") {
+    loadChildrenFromSheet().then(() => renderTrackerTab()).catch(() => {});
   }
   if (tab === "students") {
     loadChildrenFromSheet().then(() => renderStudentsTab()).catch(() => renderStudentsTab());
@@ -2835,28 +2841,37 @@ function renderClassesTab() {
   const el = document.getElementById("tabClassesContent");
   if (!el) return;
 
-  // Collect ALL students regardless of adminGrade
+  // Collect ALL students — bypass adminGrade filter for display
+  // We use raw sheet data loaded separately so all grades show
   const allGrades = { 6: [], 7: [], 8: [], 9: [] };
   const pending = [], unassigned = [];
   const seen = new Set();
 
+  // Build a full child lookup from both childrenSheetData AND localStorage (bypass grade filter)
+  const fullChildMap = {};
+  // From sheet data (may be filtered — supplement with localStorage)
+  childrenSheetData.forEach(row => {
+    if (row.parentName && row.childName) fullChildMap[row.parentName] = { name: row.childName, grade: Number(row.grade), teacher: row.teacher, unassigned: row.unassigned };
+  });
+  // Also check localStorage for all roster parents
   roster.forEach(week => {
     week.parents.forEach(p => {
-      // For childInfo, bypass adminGrade filter by reading directly
-      const fromSheet = childrenSheetData.find(r => r.parentName === p.name);
-      let ci = fromSheet ? { name: fromSheet.childName, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned } : null;
-      if (!ci) {
-        let ph = null;
-        roster.forEach(w => w.parents.forEach(x => { if (x.name === p.name) ph = x.h; }));
-        if (ph) { const raw = localStorage.getItem("childInfo__" + ph); if (raw) ci = JSON.parse(raw); }
+      if (!fullChildMap[p.name]) {
+        const raw = localStorage.getItem("childInfo__" + p.h);
+        if (raw) { try { const ci = JSON.parse(raw); if (ci.name) fullChildMap[p.name] = ci; } catch(e) {} }
       }
+    });
+  });
 
-      if (!ci || !ci.name) {
-        if (!seen.has(p.name) && !adminGrade) { seen.add(p.name); pending.push({ parent: p.name, h: p.h }); }
-        return;
-      }
+  roster.forEach(week => {
+    week.parents.forEach(p => {
       if (seen.has(p.name)) return;
       seen.add(p.name);
+      const ci = fullChildMap[p.name];
+      if (!ci || !ci.name) {
+        if (!adminGrade) pending.push({ parent: p.name, h: p.h });
+        return;
+      }
       const g = Number(ci.grade);
       const entry = { child: ci.name, parent: p.name, teacher: ci.teacher || TEACHERS[g] || "", grade: g, h: p.h };
       if (ci.unassigned) { unassigned.push(entry); return; }
