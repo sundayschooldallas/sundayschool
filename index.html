@@ -1732,16 +1732,17 @@ function renderAdminDash() {
   `;
 
   renderAttendanceTab(isSunday, isPastCheck);
-  try { renderSwapTab(); } catch(e) { console.log("SwapTab error:", e); }
-  try { renderPinTab(); } catch(e) { console.log("PinTab error:", e); }
+  if (!isGradeAdmin) { try { renderSwapTab(); } catch(e) { console.log("SwapTab error:", e); } }
+  if (!isGradeAdmin) { try { renderPinTab(); } catch(e) { console.log("PinTab error:", e); } }
   try { renderTrackerTab(); } catch(e) { console.log("TrackerTab error:", e); document.getElementById("tabTrackerContent").innerHTML = `<div style="padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`; }
   try { renderClassesTab(); } catch(e) { console.log("ClassesTab error:", e); }
-  try { renderParentsTab(); } catch(e) { console.log("ParentsTab error:", e); document.getElementById("tabParentsContent").innerHTML = `<div style="padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`; }
+  if (!isGradeAdmin) { try { renderParentsTab(); } catch(e) { console.log("ParentsTab error:", e); document.getElementById("tabParentsContent").innerHTML = `<div style="padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`; } }
   renderAdminTodayHero();
 }
 
 function showAdminTab(tab) {
-  ["attendance","swap","pin","tracker","classes","students","superadmin","parents"].forEach(t => {
+  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents"];
+  allTabs.forEach(t => {
     const idSuffix = t === "superadmin" ? "SuperAdmin" : t.charAt(0).toUpperCase() + t.slice(1);
     const content = document.getElementById("tab" + idSuffix + "Content");
     if (content) content.style.display = tab === t ? "block" : "none";
