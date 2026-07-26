@@ -980,6 +980,7 @@ let mockOverride = null;
 let mockStartReal = null;
 let mockStartTime = null;
 let rollCallInterval = null;
+let rollCallGrade = 78; // 78 = grades 7&8, 6 = grade 6, 9 = grade 9
 
 function getMockNow() {
   if (!mockOverride) return new Date();
@@ -3107,8 +3108,6 @@ function saveRollCallEntry(date, childName, status) {
   data[childName] = status;
   localStorage.setItem(getRollCallKey(date), JSON.stringify(data));
 }
-
-let rollCallGrade = 78; // 78 = grades 7&8, 6 = grade 6, 9 = grade 9
 
 function showRollCallDash(grade) {
   if (grade !== undefined) rollCallGrade = grade;
