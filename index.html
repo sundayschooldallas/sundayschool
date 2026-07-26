@@ -1782,6 +1782,26 @@ function renderSuperAdminTab() {
             </button>
           </div>
         </div>`).join("")}
+
+      <!-- ADD NEW GRADE SECTION -->
+      <div style="padding:14px;border-top:2px solid #f0eefb;background:#f8f7ff;">
+        <div style="font-size:13px;font-weight:800;color:#3b2f8f;margin-bottom:10px;">➕ Add New Grade & Teacher</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input id="newGradeNum" type="number" placeholder="Grade #" min="1" max="12"
+            style="width:90px;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:10px;outline:none;color:#1a1535;" />
+          <input id="newGradeTeacher" type="text" placeholder="Teacher name(s)"
+            style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:10px;outline:none;color:#1a1535;" />
+        </div>
+        <div style="margin-bottom:8px;">
+          <input id="newGradePassword" type="text" placeholder="Roll call password (e.g. JesusislordForGrade10)"
+            style="width:100%;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:10px;outline:none;color:#1a1535;box-sizing:border-box;" />
+        </div>
+        <button onclick="addNewGrade()"
+          style="width:100%;padding:11px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;background:linear-gradient(135deg,#0f6e56,#1db88a);color:white;border:none;border-radius:10px;cursor:pointer;">
+          ➕ Add Grade & Teacher
+        </button>
+        <div id="newGradeResult" style="margin-top:8px;font-size:12px;font-weight:700;color:#0e6b47;display:none;"></div>
+      </div>
     </div>
 
     <!-- PASSWORD MANAGEMENT -->
@@ -1827,6 +1847,45 @@ function renderSuperAdminTab() {
           <div style="font-size:12px;font-weight:800;color:#5c4ac7;background:#ede9fb;padding:4px 10px;border-radius:8px;">${p.pw}</div>
         </div>`).join("")}
     </div>`;
+}
+
+function addNewGrade() {
+  const gradeNum = parseInt(document.getElementById("newGradeNum").value);
+  const teacherName = document.getElementById("newGradeTeacher").value.trim();
+  const password = document.getElementById("newGradePassword").value.trim();
+
+  if (!gradeNum || !teacherName) {
+    showToast("❌ Please enter a grade number and teacher name.");
+    return;
+  }
+
+  // Save teacher
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  customTeachers[gradeNum] = teacherName;
+  localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
+  TEACHERS[gradeNum] = teacherName;
+
+  // Save password if provided
+  if (password) {
+    const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+    customPws["rollcall_grade" + gradeNum] = password;
+    localStorage.setItem("customAdminPws", JSON.stringify(customPws));
+  }
+
+  const result = document.getElementById("newGradeResult");
+  if (result) {
+    result.style.display = "block";
+    result.textContent = "✅ Grade " + gradeNum + " added with teacher " + teacherName + (password ? " · Roll call password: " + password : "");
+  }
+
+  // Clear inputs
+  document.getElementById("newGradeNum").value = "";
+  document.getElementById("newGradeTeacher").value = "";
+  document.getElementById("newGradePassword").value = "";
+
+  showToast("✅ Grade " + gradeNum + " — " + teacherName + " added!");
+  renderSuperAdminTab();
+  renderClassesTab();
 }
 
 function saveTeacherAssignment(grade) {
