@@ -1658,6 +1658,12 @@ function renderAdminTodayHero() {
 }
 
 function renderAdminDash() {
+  // Load custom teacher overrides
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  Object.keys(customTeachers).forEach(g => { TEACHERS[Number(g)] = customTeachers[g]; });
+  // Load custom admin password
+  const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+
   const now = getMockNow();
   const hour = now.getHours();
   const isSunday = now.getDay() === 0;
@@ -1684,6 +1690,7 @@ function renderAdminDash() {
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🎓 Classes</button>
       ${studentsTab}
+      ${isSuperAdmin ? `<button id="tabSuperAdmin" onclick="showAdminTab('superadmin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">⚙️ Super</button>` : ""}
       <button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">➕ Parents</button>
     </div>
     <div id="tabAttendanceContent"></div>
@@ -1692,6 +1699,7 @@ function renderAdminDash() {
     <div id="tabTrackerContent" style="display:none;"></div>
     <div id="tabClassesContent" style="display:none;"></div>
     <div id="tabStudentsContent" style="display:none;"></div>
+    <div id="tabSuperAdminContent" style="display:none;"></div>
     <div id="tabParentsContent" style="display:none;"></div>
   `;
 
@@ -1705,7 +1713,7 @@ function renderAdminDash() {
 }
 
 function showAdminTab(tab) {
-  ["attendance","swap","pin","tracker","classes","students","parents"].forEach(t => {
+  ["attendance","swap","pin","tracker","classes","students","superadmin","parents"].forEach(t => {
     const content = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1) + "Content");
     if (content) content.style.display = tab === t ? "block" : "none";
     const btn = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1));
@@ -1722,6 +1730,124 @@ function showAdminTab(tab) {
   if (tab === "students") {
     loadChildrenFromSheet().then(() => renderStudentsTab()).catch(() => renderStudentsTab());
   }
+  if (tab === "superadmin") renderSuperAdminTab();
+}
+
+function renderSuperAdminTab() {
+  const el = document.getElementById("tabSuperAdminContent");
+  if (!el) return;
+
+  // Load custom teachers from localStorage
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const teachers = {
+    6: customTeachers[6] || TEACHERS[6],
+    7: customTeachers[7] || TEACHERS[7],
+    8: customTeachers[8] || TEACHERS[8],
+    9: customTeachers[9] || TEACHERS[9]
+  };
+
+  // Load custom passwords
+  const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+  const adminPw = customPws.admin || "Jesusislord";
+
+  const gradeColors = {
+    6: "#f5a623", 7: "#1db88a", 8: "#5c4ac7", 9: "#e05c8a"
+  };
+
+  el.innerHTML = `
+    <div style="background:linear-gradient(135deg,#1a0a2e,#3b2f8f);border-radius:16px;padding:16px;margin-bottom:16px;color:white;">
+      <div style="font-size:16px;font-weight:800;">👑 Super Admin Controls</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">Only you can see and change these settings</div>
+    </div>
+
+    <!-- TEACHER MANAGEMENT -->
+    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);margin-bottom:14px;">
+      <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:white;">👨‍🏫 Teacher Assignments</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Change which teacher is assigned to each grade</div>
+      </div>
+      ${[6,7,8,9].map(g => `
+        <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
+          <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:6px;">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${gradeColors[g]};margin-right:6px;"></span>
+            Grade ${g}
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="teacher_grade${g}" type="text" value="${teachers[g]}"
+              style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:10px;outline:none;color:#1a1535;" />
+            <button onclick="saveTeacherAssignment(${g})"
+              style="padding:9px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+              💾 Save
+            </button>
+          </div>
+        </div>`).join("")}
+    </div>
+
+    <!-- PASSWORD MANAGEMENT -->
+    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);margin-bottom:14px;">
+      <div style="background:linear-gradient(135deg,#854f0b,#f5a623);padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:white;">🔐 Manage Passwords</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Update access passwords for each portal</div>
+      </div>
+      ${[
+        { label: "🛡️ Admin password", key: "admin", current: adminPw, placeholder: "Admin password" },
+      ].map(p => `
+        <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
+          <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:6px;">${p.label}</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="pw_${p.key}" type="text" value="${p.current}" placeholder="${p.placeholder}"
+              style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:10px;outline:none;color:#1a1535;" />
+            <button onclick="saveAdminPassword('${p.key}')"
+              style="padding:9px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#854f0b,#f5a623);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+              💾 Save
+            </button>
+          </div>
+        </div>`).join("")}
+      <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;background:#f4f3f8;border-radius:0 0 16px 16px;">
+        <div style="font-size:11px;color:#7b7a90;font-weight:700;">🔒 Super Admin password can only be changed by editing the source code.</div>
+      </div>
+    </div>
+
+    <!-- ALL PASSWORDS SUMMARY -->
+    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);">
+      <div style="background:linear-gradient(135deg,#0d3b2e,#0f6e56);padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:white;">📋 All Passwords Summary</div>
+      </div>
+      ${[
+        { label: "👑 Super Admin", pw: "Jesusislord4SuperAdmin" },
+        { label: "🛡️ Admin", pw: adminPw },
+        { label: "💚 Advocate (Lemlem)", pw: "Jesusislord4Lemlem" },
+        { label: "📋 Roll Call — Grade 7 & 8", pw: "JesusislordRollCall" },
+        { label: "📋 Roll Call — Grade 6", pw: "JesusislordForGrade6" },
+        { label: "📋 Roll Call — Grade 9", pw: "JesusislordForGrade9" },
+      ].map(p => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
+          <div style="font-size:13px;font-weight:700;color:#1a1535;">${p.label}</div>
+          <div style="font-size:12px;font-weight:800;color:#5c4ac7;background:#ede9fb;padding:4px 10px;border-radius:8px;">${p.pw}</div>
+        </div>`).join("")}
+    </div>`;
+}
+
+function saveTeacherAssignment(grade) {
+  const val = document.getElementById("teacher_grade" + grade).value.trim();
+  if (!val) return;
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  customTeachers[grade] = val;
+  localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
+  TEACHERS[grade] = val;
+  showToast("✅ Grade " + grade + " teacher updated to " + val);
+  renderSuperAdminTab();
+  renderClassesTab();
+}
+
+function saveAdminPassword(key) {
+  const val = document.getElementById("pw_" + key).value.trim();
+  if (!val) return;
+  const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+  customPws[key] = val;
+  localStorage.setItem("customAdminPws", JSON.stringify(customPws));
+  showToast("✅ Admin password updated! Share the new password with your team.");
+  renderSuperAdminTab();
 }
 
 function renderStudentsTab() {
