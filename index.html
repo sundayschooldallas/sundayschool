@@ -1714,9 +1714,10 @@ function renderAdminDash() {
 
 function showAdminTab(tab) {
   ["attendance","swap","pin","tracker","classes","students","superadmin","parents"].forEach(t => {
-    const content = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1) + "Content");
+    const idSuffix = t === "superadmin" ? "SuperAdmin" : t.charAt(0).toUpperCase() + t.slice(1);
+    const content = document.getElementById("tab" + idSuffix + "Content");
     if (content) content.style.display = tab === t ? "block" : "none";
-    const btn = document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1));
+    const btn = document.getElementById("tab" + idSuffix);
     if (btn) { btn.style.background = tab === t ? "#3b2f8f" : "#ede9fb"; btn.style.color = tab === t ? "white" : "#3b2f8f"; }
   });
   if (tab === "classes" || tab === "tracker") {
