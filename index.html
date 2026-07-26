@@ -2168,6 +2168,13 @@ function renderSwapTab() {
     <option value="">-- Select a parent --</option>`;
   roster.forEach(week => {
     week.parents.forEach(p => {
+      if (adminGrade) {
+        const ci = getChildInfoByParent(p.name);
+        if (!ci || !ci.grade) return;
+        const g = Number(ci.grade);
+        if (adminGrade === 78 && g !== 7 && g !== 8) return;
+        if (adminGrade !== 78 && g !== adminGrade) return;
+      }
       parentOptions += `<option value="${week.date}|${p.name}">${p.name} — currently ${week.date}</option>`;
     });
   });
@@ -2187,7 +2194,17 @@ function renderSwapTab() {
   html += `<div id="swapResult" style="margin-top:14px;display:none;"></div>`;
 
   // ── MAKE SOLE CONTACT SECTION ──
-  const pairs = roster.filter(w => w.parents.length === 2);
+  const pairs = roster.filter(w => {
+    if (!adminGrade) return w.parents.length === 2;
+    const gradeParents = w.parents.filter(p => {
+      const ci = getChildInfoByParent(p.name);
+      if (!ci || !ci.grade) return false;
+      const g = Number(ci.grade);
+      if (adminGrade === 78) return g === 7 || g === 8;
+      return g === adminGrade;
+    });
+    return gradeParents.length === 2;
+  });
   if (pairs.length > 0) {
     html += `
     <div style="margin-top:20px;">
@@ -2273,6 +2290,14 @@ function renderPinTab() {
 
   roster.forEach(week => {
     week.parents.forEach(p => {
+      // Filter by grade if grade admin
+      if (adminGrade) {
+        const ci = getChildInfoByParent(p.name);
+        if (!ci || !ci.grade) return;
+        const g = Number(ci.grade);
+        if (adminGrade === 78 && g !== 7 && g !== 8) return;
+        if (adminGrade !== 78 && g !== adminGrade) return;
+      }
       const currentPin = customPins[p.name] || p.pin;
       const safeId = p.name.replace(/\s|\./g,'_');
       html += `
@@ -2649,7 +2674,13 @@ function renderParentsTab() {
     `<option value="new_aug23">📅 Aug 23 — new date</option>` +
     `<option value="new_aug30">📅 Aug 30 — new date</option>`;
 
+  const gradeNote = adminGrade ? `
+    <div style="background:#e4f7ef;border-radius:14px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#0e6b47;font-weight:700;">
+      📚 You are adding a parent for Grade ${adminGrade === 78 ? "7 & 8" : adminGrade}. Once added, ask the parent to log in and register their child in Grade ${adminGrade === 78 ? "7 or 8" : adminGrade}.
+    </div>` : "";
+
   let html = `
+    ${gradeNote}
     <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
       ➕ Add a new parent to the roster. The system will suggest the best available slot automatically.
     </div>
