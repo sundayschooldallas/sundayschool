@@ -2091,6 +2091,14 @@ function renderAttendanceTab(isSunday, isPastCheck) {
     const noShows = [];
     todayWeeks.forEach(week => {
       week.parents.forEach(p => {
+        // Filter by grade if grade admin
+        if (adminGrade) {
+          const ci = getChildInfoByParent(p.name);
+          if (!ci || !ci.grade) return;
+          const g = Number(ci.grade);
+          if (adminGrade === 78 && g !== 7 && g !== 8) return;
+          if (adminGrade !== 78 && g !== adminGrade) return;
+        }
         if (getStatus(week.date, p.name) !== "confirmed") noShows.push({ ...p, date: week.date });
       });
     });
