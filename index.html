@@ -1674,11 +1674,11 @@ function renderAdminDash() {
   `;
 
   renderAttendanceTab(isSunday, isPastCheck);
-  renderSwapTab();
-  renderPinTab();
-  renderTrackerTab();
-  renderClassesTab();
-  renderParentsTab();
+  try { renderSwapTab(); } catch(e) { console.log("SwapTab error:", e); }
+  try { renderPinTab(); } catch(e) { console.log("PinTab error:", e); }
+  try { renderTrackerTab(); } catch(e) { console.log("TrackerTab error:", e); document.getElementById("tabTrackerContent").innerHTML = `<div style="padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`; }
+  try { renderClassesTab(); } catch(e) { console.log("ClassesTab error:", e); }
+  try { renderParentsTab(); } catch(e) { console.log("ParentsTab error:", e); document.getElementById("tabParentsContent").innerHTML = `<div style="padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`; }
   renderAdminTodayHero();
 }
 
