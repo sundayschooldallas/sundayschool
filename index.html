@@ -2102,9 +2102,20 @@ function renderAttendanceTab(isSunday, isPastCheck) {
 
   html += `<div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Full Roster Status</div>`;
   roster.forEach(week => {
+    // Filter parents by grade if grade admin
+    const parents = adminGrade ? week.parents.filter(p => {
+      const ci = getChildInfoByParent(p.name);
+      if (!ci || !ci.grade) return false;
+      const g = Number(ci.grade);
+      if (adminGrade === 78) return g === 7 || g === 8;
+      return g === adminGrade;
+    }) : week.parents;
+
+    if (parents.length === 0) return; // skip weeks with no relevant parents
+
     html += `<div style="background:white;border-radius:14px;margin-bottom:10px;overflow:hidden;box-shadow:0 2px 10px rgba(92,74,199,0.08);">
       <div style="background:#ede9fb;padding:9px 14px;font-size:13px;font-weight:800;color:#3b2f8f;">📅 ${week.date}${week.perf ? " ⭐" : ""}</div>`;
-    week.parents.forEach(p => {
+    parents.forEach(p => {
       const s = getStatus(week.date, p.name);
       const icon = s === "confirmed" ? "✅" : "⏳";
       const label = s === "confirmed" ? "Confirmed" : "Pending";
