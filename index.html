@@ -1720,9 +1720,9 @@ function renderAdminDash() {
 
   // Super admin gets Students tab, regular admin doesn't
   const studentsTab = isSuperAdmin ? `<button id="tabStudents" onclick="showAdminTab('students')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">👦 Students</button>` : "";
-  const pinTab = !isGradeAdmin ? `<button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔐 PIN</button>` : "";
-  const swapTab = !isGradeAdmin ? `<button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔄 Swap</button>` : "";
-  const parentsTab = !isGradeAdmin ? `<button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">➕ Parents</button>` : "";
+  const pinTab = `<button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔐 PIN</button>`;
+  const swapTab = `<button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">🔄 Swap</button>`;
+  const parentsTab = `<button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#ede9fb;color:#3b2f8f;cursor:pointer;">➕ Parents</button>`;
 
   container.innerHTML = `
     <div style="display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap;">
@@ -1746,11 +1746,11 @@ function renderAdminDash() {
   `;
 
   renderAttendanceTab(isSunday, isPastCheck);
-  if (!isGradeAdmin) { try { renderSwapTab(); } catch(e) { console.log("SwapTab error:", e); } }
-  if (!isGradeAdmin) { try { renderPinTab(); } catch(e) { console.log("PinTab error:", e); } }
+  try { renderSwapTab(); } catch(e) { console.log("SwapTab error:", e); }
+  try { renderPinTab(); } catch(e) { console.log("PinTab error:", e); }
   try { renderTrackerTab(); } catch(e) { console.log("TrackerTab error:", e); document.getElementById("tabTrackerContent").innerHTML = `<div style="padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`; }
   try { renderClassesTab(); } catch(e) { console.log("ClassesTab error:", e); }
-  if (!isGradeAdmin) { try { renderParentsTab(); } catch(e) { console.log("ParentsTab error:", e); document.getElementById("tabParentsContent").innerHTML = `<div style="padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`; } }
+  try { renderParentsTab(); } catch(e) { console.log("ParentsTab error:", e); document.getElementById("tabParentsContent").innerHTML = `<div style="padding:20px;color:#e03e3e;font-size:13px;font-weight:700;">⚠️ Error: ${e.message}</div>`; }
   renderAdminTodayHero();
 }
 
