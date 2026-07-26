@@ -2538,7 +2538,14 @@ async function loadChildrenFromSheet() {
     if (!res.ok) throw new Error("Bad response");
     const data = await res.json();
     if (Array.isArray(data)) {
-      childrenSheetData = data;
+      // Filter by adminGrade if grade admin — grade 6 and 9 only see their own students
+      const filtered = data.filter(row => {
+        if (!adminGrade) return true;
+        const g = Number(row.grade);
+        if (adminGrade === 78) return g === 7 || g === 8;
+        return g === adminGrade;
+      });
+      childrenSheetData = filtered;
       // Also save to local cache
       data.forEach(row => {
         if (row.phone) {
@@ -2558,7 +2565,15 @@ async function loadChildrenFromSheet() {
 function getChildInfoByParent(parentName) {
   // First check Sheets data (admin view — cross-device)
   const fromSheet = childrenSheetData.find(r => r.parentName === parentName);
-  if (fromSheet) return { name: fromSheet.childName, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned };
+  if (fromSheet) {
+    // If grade admin, only return if grade matches
+    if (adminGrade) {
+      const g = Number(fromSheet.grade);
+      if (adminGrade === 78 && g !== 7 && g !== 8) return null;
+      if (adminGrade !== 78 && g !== adminGrade) return null;
+    }
+    return { name: fromSheet.childName, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned };
+  }
 
   // Fallback to localStorage
   let ph = null;
@@ -2567,7 +2582,15 @@ function getChildInfoByParent(parentName) {
   });
   if (!ph) return null;
   const raw = localStorage.getItem("childInfo__" + ph);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  const ci = JSON.parse(raw);
+  // If grade admin, only return if grade matches
+  if (adminGrade && ci.grade) {
+    const g = Number(ci.grade);
+    if (adminGrade === 78 && g !== 7 && g !== 8) return null;
+    if (adminGrade !== 78 && g !== adminGrade) return null;
+  }
+  return ci;
 }
 
 // ── ADMIN TRACKER TAB ─────────────────────────────────
