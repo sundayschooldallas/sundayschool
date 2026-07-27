@@ -4068,7 +4068,7 @@ function renderRollCallScreen() {
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button onclick="setRollCallMock('before')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.1);color:white;">⏳ 10:14 AM</button>
         <button onclick="setRollCallMock('open')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(34,160,107,0.4);color:white;">🟢 10:16 AM</button>
-        <button onclick="setRollCallMock('closed')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(200,50,50,0.4);color:white;">🔴 10:26 AM</button>
+        <button onclick="closedTestBtn()" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(200,50,50,0.4);color:white;">🔴 10:26 AM</button>
         <button onclick="setRollCallMock('real')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);">Real Time</button>
       </div>
     </div>` : ""}
@@ -4155,6 +4155,28 @@ async function autoDeductLateStars(todayStr) {
   }
 }
 
+
+function closedTestBtn() {
+  clearInterval(rollCallInterval);
+  rollCallInterval = null;
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const now = new Date();
+  const dateStr = months[now.getMonth()] + " " + now.getDate();
+  // Mark absent students as late (1 star punctuality) in local tracker
+  const students = getRollCallStudents();
+  const rollData = getRollCallData(dateStr);
+  students.forEach(function(s) {
+    if (rollData[s.childName] !== "present") {
+      const ex = getTrackerData(s.parentName, dateStr) || {};
+      if (!ex.lateToClass) {
+        ex.lateToClass = { stars: 1, comment: "Auto: absent at roll call" };
+        saveTrackerData(s.parentName, dateStr, ex);
+      }
+    }
+  });
+  showToast("🔴 Roll call closed — scoring opened!");
+  showScoringScreen(dateStr);
+}
 
 function showScoringScreen(dateStr) {
   const container = document.getElementById("rollCallContent");
