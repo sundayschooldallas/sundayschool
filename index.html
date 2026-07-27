@@ -3932,19 +3932,30 @@ function showRollCallDash(grade) {
 }
 
 function setRollCallMock(scenario) {
-  if (scenario === "before") mockOverride = new Date(2026, 4, 10, 10, 14, 0);
-  else if (scenario === "open")   mockOverride = new Date(2026, 4, 10, 10, 16, 0);
-  else if (scenario === "closed") {
-    mockOverride = new Date(2026, 4, 10, 10, 26, 0);
-    localStorage.removeItem("rollCallAutoDeduct__May 10");
-  }
-  else mockOverride = null;
-  // Reset advancing clock
-  mockStartReal = null;
-  mockStartTime = null;
+  // Always stop any running interval first
   clearInterval(rollCallInterval);
   rollCallInterval = null;
-  renderRollCallScreen();
+  mockStartReal = null;
+  mockStartTime = null;
+
+  if (scenario === "before") {
+    mockOverride = new Date(2026, 4, 10, 10, 14, 0);
+    renderRollCallScreen();
+  } else if (scenario === "open") {
+    mockOverride = new Date(2026, 4, 10, 10, 16, 0);
+    renderRollCallScreen();
+  } else if (scenario === "closed") {
+    mockOverride = new Date(2026, 4, 10, 10, 26, 0);
+    // Clear autoDeduct flag so it runs fresh, but do it synchronously
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const ds = months[mockOverride.getMonth()] + " " + mockOverride.getDate();
+    localStorage.removeItem("rollCallAutoDeduct__" + ds);
+    // Run auto-deduct then render — no interval, no sheet fetch blocking
+    autoDeductLateStars(ds).then(() => renderRollCallScreen());
+  } else {
+    mockOverride = null;
+    renderRollCallScreen();
+  }
   window.scrollTo(0, 0);
 }
 
@@ -4134,10 +4145,12 @@ async function autoDeductLateStars(todayStr) {
     }
   });
 
-  await Promise.allSettled(promises);
-  console.log("autoDeductLateStars: saved", count, "records to sheet");
+  // Fire-and-forget to sheet — don't await, don't block render
+  Promise.allSettled(promises).then(() => {
+    console.log("autoDeductLateStars: pushed", count, "to sheet");
+  });
   if (count > 0) {
-    showToast("⏰ " + count + " student" + (count !== 1 ? "s" : "") + " marked late — saved to sheet.");
+    showToast("⏰ " + count + " student" + (count !== 1 ? "s" : "") + " marked late.");
   }
 }
 
