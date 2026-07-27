@@ -2773,24 +2773,39 @@ function addNewParent() {
   let assignedWeek = null;
 
   if (dateChoice === "auto") {
-    // Find first date with < 2 parents
-    assignedWeek = roster.find(w => w.parents.length < 2);
-    if (!assignedWeek) {
-      // All full — create new Aug date
-      const newDates = ["Aug 16","Aug 23","Aug 30"];
-      for (const d of newDates) {
-        if (!roster.find(w => w.date === d)) { assignedDate = d; break; }
-      }
-      if (assignedDate) {
-        roster.push({ date: assignedDate, parents: [newParent] });
+    if (adminGrade && adminGrade !== 78) {
+      // Grade admin — find a slot that has < 2 parents from THIS grade only
+      // or create a brand new grade-specific date
+      const gradePrefix = "G" + adminGrade + "-";
+      let gradeWeek = roster.find(w => w.date.startsWith(gradePrefix) && w.parents.length < 2);
+      if (gradeWeek) {
+        gradeWeek.parents.push(newParent);
+        assignedDate = gradeWeek.date;
       } else {
-        errEl.textContent = "❌ All slots are full. Please add a new date manually.";
-        errEl.style.display = "block";
-        return;
+        // Create new slot for this grade
+        const slotNum = roster.filter(w => w.date.startsWith(gradePrefix)).length + 1;
+        assignedDate = gradePrefix + "Slot" + slotNum;
+        roster.push({ date: assignedDate, parents: [newParent] });
       }
     } else {
-      assignedWeek.parents.push(newParent);
-      assignedDate = assignedWeek.date;
+      // Regular admin — find first date with < 2 parents
+      assignedWeek = roster.find(w => w.parents.length < 2 && !w.date.startsWith("G6-") && !w.date.startsWith("G9-"));
+      if (!assignedWeek) {
+        const newDates = ["Aug 16","Aug 23","Aug 30"];
+        for (const d of newDates) {
+          if (!roster.find(w => w.date === d)) { assignedDate = d; break; }
+        }
+        if (assignedDate) {
+          roster.push({ date: assignedDate, parents: [newParent] });
+        } else {
+          errEl.textContent = "❌ All slots are full. Please add a new date manually.";
+          errEl.style.display = "block";
+          return;
+        }
+      } else {
+        assignedWeek.parents.push(newParent);
+        assignedDate = assignedWeek.date;
+      }
     }
   } else if (dateChoice.startsWith("new_")) {
     // New date
