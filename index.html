@@ -3946,12 +3946,10 @@ function setRollCallMock(scenario) {
     renderRollCallScreen();
   } else if (scenario === "closed") {
     mockOverride = new Date(2026, 4, 10, 10, 26, 0);
-    // Clear autoDeduct flag so it runs fresh, but do it synchronously
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const ds = months[mockOverride.getMonth()] + " " + mockOverride.getDate();
     localStorage.removeItem("rollCallAutoDeduct__" + ds);
-    // Run auto-deduct then render — no interval, no sheet fetch blocking
-    autoDeductLateStars(ds).then(() => renderRollCallScreen());
+    autoDeductLateStars(ds).then(() => showScoringScreen(ds));
   } else {
     mockOverride = null;
     renderRollCallScreen();
@@ -4037,7 +4035,6 @@ function renderRollCallScreen() {
             ${isPresent ? "✅ Present" : "⚠️ Absent"}
           </div>`}
       </div>
-      ${isClosed ? renderStarRating(s, todayStr) : ""}
     </div>`;
   };
 
@@ -4089,8 +4086,7 @@ function renderRollCallScreen() {
       if (nm >= endMin) {
         clearInterval(rollCallInterval);
         await autoDeductLateStars(todayStr);
-        // ← Auto-enable Parent CMS after roll call closes
-        renderRollCallScreen();
+        showScoringScreen(todayStr);
       } else {
         renderRollCallScreen();
       }
@@ -4099,7 +4095,9 @@ function renderRollCallScreen() {
 
   if (isClosed) {
     const alreadyRan = localStorage.getItem("rollCallAutoDeduct__" + todayStr);
-    if (!alreadyRan) autoDeductLateStars(todayStr);
+    if (!alreadyRan) autoDeductLateStars(todayStr).then(() => showScoringScreen(todayStr));
+    else showScoringScreen(todayStr);
+    return; // don't render roll call screen when already closed
   }
 }
 
@@ -4157,51 +4155,6 @@ async function autoDeductLateStars(todayStr) {
   }
 }
 
-const RC_TRACKER_CATS = [
-  { key:"bible",         label:"📖 Bible",           short:"Bible" },
-  { key:"notebook",      label:"📓 Notebook",         short:"Notebook" },
-  { key:"participation", label:"🙏 Participation",    short:"Particip." },
-  { key:"chatter",       label:"🗣️ Chatter",          short:"Chatter" },
-  { key:"godly",         label:"✝️ Godly Character",  short:"Godly" },
-  { key:"lateToClass",   label:"⏰ Late to Class",    short:"Punctual" }
-];
-
-function renderStarRating(s, todayStr) {
-  const existing = getTrackerData(s.parentName, todayStr) || {};
-  const isAbsent = getRollCallData(todayStr)[s.childName] !== "present";
-  const rows = RC_TRACKER_CATS.map(cat => {
-    const cur = (existing[cat.key] && existing[cat.key].stars) != null
-      ? existing[cat.key].stars
-      : (cat.key === "lateToClass" && isAbsent ? 1 : 5);
-    const stars = [1,2,3,4,5].map(n =>
-      `<button onclick="rcRate('${s.childName.replace(/'/g,"\'")}','${s.parentName.replace(/'/g,"\'")}','${todayStr}','${cat.key}',${n})"
-        style="flex:1;padding:7px 0;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;
-        border:2px solid ${n <= cur ? "#17b8d4" : "rgba(255,255,255,0.15)"};border-radius:8px;cursor:pointer;
-        background:${n <= cur ? "linear-gradient(135deg,#0a5260,#17b8d4)" : "rgba(255,255,255,0.05)"};
-        color:${n <= cur ? "white" : "rgba(255,255,255,0.3)"};">${n}</button>`
-    ).join("");
-    return `<div style="margin-bottom:8px;">
-      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:4px;">${cat.label} <span style="float:right;color:#17b8d4;">${cur}★</span></div>
-      <div style="display:flex;gap:4px;">${stars}</div>
-    </div>`;
-  }).join("");
-  return `<div style="margin-top:10px;padding:12px;background:rgba(255,255,255,0.05);border-radius:14px;border:1px solid rgba(255,255,255,0.1);">
-    ${rows}
-  </div>`;
-}
-
-async function rcRate(childName, parentName, dateStr, category, stars) {
-  const existing = getTrackerData(parentName, dateStr) || {};
-  existing[category] = { stars, comment: "Roll call rating — " + new Date().toLocaleTimeString() };
-  saveTrackerData(parentName, dateStr, existing);
-  fetch(SHEET_URL, {
-    method:"POST", mode:"no-cors",
-    headers:{"Content-Type":"text/plain"},
-    body: JSON.stringify({ type:"tracker", parentName, date:dateStr, category, stars,
-      comment:"Roll call rating — " + new Date().toLocaleTimeString() })
-  }).catch(()=>{});
-  renderRollCallScreen();
-}
 
 function markRollCall(childName, date, isPresent) {
   saveRollCallEntry(date, childName, isPresent ? null : "present");
