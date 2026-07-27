@@ -1834,7 +1834,7 @@ function renderSuperAdminTab() {
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${gradeColors[g]};margin-right:6px;"></span>
             Grade ${g} — ${teachers[g] || TEACHERS[g] || ""}
           </div>
-          ${calHtml}
+          <div id="calContainer_${g}">${calHtml}</div>
           <div style="font-size:11px;color:#7b7a90;margin:8px 0;" id="calSummary_${g}">
             ${saved.length} date${saved.length!==1?"s":""} selected${saved.length > 0 ? ": " + saved.join(", ") : " — tap Sundays above"}
           </div>
@@ -1980,37 +1980,50 @@ function addNewGrade() {
 function buildYearCalendar(grade, selected, color) {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const year = 2026;
-  let html = `<div style="overflow-x:auto;">`;
+  const calYear = (window["calYear_" + grade] = window["calYear_" + grade] || new Date().getFullYear());
+  let html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <button onclick="changeCalYear(${grade},-1)" style="font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;border:1.5px solid #ddd8f8;border-radius:8px;padding:4px 12px;cursor:pointer;background:white;color:#3b2f8f;">‹</button>
+      <div style="font-size:15px;font-weight:800;color:#1a1535;">${calYear}</div>
+      <button onclick="changeCalYear(${grade},1)" style="font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;border:1.5px solid #ddd8f8;border-radius:8px;padding:4px 12px;cursor:pointer;background:white;color:#3b2f8f;">›</button>
+    </div>`;
 
   for (let m = 0; m < 12; m++) {
-    const firstDay = new Date(year, m, 1).getDay(); // 0=Sun
-    const daysInMonth = new Date(year, m + 1, 0).getDate();
-    html += `<div style="margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:800;color:#3b2f8f;margin-bottom:6px;">${monthNames[m]} ${year}</div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">
-        ${["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => `<div style="font-size:9px;font-weight:800;color:#bbb;text-align:center;padding:2px 0;">${d}</div>`).join("")}
+    const firstDay = new Date(calYear, m, 1).getDay();
+    const daysInMonth = new Date(calYear, m + 1, 0).getDate();
+    html += `<div style="margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:800;color:#3b2f8f;margin-bottom:5px;">${monthNames[m]} ${calYear}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">
+        ${["Su","Mo","Tu","We","Th","Fr","Sa"].map(d =>
+          `<div style="font-size:9px;font-weight:800;color:#bbb;text-align:center;padding:2px 0;">${d}</div>`
+        ).join("")}
         ${Array(firstDay).fill(`<div></div>`).join("")}
         ${Array.from({length: daysInMonth}, (_,i) => {
           const day = i + 1;
-          const date = new Date(year, m, day);
-          const isSunday = date.getDay() === 0;
-          const dateStr = months[m] + " " + day;
+          const isSunday = new Date(calYear, m, day).getDay() === 0;
+          const dateStr = months[m] + " " + day + " " + calYear;
           const isSelected = selected.includes(dateStr);
-          if (isSunday) {
-            return `<button onclick="toggleGradeDate(${grade},'${dateStr}')" id="cal_${grade}_${dateStr.replace(/ /g,'_')}"
-              style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:1.5px solid ${isSelected ? color : "#ddd8f8"};border-radius:6px;padding:4px 2px;cursor:pointer;text-align:center;width:100%;background:${isSelected ? color : "#f8f7ff"};color:${isSelected ? "white" : "#3b2f8f"};">
-              ${day}
-            </button>`;
-          } else {
-            return `<div style="font-size:11px;color:#ccc;text-align:center;padding:4px 2px;">${day}</div>`;
-          }
+          const btnBg = isSelected ? color : isSunday ? "#f0eefb" : "white";
+          const btnColor = isSelected ? "white" : isSunday ? "#3b2f8f" : "#999";
+          const btnBorder = isSelected ? color : isSunday ? "#c5baf5" : "#eee";
+          return `<button onclick="toggleGradeDate(${grade},'${dateStr}')" id="cal_${grade}_${dateStr.replace(/ /g,'_')}"
+            style="font-family:'Nunito',sans-serif;font-size:10px;font-weight:${isSunday?"800":"600"};border:1.5px solid ${btnBorder};border-radius:5px;padding:4px 1px;cursor:pointer;text-align:center;width:100%;background:${btnBg};color:${btnColor};">
+            ${day}
+          </button>`;
         }).join("")}
       </div>
     </div>`;
   }
-  html += `</div>`;
   return html;
+}
+
+function changeCalYear(grade, delta) {
+  window["calYear_" + grade] = (window["calYear_" + grade] || new Date().getFullYear()) + delta;
+  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
+  const saved = gradeCalendars[grade] || [];
+  const gradeColors2 = { 6:"#f5a623", 9:"#e05c8a" };
+  const calContainer = document.getElementById("calContainer_" + grade);
+  if (calContainer) calContainer.innerHTML = buildYearCalendar(grade, saved, gradeColors2[grade] || "#5c4ac7");
 }
 
 function toggleGradeDate(grade, date) {
@@ -2019,19 +2032,18 @@ function toggleGradeDate(grade, date) {
   const idx = gradeCalendars[grade].indexOf(date);
   if (idx > -1) gradeCalendars[grade].splice(idx, 1);
   else gradeCalendars[grade].push(date);
-  gradeCalendars[grade].sort((a,b) => {
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const [am,ad] = a.split(" "); const [bm,bd] = b.split(" ");
-    return (months.indexOf(am)*31 + parseInt(ad)) - (months.indexOf(bm)*31 + parseInt(bd));
-  });
+  // Sort by date
+  gradeCalendars[grade].sort((a,b) => new Date(a) - new Date(b));
   localStorage.setItem("gradeCalendars", JSON.stringify(gradeCalendars));
   const calColors = { 6:"#f5a623", 9:"#e05c8a" };
+  const col = calColors[grade] || "#5c4ac7";
   const btn = document.getElementById("cal_" + grade + "_" + date.replace(/ /g,"_"));
   const active = gradeCalendars[grade].includes(date);
   if (btn) {
-    btn.style.background = active ? calColors[grade] : "white";
-    btn.style.color = active ? "white" : "#7b7a90";
-    btn.style.borderColor = active ? calColors[grade] : "#ddd8f8";
+    const isSunday = btn.style.borderColor === "#c5baf5" || btn.style.background === "#f0eefb" || active;
+    btn.style.background = active ? col : (btn.dataset.sun === "1" ? "#f0eefb" : "white");
+    btn.style.color = active ? "white" : (btn.dataset.sun === "1" ? "#3b2f8f" : "#999");
+    btn.style.borderColor = active ? col : (btn.dataset.sun === "1" ? "#c5baf5" : "#eee");
   }
   const summary = document.getElementById("calSummary_" + grade);
   if (summary) {
@@ -2050,12 +2062,13 @@ function applyGradeCalendar(grade) {
   for (let i = roster.length - 1; i >= 0; i--) {
     if (roster[i].date.startsWith(prefix)) roster.splice(i, 1);
   }
-  // Add new slots for each date (empty, ready for parents)
+  // Add new slots — use the actual date as the key (strip year for display)
   dates.forEach(d => {
+    // Store as "G6-May 17 2026" so we know it's grade-specific
     roster.push({ date: prefix + d, parents: [], perf: false });
   });
 
-  showToast("✅ Grade " + grade + " calendar set — " + dates.length + " Sundays added!");
+  showToast("✅ Grade " + grade + " calendar set — " + dates.length + " date" + (dates.length!==1?"s":"") + " added!");
   renderSuperAdminTab();
   renderParentsTab();
 }
@@ -2861,7 +2874,7 @@ function renderParentsTab() {
     ${relevantRoster.map(w => `
       <div style="background:white;border-radius:12px;padding:11px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(92,74,199,0.06);display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-size:13px;font-weight:800;color:#1a1535;">📅 ${w.date.replace(/^G\d+-/,"Slot ")}</div>
+          <div style="font-size:13px;font-weight:800;color:#1a1535;">📅 ${w.date.replace(/^G\d+-/,"")}</div>
           <div style="font-size:12px;color:#7b7a90;margin-top:2px;">${w.parents.map(p => p.name).join(" & ") || "No parents yet"}</div>
         </div>
         <div style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:20px;background:${w.parents.length < 2 ? "#fff4e0" : "#e4f7ef"};color:${w.parents.length < 2 ? "#854f0b" : "#0e6b47"};">
