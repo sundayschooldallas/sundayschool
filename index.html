@@ -1634,9 +1634,11 @@ function renderAdminTodayHero() {
     const customTeachersHero = JSON.parse(localStorage.getItem("customTeachers") || "{}");
     let teacherNameHero = "";
     if (adminGrade === 78) {
-      const t7 = customTeachersHero[7] || TEACHERS[7] || "";
-      const t8 = customTeachersHero[8] || TEACHERS[8] || "";
-      teacherNameHero = t7 === t8 ? t7 : [t7, t8].filter(Boolean).join(" & ");
+      const rawT7 = customTeachersHero[7] || TEACHERS[7] || "";
+      const rawT8 = customTeachersHero[8] || TEACHERS[8] || "";
+      // Combine all unique teachers from both grades
+      const allT = [...new Set([...rawT7.split(/[,&]/).map(s=>s.trim()), ...rawT8.split(/[,&]/).map(s=>s.trim())].filter(Boolean))];
+      teacherNameHero = allT.join(" & ");
     } else {
       teacherNameHero = customTeachersHero[adminGrade] || TEACHERS[adminGrade] || "";
     }
@@ -1896,14 +1898,18 @@ function renderSuperAdminTab() {
             </button>
           </div>
 
-          <!-- Teacher field -->
-          <div style="font-size:11px;font-weight:800;color:#7b7a90;margin-bottom:4px;">👨‍🏫 Teacher</div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <input id="teacher_grade${g}" type="text" value="${teacher}"
-              style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
-            <button onclick="saveTeacherAssignment(${g})"
-              style="padding:9px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#0a5260,#0d7a8a);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
-              💾 Save
+          <!-- Teachers for this class -->
+          <div style="font-size:11px;font-weight:800;color:#7b7a90;margin-bottom:6px;">👨‍🏫 Teachers (share one class password)</div>
+          <div id="teacherList_${g}" style="margin-bottom:8px;">
+            ${getTeacherListHtml(g, teachers[g] || "", col)}
+          </div>
+          <!-- Add another teacher to this class -->
+          <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <input id="addTeacherInput_${g}" type="text" placeholder="Add teacher name…"
+              style="flex:1;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
+            <button onclick="addTeacherToClass(${g})"
+              style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#0a5260,#0d7a8a);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+              ➕ Add
             </button>
           </div>
 
@@ -1939,7 +1945,7 @@ function renderSuperAdminTab() {
             style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
         </div>
         <div style="margin-bottom:8px;">
-          <input id="newGradePassword" type="text" placeholder="Roll call password (optional)"
+          <input id="newGradePassword" type="text" placeholder="Class admin password — shared by ALL teachers in this class"
             style="width:100%;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;box-sizing:border-box;" />
         </div>
         <button onclick="addNewGrade()"
@@ -2040,6 +2046,57 @@ function renderSuperAdminTab() {
     </div>`;
 }
 
+function getTeacherListHtml(grade, teacherStr, color) {
+  // teacherStr may be "Name1" or "Name1 & Name2" or "Name1, Name2"
+  const teachers = teacherStr ? teacherStr.split(/[,&]/).map(t => t.trim()).filter(Boolean) : [];
+  if (teachers.length === 0) return `<div style="font-size:12px;color:#bbb;padding:4px 0;">No teachers yet</div>`;
+  return teachers.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f0fafc;border-radius:8px;margin-bottom:4px;">
+      <div style="flex:1;font-size:13px;font-weight:700;color:#0a3d45;">${t}</div>
+      <button onclick="removeTeacherFromClass(${grade}, ${i})"
+        style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#fff0f0;color:#c0392b;border:1.5px solid #fbbcbc;border-radius:7px;padding:4px 8px;cursor:pointer;">
+        ✕
+      </button>
+    </div>`).join("");
+}
+
+function getTeacherArray(grade) {
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const raw = customTeachers[grade] || TEACHERS[grade] || "";
+  return raw ? raw.split(/[,&]/).map(t => t.trim()).filter(Boolean) : [];
+}
+
+function saveTeacherArray(grade, arr) {
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const joined = arr.join(" & ");
+  customTeachers[grade] = joined;
+  localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
+  TEACHERS[grade] = joined;
+}
+
+function addTeacherToClass(grade) {
+  const inp = document.getElementById("addTeacherInput_" + grade);
+  const name = inp ? inp.value.trim() : "";
+  if (!name) { showToast("❌ Please enter a teacher name."); return; }
+  const arr = getTeacherArray(grade);
+  if (arr.includes(name)) { showToast("⚠️ " + name + " is already in this class."); return; }
+  arr.push(name);
+  saveTeacherArray(grade, arr);
+  showToast("✅ " + name + " added to Grade " + grade);
+  renderSuperAdminTab();
+  renderClassesTab();
+}
+
+function removeTeacherFromClass(grade, idx) {
+  const arr = getTeacherArray(grade);
+  if (arr.length <= 1) { showToast("⚠️ A class must have at least one teacher. Use Delete Class to remove it entirely."); return; }
+  const removed = arr.splice(idx, 1)[0];
+  saveTeacherArray(grade, arr);
+  showToast("🗑️ " + removed + " removed from Grade " + grade);
+  renderSuperAdminTab();
+  renderClassesTab();
+}
+
 function addNewGrade() {
   const gradeNum = parseInt(document.getElementById("newGradeNum").value);
   const teacherName = document.getElementById("newGradeTeacher").value.trim();
@@ -2056,17 +2113,17 @@ function addNewGrade() {
   localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
   TEACHERS[gradeNum] = teacherName;
 
-  // Save password if provided
+  // Save password as the shared class admin password for ALL teachers in this class
   if (password) {
     const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
-    customPws["rollcall_grade" + gradeNum] = password;
+    customPws["gradeadmin_" + gradeNum] = password;
     localStorage.setItem("customAdminPws", JSON.stringify(customPws));
   }
 
   const result = document.getElementById("newGradeResult");
   if (result) {
     result.style.display = "block";
-    result.textContent = "✅ Grade " + gradeNum + " added with teacher " + teacherName + (password ? " · Roll call password: " + password : "");
+    result.textContent = "✅ Grade " + gradeNum + " created — Teacher: " + teacherName + (password ? " · Class Admin Password: " + password : " (no password set)");
   }
 
   // Clear inputs
@@ -2185,13 +2242,15 @@ function applyGradeCalendar(grade) {
 }
 
 function saveTeacherAssignment(grade) {
-  const val = document.getElementById("teacher_grade" + grade).value.trim();
+  // Legacy: kept for compatibility. Use addTeacherToClass / removeTeacherFromClass instead.
+  const val = document.getElementById("teacher_grade" + grade);
   if (!val) return;
-  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  customTeachers[grade] = val;
-  localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
-  TEACHERS[grade] = val;
-  showToast("✅ Grade " + grade + " teacher updated to " + val);
+  const name = val.value.trim();
+  if (!name) return;
+  const arr = getTeacherArray(grade);
+  if (!arr.includes(name)) arr.push(name);
+  saveTeacherArray(grade, arr);
+  showToast("✅ Grade " + grade + " updated");
   renderSuperAdminTab();
   renderClassesTab();
 }
