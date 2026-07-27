@@ -1800,14 +1800,57 @@ function renderSuperAdminTab() {
   const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
   const adminPw = customPws.admin || "Jesusislord";
 
-  const gradeColors = {
-    6: "#f5a623", 7: "#1db88a", 8: "#5c4ac7", 9: "#e05c8a"
-  };
+  // Load grade calendars
+  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
+
+  const gradeColors = { 6: "#f5a623", 7: "#1db88a", 8: "#5c4ac7", 9: "#e05c8a" };
+
+  // All available Sundays
+  const allSundays = [
+    "May 3","May 10","May 17","May 24","May 31",
+    "Jun 7","Jun 14","Jun 21","Jun 28",
+    "Jul 5","Jul 12","Jul 19","Jul 26",
+    "Aug 2","Aug 9","Aug 16","Aug 23","Aug 30"
+  ];
 
   el.innerHTML = `
     <div style="background:linear-gradient(135deg,#1a0a2e,#3b2f8f);border-radius:16px;padding:16px;margin-bottom:16px;color:white;">
       <div style="font-size:16px;font-weight:800;">👑 Super Admin Controls</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">Only you can see and change these settings</div>
+    </div>
+
+    <!-- CALENDAR MANAGEMENT -->
+    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);margin-bottom:14px;">
+      <div style="background:linear-gradient(135deg,#17b8d4,#0a6b7a);padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:white;">📅 Class Calendars</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Assign which Sundays Grade 6 and 9 serve. Tap dates to select, then Apply.</div>
+      </div>
+      ${[6,9].map(g => {
+        const saved = gradeCalendars[g] || [];
+        return `
+        <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
+          <div style="font-size:13px;font-weight:800;color:#1a1535;margin-bottom:8px;">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${gradeColors[g]};margin-right:6px;"></span>
+            Grade ${g} — ${teachers[g] || TEACHERS[g] || ""}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+            ${allSundays.map(d => {
+              const active = saved.includes(d);
+              return `<button onclick="toggleGradeDate(${g},'${d}')" id="cal_${g}_${d.replace(/ /g,'_')}"
+                style="padding:5px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:1.5px solid ${active ? gradeColors[g] : "#ddd8f8"};border-radius:8px;cursor:pointer;background:${active ? gradeColors[g] : "white"};color:${active ? "white" : "#7b7a90"};">
+                ${d}
+              </button>`;
+            }).join("")}
+          </div>
+          <div style="font-size:11px;color:#7b7a90;margin-bottom:8px;" id="calSummary_${g}">
+            ${saved.length} date${saved.length!==1?"s":""} selected${saved.length > 0 ? ": " + saved.join(", ") : " — tap dates above"}
+          </div>
+          <button onclick="applyGradeCalendar(${g})"
+            style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#17b8d4,#0a6b7a);color:white;border:none;border-radius:10px;cursor:pointer;">
+            ✅ Apply Calendar for Grade ${g}
+          </button>
+        </div>`;
+      }).join("")}
     </div>
 
     <!-- TEACHER MANAGEMENT -->
@@ -1939,6 +1982,53 @@ function addNewGrade() {
   showToast("✅ Grade " + gradeNum + " — " + teacherName + " added!");
   renderSuperAdminTab();
   renderClassesTab();
+}
+
+function toggleGradeDate(grade, date) {
+  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
+  if (!gradeCalendars[grade]) gradeCalendars[grade] = [];
+  const idx = gradeCalendars[grade].indexOf(date);
+  if (idx > -1) gradeCalendars[grade].splice(idx, 1);
+  else gradeCalendars[grade].push(date);
+  gradeCalendars[grade].sort((a,b) => {
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const [am,ad] = a.split(" "); const [bm,bd] = b.split(" ");
+    return (months.indexOf(am)*31 + parseInt(ad)) - (months.indexOf(bm)*31 + parseInt(bd));
+  });
+  localStorage.setItem("gradeCalendars", JSON.stringify(gradeCalendars));
+  const calColors = { 6:"#f5a623", 9:"#e05c8a" };
+  const btn = document.getElementById("cal_" + grade + "_" + date.replace(/ /g,"_"));
+  const active = gradeCalendars[grade].includes(date);
+  if (btn) {
+    btn.style.background = active ? calColors[grade] : "white";
+    btn.style.color = active ? "white" : "#7b7a90";
+    btn.style.borderColor = active ? calColors[grade] : "#ddd8f8";
+  }
+  const summary = document.getElementById("calSummary_" + grade);
+  if (summary) {
+    const saved = gradeCalendars[grade];
+    summary.textContent = saved.length + " date" + (saved.length!==1?"s":"") + " selected" + (saved.length > 0 ? ": " + saved.join(", ") : " — tap dates above");
+  }
+}
+
+function applyGradeCalendar(grade) {
+  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
+  const dates = gradeCalendars[grade] || [];
+  if (dates.length === 0) { showToast("⚠️ Please select at least one date first."); return; }
+
+  const prefix = "G" + grade + "-";
+  // Remove old grade slots
+  for (let i = roster.length - 1; i >= 0; i--) {
+    if (roster[i].date.startsWith(prefix)) roster.splice(i, 1);
+  }
+  // Add new slots for each date (empty, ready for parents)
+  dates.forEach(d => {
+    roster.push({ date: prefix + d, parents: [], perf: false });
+  });
+
+  showToast("✅ Grade " + grade + " calendar set — " + dates.length + " Sundays added!");
+  renderSuperAdminTab();
+  renderParentsTab();
 }
 
 function saveTeacherAssignment(grade) {
