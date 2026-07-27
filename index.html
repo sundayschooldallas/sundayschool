@@ -2668,27 +2668,37 @@ const ALL_SUNDAYS = [
 
 // ── PARENTS TAB ───────────────────────────────────────
 function renderParentsTab() {
-  // Find dates with only 1 parent (open slot)
-  const openSlots = roster.filter(w => w.parents.length < 2).map(w => w.date);
+  // For grade admins — only show their grade's slots
+  const gradePrefix = adminGrade && adminGrade !== 78 ? "G" + adminGrade + "-" : null;
+
+  // Filter roster to only relevant slots
+  const relevantRoster = adminGrade && adminGrade !== 78
+    ? roster.filter(w => w.date.startsWith(gradePrefix))
+    : adminGrade === 78
+    ? roster.filter(w => !w.date.startsWith("G6-") && !w.date.startsWith("G9-"))
+    : roster;
+
+  const openSlots = relevantRoster.filter(w => w.parents.length < 2).map(w => w.date);
   const openSlotsHTML = openSlots.length > 0
     ? openSlots.map(d => `<option value="${d}">📅 ${d} — open slot</option>`).join("")
     : "";
 
-  // All dates for manual override
-  const allDatesHTML = roster.map(w => `<option value="${w.date}">📅 ${w.date} (${w.parents.length}/2 parents)</option>`).join("") +
-    `<option value="new_aug16">📅 Aug 16 — new date</option>` +
-    `<option value="new_aug23">📅 Aug 23 — new date</option>` +
-    `<option value="new_aug30">📅 Aug 30 — new date</option>`;
+  const allDatesHTML = relevantRoster.map(w =>
+    `<option value="${w.date}">📅 ${w.date} (${w.parents.length}/2 parents)</option>`
+  ).join("") + (adminGrade && adminGrade !== 78 ? "" :
+    `<option value="new_aug16">📅 Aug 16 — new date</option>
+     <option value="new_aug23">📅 Aug 23 — new date</option>
+     <option value="new_aug30">📅 Aug 30 — new date</option>`);
 
   const gradeNote = adminGrade ? `
     <div style="background:#e4f7ef;border-radius:14px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#0e6b47;font-weight:700;">
-      📚 You are adding a parent for Grade ${adminGrade === 78 ? "7 & 8" : adminGrade}. Once added, ask the parent to log in and register their child in Grade ${adminGrade === 78 ? "7 or 8" : adminGrade}.
+      📚 Adding parents for Grade ${adminGrade === 78 ? "7 & 8" : adminGrade}. Once added, ask them to log in and register their child in Grade ${adminGrade === 78 ? "7 or 8" : adminGrade}.
     </div>` : "";
 
   let html = `
     ${gradeNote}
     <div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#3b2f8f;font-weight:700;">
-      ➕ Add a new parent to the roster. The system will suggest the best available slot automatically.
+      ➕ Add a new parent. Auto will find the best available slot for your class.
     </div>
 
     <div style="background:white;border-radius:16px;padding:18px;box-shadow:0 4px 16px rgba(92,74,199,0.08);margin-bottom:16px;">
@@ -2707,13 +2717,11 @@ function renderParentsTab() {
       </div>
 
       <div style="margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Assign to Date</div>
+        <div style="font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Assign to Slot</div>
         <select id="newParentDate" style="width:100%;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #ddd8f8;border-radius:12px;outline:none;color:#1a1535;background:white;">
           <option value="auto">🤖 Auto — best available slot</option>
-          <option disabled>── Open slots (1 parent only) ──</option>
-          ${openSlotsHTML || '<option disabled>No open slots currently</option>'}
-          <option disabled>── All dates ──</option>
-          ${allDatesHTML}
+          ${openSlotsHTML ? `<option disabled>── Open slots ──</option>${openSlotsHTML}` : ""}
+          ${allDatesHTML ? `<option disabled>── All slots ──</option>${allDatesHTML}` : ""}
         </select>
       </div>
 
@@ -2726,18 +2734,24 @@ function renderParentsTab() {
       <div id="newParentResult" style="margin-top:12px;"></div>
     </div>
 
-    <!-- Current Roster Overview -->
-    <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Current Roster</div>
-    ${roster.map(w => `
+    <!-- Current Roster for this class only -->
+    ${relevantRoster.length > 0 ? `
+    <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">
+      ${adminGrade ? "Your Class Parents" : "Current Roster"}
+    </div>
+    ${relevantRoster.map(w => `
       <div style="background:white;border-radius:12px;padding:11px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(92,74,199,0.06);display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-size:13px;font-weight:800;color:#1a1535;">📅 ${w.date}${w.perf ? " ⭐" : ""}</div>
-          <div style="font-size:12px;color:#7b7a90;margin-top:2px;">${w.parents.map(p => p.name).join(" & ")}</div>
+          <div style="font-size:13px;font-weight:800;color:#1a1535;">📅 ${w.date.replace(/^G\d+-/,"Slot ")}</div>
+          <div style="font-size:12px;color:#7b7a90;margin-top:2px;">${w.parents.map(p => p.name).join(" & ") || "No parents yet"}</div>
         </div>
         <div style="font-size:12px;font-weight:800;padding:4px 10px;border-radius:20px;background:${w.parents.length < 2 ? "#fff4e0" : "#e4f7ef"};color:${w.parents.length < 2 ? "#854f0b" : "#0e6b47"};">
           ${w.parents.length}/2
         </div>
-      </div>`).join("")}
+      </div>`).join("")}` : `
+    <div style="text-align:center;padding:20px;color:#bbb;font-size:13px;font-weight:700;">
+      No parents added yet for this class. Use ➕ Add Parent above to get started.
+    </div>`}
   `;
 
   document.getElementById("tabParentsContent").innerHTML = html;
