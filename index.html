@@ -4159,26 +4159,24 @@ async function autoDeductLateStars(todayStr) {
 function closedTestBtn() {
   clearInterval(rollCallInterval);
   rollCallInterval = null;
+  // Use the mock date (May 10 2026) — same date the open mock uses
+  mockOverride = new Date(2026, 4, 10, 10, 26, 0);
+  mockStartReal = null;
+  mockStartTime = null;
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  // Use mock date May 10 to match what was used during open test
-  const dateStr = "May 10";
-  // Mark absent students late in local tracker
+  const dateStr = months[mockOverride.getMonth()] + " " + mockOverride.getDate();
+  // Mark absent students with punctuality 1 star
   const students = getRollCallStudents();
   const rollData = getRollCallData(dateStr);
   students.forEach(function(s) {
     if (rollData[s.childName] !== "present") {
       const ex = getTrackerData(s.parentName, dateStr) || {};
-      if (!ex.lateToClass) {
-        ex.lateToClass = { stars: 1, comment: "Auto: absent at roll call" };
-        saveTrackerData(s.parentName, dateStr, ex);
-      }
+      ex.punctuality = { stars: 1, comment: "Auto: absent at roll call" };
+      saveTrackerData(s.parentName, dateStr, ex);
     }
   });
-  showToast("🔴 Roll call closed — loading scoring...");
-  // Load sheet data first, then show scorer
-  Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
-    .then(function() { showScoringScreen(dateStr); })
-    .catch(function() { showScoringScreen(dateStr); });
+  showToast("🔴 Roll call closed — opening scoring!");
+  showScoringScreen(dateStr);
 }
 
 function showScoringScreen(dateStr) {
@@ -4199,6 +4197,7 @@ function showScoringScreen(dateStr) {
     </div>`;
 
   if (all.length === 0) {
+    showToast("⚠️ No students found — check sheet data");
     html += `<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.4);font-size:14px;font-weight:700;">No students found for this class</div>`;
   } else {
     all.forEach(function(s) {
