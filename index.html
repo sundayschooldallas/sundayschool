@@ -1329,35 +1329,44 @@ function showVerify() {
 
 async function verifyAdmin() {
   const pw = document.getElementById("adminPwInput").value;
+  const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+  const effectiveAdminPw = customPws.admin || ADMIN_PASSWORD;
+
+  async function loginAdmin(role, grade) {
+    adminRole = role;
+    adminGrade = grade;
+    document.getElementById("adminLogin").style.display = "none";
+    document.getElementById("adminDash").style.display = "block";
+    document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
+    await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
+    renderAdminDash();
+  }
+
   if (pw === SUPER_ADMIN_PASSWORD) {
-    adminRole = "superadmin";
-    document.getElementById("adminLogin").style.display = "none";
-    document.getElementById("adminDash").style.display = "block";
-    document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
-    await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
-    renderAdminDash();
-  } else if (pw === ADMIN_PASSWORD) {
-    adminRole = "admin";
-    document.getElementById("adminLogin").style.display = "none";
-    document.getElementById("adminDash").style.display = "block";
-    document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
-    await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
-    renderAdminDash();
+    await loginAdmin("superadmin", null);
+  } else if (pw === effectiveAdminPw) {
+    await loginAdmin("admin", null);
   } else {
-    // Check grade admin passwords
+    // Check grade admin passwords (built-in + custom overrides)
     let gradeMatch = null;
     Object.entries(GRADE_ADMIN_PASSWORDS).forEach(([grade, gpw]) => {
-      if (pw === gpw) gradeMatch = Number(grade);
+      const effective = customPws["gradeadmin_" + grade] || gpw;
+      if (pw === effective) gradeMatch = Number(grade);
     });
     if (gradeMatch !== null) {
-      adminRole = "gradeadmin";
-      adminGrade = gradeMatch === 7 || gradeMatch === 8 ? 78 : gradeMatch;
-      document.getElementById("adminLogin").style.display = "none";
-      document.getElementById("adminDash").style.display = "block";
-      document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
-      await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
-      renderAdminDash();
-    } else if (pw === ADVOCATE_PASSWORD) {
+      await loginAdmin("gradeadmin", gradeMatch === 7 || gradeMatch === 8 ? 78 : gradeMatch);
+    } else {
+      // Check custom admin users from localStorage
+      const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
+      const found = adminUsers.find(u => u.pw === pw);
+      if (found) {
+        if (found.role === "admin") {
+          await loginAdmin("admin", null);
+        } else if (found.role === "gradeadmin") {
+          const g = Number(found.grade);
+          await loginAdmin("gradeadmin", g === 7 || g === 8 ? 78 : g);
+        }
+      } else if (pw === ADVOCATE_PASSWORD) {
       document.getElementById("adminLogin").style.display = "none";
       document.getElementById("advocateDash").style.display = "block";
       document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">⏳ Loading data from server...</div>`;
@@ -1372,8 +1381,9 @@ async function verifyAdmin() {
     } else if (pw === ROLL_CALL_PASSWORD_G9) {
       document.getElementById("adminLogin").style.display = "none";
       showRollCallDash(9);
-    } else {
-      document.getElementById("adminError").style.display = "block";
+      } else {
+        document.getElementById("adminError").style.display = "block";
+      }
     }
   }
 }
@@ -1793,31 +1803,33 @@ function renderSuperAdminTab() {
   const el = document.getElementById("tabSuperAdminContent");
   if (!el) return;
 
-  // Load custom teachers from localStorage
   const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  const teachers = {
-    6: customTeachers[6] || TEACHERS[6],
-    7: customTeachers[7] || TEACHERS[7],
-    8: customTeachers[8] || TEACHERS[8],
-    9: customTeachers[9] || TEACHERS[9]
-  };
+  const teachers = {};
+  Object.keys(TEACHERS).forEach(g => { teachers[g] = customTeachers[g] || TEACHERS[g]; });
+  Object.keys(customTeachers).forEach(g => { teachers[g] = customTeachers[g]; });
 
-  // Load custom passwords
   const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
-  const adminPw = customPws.admin || "Jesusislord";
+  const adminPw   = customPws.admin || "Jesusislord";
 
-  // Load grade calendars
-  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
-
-  const gradeColors = { 6: "#f5a623", 7: "#1db88a", 8: "#5c4ac7", 9: "#e05c8a" };
-
-  // All available Sundays
-  const allSundays = [
-    "May 3","May 10","May 17","May 24","May 31",
-    "Jun 7","Jun 14","Jun 21","Jun 28",
-    "Jul 5","Jul 12","Jul 19","Jul 26",
-    "Aug 2","Aug 9","Aug 16","Aug 23","Aug 30"
+  // Admin users: built-in + custom
+  const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
+  // built-in static accounts (display only, not deletable)
+  const builtinAccounts = [
+    { label:"👑 Super Admin",          key:"superadmin",       pw:"Jesusislord4SuperAdmin",      deletable:false },
+    { label:"🛡️ Admin",               key:"admin",            pw:adminPw,                       deletable:false },
+    { label:"💚 Advocate (Lemlem)",    key:"lemlem",           pw:"Jesusislord4Lemlem",          deletable:false },
+    { label:"📋 Roll Call — Grade 7&8",key:"rollcall_78",      pw:"JesusislordRollCall",         deletable:false },
+    { label:"📋 Roll Call — Grade 6",  key:"rollcall_6",       pw:"JesusislordForGrade6",        deletable:false },
+    { label:"📋 Roll Call — Grade 9",  key:"rollcall_9",       pw:"JesusislordForGrade9",        deletable:false },
+    { label:"📚 Grade 6 Teacher",      key:"gradeadmin_6",     pw:customPws.gradeadmin_6||"JesusislordAdmin6",  deletable:false },
+    { label:"📚 Grade 7 Teacher",      key:"gradeadmin_7",     pw:customPws.gradeadmin_7||"JesusislordAdmin7",  deletable:false },
+    { label:"📚 Grade 8 Teacher",      key:"gradeadmin_8",     pw:customPws.gradeadmin_8||"JesusislordAdmin8",  deletable:false },
+    { label:"📚 Grade 9 Teacher",      key:"gradeadmin_9",     pw:customPws.gradeadmin_9||"JesusislordAdmin9",  deletable:false },
   ];
+
+  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
+  const gradeColors = { 6:"#f5a623", 7:"#1db88a", 8:"#5c4ac7", 9:"#e05c8a" };
+  const allGrades = Object.keys(teachers).map(Number).sort((a,b)=>a-b);
 
   el.innerHTML = `
     <div style="background:linear-gradient(135deg,#021a1e,#0a5260);border-radius:16px;padding:16px;margin-bottom:16px;color:white;">
@@ -1825,58 +1837,61 @@ function renderSuperAdminTab() {
       <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">Only you can see and change these settings</div>
     </div>
 
-    <!-- CALENDAR MANAGEMENT -->
-    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(13,122,138,0.08);margin-bottom:14px;">
-      <div style="background:linear-gradient(135deg,#4caf50,#2e7d32);padding:14px 16px;">
-        <div style="font-size:15px;font-weight:800;color:white;">📅 Class Calendars</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Assign which Sundays Grade 6 and 9 serve. Tap Sundays to select, then Apply.</div>
-      </div>
-      ${[6,9].map(g => {
-        const saved = gradeCalendars[g] || [];
-        const calHtml = buildYearCalendar(g, saved, gradeColors[g]);
-        return `
-        <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
-          <div style="font-size:13px;font-weight:800;color:#0a3d45;margin-bottom:10px;">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${gradeColors[g]};margin-right:6px;"></span>
-            Grade ${g} — ${teachers[g] || TEACHERS[g] || ""}
-          </div>
-          <div id="calContainer_${g}">${calHtml}</div>
-          <div style="font-size:11px;color:#7b7a90;margin:8px 0;" id="calSummary_${g}">
-            ${saved.length} date${saved.length!==1?"s":""} selected${saved.length > 0 ? ": " + saved.join(", ") : " — tap Sundays above"}
-          </div>
-          <button onclick="applyGradeCalendar(${g})"
-            style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:10px;cursor:pointer;">
-            ✅ Apply Calendar for Grade ${g}
-          </button>
-        </div>`;
-      }).join("")}
-    </div>
-
-    <!-- TEACHER MANAGEMENT -->
+    <!-- ── CLASS MANAGEMENT ─────────────────────────────────────────── -->
     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(13,122,138,0.08);margin-bottom:14px;">
       <div style="background:linear-gradient(135deg,#0a5260,#0d7a8a);padding:14px 16px;">
-        <div style="font-size:15px;font-weight:800;color:white;">👨‍🏫 Teacher Assignments</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Change which teacher is assigned to each grade</div>
+        <div style="font-size:15px;font-weight:800;color:white;">🏫 Class Management</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Create classes, assign teachers, manage calendars, delete classes</div>
       </div>
-      ${[6,7,8,9].map(g => `
-        <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
-          <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:6px;">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${gradeColors[g]};margin-right:6px;"></span>
-            Grade ${g}
+
+      <!-- Existing classes -->
+      ${allGrades.map(g => {
+        const col = gradeColors[g] || "#5c4ac7";
+        const saved = gradeCalendars[g] || [];
+        const calHtml = ([6,9].includes(g)) ? buildYearCalendar(g, saved, col) : "";
+        const teacher = teachers[g] || "";
+        return `
+        <div style="padding:14px;border-top:0.5px solid #f0eefb;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:13px;font-weight:800;color:#0a3d45;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:6px;"></span>
+              Grade ${g}
+            </div>
+            <button onclick="deleteClass(${g})"
+              style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#fff0f0;color:#c0392b;border:1.5px solid #fbbcbc;border-radius:8px;padding:5px 10px;cursor:pointer;">
+              🗑️ Delete Class
+            </button>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input id="teacher_grade${g}" type="text" value="${teachers[g]}"
-              style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
+
+          <!-- Teacher field -->
+          <div style="font-size:11px;font-weight:800;color:#7b7a90;margin-bottom:4px;">👨‍🏫 Teacher</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <input id="teacher_grade${g}" type="text" value="${teacher}"
+              style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
             <button onclick="saveTeacherAssignment(${g})"
               style="padding:9px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#0a5260,#0d7a8a);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
               💾 Save
             </button>
           </div>
-        </div>`).join("")}
 
-      <!-- ADD NEW GRADE SECTION -->
-      <div style="padding:14px;border-top:2px solid #f0eefb;background:#f8f7ff;">
-        <div style="font-size:13px;font-weight:800;color:#0a5260;margin-bottom:10px;">➕ Add New Grade & Teacher</div>
+          ${[6,9].includes(g) ? `
+          <!-- Calendar (grade 6 & 9 only) -->
+          <div style="font-size:11px;font-weight:800;color:#7b7a90;margin-bottom:6px;">📅 Sunday Calendar</div>
+          <div id="calContainer_${g}">${calHtml}</div>
+          <div style="font-size:11px;color:#7b7a90;margin:8px 0;" id="calSummary_${g}">
+            ${saved.length} date${saved.length!==1?"s":""} selected${saved.length > 0 ? ": " + saved.join(", ") : " — tap Sundays above"}
+          </div>
+          <button onclick="applyGradeCalendar(${g})"
+            style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:10px;cursor:pointer;margin-bottom:4px;">
+            ✅ Apply Calendar for Grade ${g}
+          </button>
+          ` : ""}
+        </div>`;
+      }).join("")}
+
+      <!-- ADD NEW CLASS -->
+      <div style="padding:14px;border-top:2px solid #e0f5f7;background:#f0fafc;">
+        <div style="font-size:13px;font-weight:800;color:#0a5260;margin-bottom:10px;">➕ Create New Class</div>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
           <input id="newGradeNum" type="number" placeholder="Grade #" min="1" max="12"
             style="width:90px;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
@@ -1884,62 +1899,103 @@ function renderSuperAdminTab() {
             style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
         </div>
         <div style="margin-bottom:8px;">
-          <input id="newGradePassword" type="text" placeholder="Roll call password (e.g. JesusislordForGrade10)"
+          <input id="newGradePassword" type="text" placeholder="Roll call password (optional)"
             style="width:100%;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;box-sizing:border-box;" />
         </div>
         <button onclick="addNewGrade()"
           style="width:100%;padding:11px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;background:linear-gradient(135deg,#0f6e56,#1db88a);color:white;border:none;border-radius:10px;cursor:pointer;">
-          ➕ Add Grade & Teacher
+          ➕ Create Class
         </button>
         <div id="newGradeResult" style="margin-top:8px;font-size:12px;font-weight:700;color:#0e6b47;display:none;"></div>
       </div>
     </div>
 
-    <!-- PASSWORD MANAGEMENT -->
+    <!-- ── ADMIN USERS MANAGEMENT ────────────────────────────────────── -->
     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(13,122,138,0.08);margin-bottom:14px;">
       <div style="background:linear-gradient(135deg,#854f0b,#f5a623);padding:14px 16px;">
-        <div style="font-size:15px;font-weight:800;color:white;">🔐 Manage Passwords</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Update access passwords for each portal</div>
+        <div style="font-size:15px;font-weight:800;color:white;">👤 Admin Users & Passwords</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Update passwords for built-in accounts · Create or delete custom admin users</div>
       </div>
-      ${[
-        { label: "🛡️ Admin password", key: "admin", current: adminPw, placeholder: "Admin password" },
-      ].map(p => `
-        <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
-          <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:6px;">${p.label}</div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input id="pw_${p.key}" type="text" value="${p.current}" placeholder="${p.placeholder}"
-              style="flex:1;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
-            <button onclick="saveAdminPassword('${p.key}')"
-              style="padding:9px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#854f0b,#f5a623);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
-              💾 Save
-            </button>
-          </div>
-        </div>`).join("")}
-      <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;background:#f4f3f8;border-radius:0 0 16px 16px;">
-        <div style="font-size:11px;color:#7b7a90;font-weight:700;">🔒 Super Admin password can only be changed by editing the source code.</div>
+
+      <!-- Built-in accounts: editable passwords -->
+      <div style="padding:14px;border-top:0.5px solid #f0eefb;">
+        <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:10px;">🔒 Built-in Accounts</div>
+        ${builtinAccounts.map(a => `
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:800;color:#0a5260;margin-bottom:4px;">${a.label}</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="pw_${a.key}" type="text" value="${a.pw}" placeholder="Password"
+                style="flex:1;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
+              ${a.key === "superadmin" ? `<div style="font-size:11px;color:#bbb;padding:8px 12px;">🔒 Source only</div>` : `
+              <button onclick="saveAdminPassword('${a.key}')"
+                style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:linear-gradient(135deg,#854f0b,#f5a623);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+                💾 Save
+              </button>`}
+            </div>
+          </div>`).join("")}
+      </div>
+
+      <!-- Custom admin users -->
+      <div style="padding:14px;border-top:2px solid #f0eefb;background:#fffaf0;">
+        <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:10px;">✨ Custom Admin Users</div>
+        ${adminUsers.length === 0
+          ? `<div style="font-size:12px;color:#bbb;text-align:center;padding:8px;">No custom admin users yet</div>`
+          : adminUsers.map((u, idx) => `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px;background:white;border-radius:12px;border:1.5px solid #f0eefb;">
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:800;color:#0a3d45;">${u.label}</div>
+              <div style="font-size:11px;color:#7b7a90;">Role: ${u.role}${u.grade ? " · Grade " + u.grade : ""}</div>
+              <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
+                <input id="custpw_${idx}" type="text" value="${u.pw}"
+                  style="flex:1;padding:6px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;border:1.5px solid #c0eaf0;border-radius:8px;outline:none;color:#0a3d45;" />
+                <button onclick="updateCustomUserPw(${idx})"
+                  style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:linear-gradient(135deg,#0a5260,#0d7a8a);color:white;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">
+                  💾
+                </button>
+                <button onclick="deleteCustomUser(${idx})"
+                  style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#fff0f0;color:#c0392b;border:1.5px solid #fbbcbc;border-radius:8px;cursor:pointer;white-space:nowrap;">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>`).join("")}
+
+        <!-- Add custom admin user form -->
+        <div style="margin-top:10px;padding:12px;background:white;border-radius:12px;border:1.5px solid #e0f5f7;">
+          <div style="font-size:12px;font-weight:800;color:#0a5260;margin-bottom:8px;">➕ Add Custom Admin User</div>
+          <input id="newUserLabel" type="text" placeholder="Label (e.g. Grade 5 Teacher)"
+            style="width:100%;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;box-sizing:border-box;margin-bottom:8px;" />
+          <select id="newUserRole"
+            style="width:100%;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;box-sizing:border-box;margin-bottom:8px;">
+            <option value="gradeadmin">Grade Admin</option>
+            <option value="admin">Full Admin</option>
+          </select>
+          <input id="newUserGrade" type="number" placeholder="Grade # (for grade admin)" min="1" max="12"
+            style="width:100%;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;box-sizing:border-box;margin-bottom:8px;" />
+          <input id="newUserPw" type="text" placeholder="Password"
+            style="width:100%;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;box-sizing:border-box;margin-bottom:8px;" />
+          <button onclick="addCustomUser()"
+            style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;background:linear-gradient(135deg,#0f6e56,#1db88a);color:white;border:none;border-radius:10px;cursor:pointer;">
+            ➕ Add Admin User
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- ALL PASSWORDS SUMMARY -->
+    <!-- ── ALL PASSWORDS SUMMARY ─────────────────────────────────────── -->
     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(13,122,138,0.08);">
       <div style="background:linear-gradient(135deg,#021a1e,#0a5260);padding:14px 16px;">
         <div style="font-size:15px;font-weight:800;color:white;">📋 All Passwords Summary</div>
       </div>
-      ${[
-        { label: "👑 Super Admin", pw: "Jesusislord4SuperAdmin" },
-        { label: "🛡️ Admin", pw: adminPw },
-        { label: "📚 Grade 6 Teacher", pw: "JesusislordAdmin6" },
-        { label: "📚 Grade 7 Teacher", pw: "JesusislordAdmin7" },
-        { label: "📚 Grade 8 Teacher", pw: "JesusislordAdmin8" },
-        { label: "📚 Grade 9 Teacher", pw: "JesusislordAdmin9" },
-        { label: "💚 Advocate (Lemlem)", pw: "Jesusislord4Lemlem" },
-        { label: "📋 Roll Call — Grade 7 & 8", pw: "JesusislordRollCall" },
-        { label: "📋 Roll Call — Grade 6", pw: "JesusislordForGrade6" },
-        { label: "📋 Roll Call — Grade 9", pw: "JesusislordForGrade9" },
-      ].map(p => `
+      ${builtinAccounts.map(a => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
-          <div style="font-size:13px;font-weight:700;color:#0a3d45;">${p.label}</div>
-          <div style="font-size:12px;font-weight:800;color:#0d7a8a;background:#e0f5f7;padding:4px 10px;border-radius:8px;">${p.pw}</div>
+          <div style="font-size:13px;font-weight:700;color:#0a3d45;">${a.label}</div>
+          <div style="font-size:12px;font-weight:800;color:#0d7a8a;background:#e0f5f7;padding:4px 10px;border-radius:8px;">${a.pw}</div>
+        </div>`).join("")}
+      ${adminUsers.map(u => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
+          <div style="font-size:13px;font-weight:700;color:#0a3d45;">✨ ${u.label}</div>
+          <div style="font-size:12px;font-weight:800;color:#0d7a8a;background:#e0f5f7;padding:4px 10px;border-radius:8px;">${u.pw}</div>
         </div>`).join("")}
     </div>`;
 }
@@ -2093,12 +2149,68 @@ function saveTeacherAssignment(grade) {
 
 function saveAdminPassword(key) {
   const val = document.getElementById("pw_" + key).value.trim();
-  if (!val) return;
+  if (!val) { showToast("❌ Password cannot be empty."); return; }
   const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
   customPws[key] = val;
   localStorage.setItem("customAdminPws", JSON.stringify(customPws));
-  showToast("✅ Admin password updated! Share the new password with your team.");
+  showToast("✅ Password updated! Share the new password with your team.");
   renderSuperAdminTab();
+}
+
+function addCustomUser() {
+  const label = document.getElementById("newUserLabel").value.trim();
+  const role  = document.getElementById("newUserRole").value;
+  const grade = parseInt(document.getElementById("newUserGrade").value) || null;
+  const pw    = document.getElementById("newUserPw").value.trim();
+  if (!label || !pw) { showToast("❌ Label and password are required."); return; }
+  if (role === "gradeadmin" && !grade) { showToast("❌ Please enter a grade number for Grade Admin."); return; }
+  const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
+  adminUsers.push({ label, role, grade: role === "gradeadmin" ? grade : null, pw });
+  localStorage.setItem("adminUsers", JSON.stringify(adminUsers));
+  showToast("✅ Admin user \"" + label + "\" created!");
+  renderSuperAdminTab();
+}
+
+function updateCustomUserPw(idx) {
+  const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
+  const val = document.getElementById("custpw_" + idx).value.trim();
+  if (!val) { showToast("❌ Password cannot be empty."); return; }
+  adminUsers[idx].pw = val;
+  localStorage.setItem("adminUsers", JSON.stringify(adminUsers));
+  showToast("✅ Password updated for " + adminUsers[idx].label);
+  renderSuperAdminTab();
+}
+
+function deleteCustomUser(idx) {
+  const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
+  const u = adminUsers[idx];
+  if (!u) return;
+  if (!confirm("Delete admin user \"" + u.label + "\"? This cannot be undone.")) return;
+  adminUsers.splice(idx, 1);
+  localStorage.setItem("adminUsers", JSON.stringify(adminUsers));
+  showToast("🗑️ Admin user deleted.");
+  renderSuperAdminTab();
+}
+
+function deleteClass(grade) {
+  if (!confirm("Delete Grade " + grade + " class? This will remove the teacher assignment, calendar, and all roster slots for this grade. Students already registered will NOT be deleted.")) return;
+  // Remove teacher
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  delete customTeachers[grade];
+  localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
+  delete TEACHERS[grade];
+  // Remove calendar
+  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
+  delete gradeCalendars[grade];
+  localStorage.setItem("gradeCalendars", JSON.stringify(gradeCalendars));
+  // Remove roster slots for this grade
+  const prefix = "G" + grade + "-";
+  for (let i = roster.length - 1; i >= 0; i--) {
+    if (roster[i].date.startsWith(prefix)) roster.splice(i, 1);
+  }
+  showToast("🗑️ Grade " + grade + " class deleted.");
+  renderSuperAdminTab();
+  renderClassesTab();
 }
 
 function renderStudentsTab() {
