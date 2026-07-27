@@ -1875,16 +1875,23 @@ function renderSuperAdminTab() {
           </div>
 
           ${[6,9].includes(g) ? `
-          <!-- Calendar (grade 6 & 9 only) -->
-          <div style="font-size:11px;font-weight:800;color:#7b7a90;margin-bottom:6px;">📅 Sunday Calendar</div>
-          <div id="calContainer_${g}">${calHtml}</div>
-          <div style="font-size:11px;color:#7b7a90;margin:8px 0;" id="calSummary_${g}">
-            ${saved.length} date${saved.length!==1?"s":""} selected${saved.length > 0 ? ": " + saved.join(", ") : " — tap Sundays above"}
-          </div>
-          <button onclick="applyGradeCalendar(${g})"
-            style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:10px;cursor:pointer;margin-bottom:4px;">
-            ✅ Apply Calendar for Grade ${g}
+          <!-- Calendar (grade 6 & 9 only) — collapsible -->
+          <button onclick="toggleCalSection(${g})"
+            id="calToggleBtn_${g}"
+            style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:#f0fafc;color:#0a5260;border:1.5px solid #c0eaf0;border-radius:10px;cursor:pointer;margin-bottom:6px;">
+            <span>📅 Sunday Calendar</span>
+            <span id="calToggleIcon_${g}" style="font-size:14px;">▼</span>
           </button>
+          <div id="calSection_${g}" style="display:none;">
+            <div id="calContainer_${g}">${calHtml}</div>
+            <div style="font-size:11px;color:#7b7a90;margin:8px 0;" id="calSummary_${g}">
+              ${saved.length} date${saved.length!==1?"s":""} selected${saved.length > 0 ? ": " + saved.join(", ") : " — tap Sundays above"}
+            </div>
+            <button onclick="applyGradeCalendar(${g})"
+              style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:10px;cursor:pointer;margin-bottom:4px;">
+              ✅ Apply Calendar for Grade ${g}
+            </button>
+          </div>
           ` : ""}
         </div>`;
       }).join("")}
@@ -2077,6 +2084,15 @@ function buildYearCalendar(grade, selected, color) {
     </div>`;
   }
   return html;
+}
+
+function toggleCalSection(grade) {
+  const sec  = document.getElementById("calSection_" + grade);
+  const icon = document.getElementById("calToggleIcon_" + grade);
+  if (!sec) return;
+  const open = sec.style.display === "none";
+  sec.style.display  = open ? "block" : "none";
+  icon.textContent   = open ? "▲" : "▼";
 }
 
 function changeCalYear(grade, delta) {
