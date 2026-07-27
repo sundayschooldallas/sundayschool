@@ -3946,11 +3946,9 @@ function setRollCallMock(scenario) {
   mockStartTime = null;
   clearInterval(rollCallInterval);
   rollCallInterval = null;
+  cmsMode = false;
   renderRollCallScreen();
   window.scrollTo(0, 0);
-  Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
-    .then(() => renderRollCallScreen())
-    .catch(() => {});
 }
 
 function renderRollCallScreen() {
@@ -4291,22 +4289,29 @@ async function cmsStar(childName, parentName, dateStr, category, stars) {
 }
 
 function seedTestStudents() {
-  // Seeds 6 test students into localStorage so roll call & CMS have something to show
-  const grade = rollCallGrade === 6 ? 6 : rollCallGrade === 9 ? 9 : 7;
+  const g1 = rollCallGrade === 6 ? 6 : rollCallGrade === 9 ? 9 : 7;
+  const g2 = rollCallGrade === 78 ? 8 : g1;
   const testKids = [
-    { phone:"5550001", parent:"Test Parent 1", child:"Abel Tesfaye",   grade },
-    { phone:"5550002", parent:"Test Parent 2", child:"Miriam Haile",   grade },
-    { phone:"5550003", parent:"Test Parent 3", child:"Dawit Bekele",   grade },
-    { phone:"5550004", parent:"Test Parent 4", child:"Sara Gebru",     grade: rollCallGrade === 78 ? 8 : grade },
-    { phone:"5550005", parent:"Test Parent 5", child:"Yonas Tekle",    grade: rollCallGrade === 78 ? 8 : grade },
-    { phone:"5550006", parent:"Test Parent 6", child:"Eden Solomon",   grade: rollCallGrade === 78 ? 8 : grade },
+    { phone:"5550001", parent:"Test Parent 1", child:"Abel Tesfaye",  grade: g1 },
+    { phone:"5550002", parent:"Test Parent 2", child:"Miriam Haile",  grade: g1 },
+    { phone:"5550003", parent:"Test Parent 3", child:"Dawit Bekele",  grade: g1 },
+    { phone:"5550004", parent:"Test Parent 4", child:"Sara Gebru",    grade: g2 },
+    { phone:"5550005", parent:"Test Parent 5", child:"Yonas Tekle",   grade: g2 },
+    { phone:"5550006", parent:"Test Parent 6", child:"Eden Solomon",  grade: g2 },
   ];
+  // Save to localStorage (persistent)
   testKids.forEach(k => {
-    const ci = { name: k.child, grade: k.grade, parentName: k.parent,
-      allChildren: [{ name: k.child, grade: k.grade }] };
-    localStorage.setItem("childInfo__" + k.phone, JSON.stringify(ci));
+    localStorage.setItem("childInfo__" + k.phone, JSON.stringify({
+      name: k.child, grade: k.grade, parentName: k.parent,
+      allChildren: [{ name: k.child, grade: k.grade }]
+    }));
   });
-  showToast("🌱 6 test students seeded! Refresh roll call.");
+  // Also inject directly into childrenSheetData (in-memory, works immediately)
+  testKids.forEach(k => {
+    const exists = childrenSheetData.some(r => r.childName === k.child);
+    if (!exists) childrenSheetData.push({ childName: k.child, grade: k.grade, parentName: k.parent, phone: k.phone });
+  });
+  showToast("🌱 " + testKids.length + " test students seeded!");
   renderRollCallScreen();
 }
 
