@@ -1823,27 +1823,20 @@ function renderSuperAdminTab() {
     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(92,74,199,0.08);margin-bottom:14px;">
       <div style="background:linear-gradient(135deg,#17b8d4,#0a6b7a);padding:14px 16px;">
         <div style="font-size:15px;font-weight:800;color:white;">📅 Class Calendars</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Assign which Sundays Grade 6 and 9 serve. Tap dates to select, then Apply.</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8);">Assign which Sundays Grade 6 and 9 serve. Tap Sundays to select, then Apply.</div>
       </div>
       ${[6,9].map(g => {
         const saved = gradeCalendars[g] || [];
+        const calHtml = buildYearCalendar(g, saved, gradeColors[g]);
         return `
         <div style="padding:12px 14px;border-top:0.5px solid #f0eefb;">
-          <div style="font-size:13px;font-weight:800;color:#1a1535;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:800;color:#1a1535;margin-bottom:10px;">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${gradeColors[g]};margin-right:6px;"></span>
             Grade ${g} — ${teachers[g] || TEACHERS[g] || ""}
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-            ${allSundays.map(d => {
-              const active = saved.includes(d);
-              return `<button onclick="toggleGradeDate(${g},'${d}')" id="cal_${g}_${d.replace(/ /g,'_')}"
-                style="padding:5px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:1.5px solid ${active ? gradeColors[g] : "#ddd8f8"};border-radius:8px;cursor:pointer;background:${active ? gradeColors[g] : "white"};color:${active ? "white" : "#7b7a90"};">
-                ${d}
-              </button>`;
-            }).join("")}
-          </div>
-          <div style="font-size:11px;color:#7b7a90;margin-bottom:8px;" id="calSummary_${g}">
-            ${saved.length} date${saved.length!==1?"s":""} selected${saved.length > 0 ? ": " + saved.join(", ") : " — tap dates above"}
+          ${calHtml}
+          <div style="font-size:11px;color:#7b7a90;margin:8px 0;" id="calSummary_${g}">
+            ${saved.length} date${saved.length!==1?"s":""} selected${saved.length > 0 ? ": " + saved.join(", ") : " — tap Sundays above"}
           </div>
           <button onclick="applyGradeCalendar(${g})"
             style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:linear-gradient(135deg,#17b8d4,#0a6b7a);color:white;border:none;border-radius:10px;cursor:pointer;">
@@ -1982,6 +1975,42 @@ function addNewGrade() {
   showToast("✅ Grade " + gradeNum + " — " + teacherName + " added!");
   renderSuperAdminTab();
   renderClassesTab();
+}
+
+function buildYearCalendar(grade, selected, color) {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const year = 2026;
+  let html = `<div style="overflow-x:auto;">`;
+
+  for (let m = 0; m < 12; m++) {
+    const firstDay = new Date(year, m, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(year, m + 1, 0).getDate();
+    html += `<div style="margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:800;color:#3b2f8f;margin-bottom:6px;">${monthNames[m]} ${year}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">
+        ${["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => `<div style="font-size:9px;font-weight:800;color:#bbb;text-align:center;padding:2px 0;">${d}</div>`).join("")}
+        ${Array(firstDay).fill(`<div></div>`).join("")}
+        ${Array.from({length: daysInMonth}, (_,i) => {
+          const day = i + 1;
+          const date = new Date(year, m, day);
+          const isSunday = date.getDay() === 0;
+          const dateStr = months[m] + " " + day;
+          const isSelected = selected.includes(dateStr);
+          if (isSunday) {
+            return `<button onclick="toggleGradeDate(${grade},'${dateStr}')" id="cal_${grade}_${dateStr.replace(/ /g,'_')}"
+              style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:1.5px solid ${isSelected ? color : "#ddd8f8"};border-radius:6px;padding:4px 2px;cursor:pointer;text-align:center;width:100%;background:${isSelected ? color : "#f8f7ff"};color:${isSelected ? "white" : "#3b2f8f"};">
+              ${day}
+            </button>`;
+          } else {
+            return `<div style="font-size:11px;color:#ccc;text-align:center;padding:4px 2px;">${day}</div>`;
+          }
+        }).join("")}
+      </div>
+    </div>`;
+  }
+  html += `</div>`;
+  return html;
 }
 
 function toggleGradeDate(grade, date) {
