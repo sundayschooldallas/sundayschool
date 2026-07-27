@@ -4013,28 +4013,31 @@ function renderRollCallScreen() {
     return `
     <div style="background:${isPresent ? "linear-gradient(135deg,rgba(34,160,107,0.3),rgba(34,160,107,0.1))" : "rgba(255,255,255,0.07)"};
       border:2px solid ${isPresent ? "rgba(34,160,107,0.6)" : "rgba(255,255,255,0.15)"};
-      border-radius:18px;padding:16px 18px;margin-bottom:12px;
-      display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="display:flex;align-items:center;gap:14px;">
-        <div style="width:52px;height:52px;border-radius:50%;background:${color};
-          display:flex;align-items:center;justify-content:center;
-          font-size:22px;font-weight:900;color:white;flex-shrink:0;">
-          ${isPresent ? "✅" : s.childName.charAt(0)}
+      border-radius:18px;padding:16px 18px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:52px;height:52px;border-radius:50%;background:${color};
+            display:flex;align-items:center;justify-content:center;
+            font-size:22px;font-weight:900;color:white;flex-shrink:0;">
+            ${isPresent ? "✅" : s.childName.charAt(0)}
+          </div>
+          <div>
+            <div style="font-size:18px;font-weight:900;color:white;">${s.childName}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">Grade ${s.grade} · ${s.parentName}${s.phone ? " · " + s.phone : ""}</div>
+          </div>
         </div>
-        <div>
-          <div style="font-size:18px;font-weight:900;color:white;">${s.childName}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">Grade ${s.grade} · ${s.parentName}${s.phone ? " · " + s.phone : ""}</div>
-        </div>
+        ${isOpen ? `
+          <button onclick="markRollCall('${s.childName.replace(/'/g,"\'")}','${todayStr}',${isPresent})"
+            style="padding:12px 18px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;
+            border:none;border-radius:14px;cursor:pointer;flex-shrink:0;
+            background:${isPresent ? "#a32d2d" : "#22a06b"};color:white;white-space:nowrap;">
+            ${isPresent ? "✕ Undo" : "✅ Present"}
+          </button>` : `
+          <div style="font-size:12px;font-weight:800;color:${isPresent ? "#22a06b" : "rgba(255,255,255,0.4)"};">
+            ${isPresent ? "✅ Present" : "⚠️ Absent"}
+          </div>`}
       </div>
-      ${isOpen ? `
-        <button onclick="markRollCall('${s.childName.replace(/'/g,"\'")}','${todayStr}',${isPresent})"
-          style="padding:12px 18px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;
-          border:none;border-radius:14px;cursor:pointer;flex-shrink:0;
-          background:${isPresent ? "#a32d2d" : "#22a06b"};color:white;white-space:nowrap;">
-          ${isPresent ? "✕ Undo" : "✅ Present"}
-        </button>` : ""}
-    </div>
-    ${isClosed ? renderStarRating(s, todayStr) : ""}
+      ${isClosed ? renderStarRating(s, todayStr) : ""}
     </div>`;
   };
 
