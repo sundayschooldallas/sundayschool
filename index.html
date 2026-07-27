@@ -4093,11 +4093,11 @@ function renderRollCallScreen() {
     }, 1000);
   }
 
-  if (isClosed) {
+  if (isClosed && isRealSunday) {
     const alreadyRan = localStorage.getItem("rollCallAutoDeduct__" + todayStr);
     if (!alreadyRan) autoDeductLateStars(todayStr).then(() => showScoringScreen(todayStr));
     else showScoringScreen(todayStr);
-    return; // don't render roll call screen when already closed
+    return;
   }
 }
 
@@ -4160,9 +4160,9 @@ function closedTestBtn() {
   clearInterval(rollCallInterval);
   rollCallInterval = null;
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const now = new Date();
-  const dateStr = months[now.getMonth()] + " " + now.getDate();
-  // Mark absent students as late (1 star punctuality) in local tracker
+  // Use mock date May 10 to match what was used during open test
+  const dateStr = "May 10";
+  // Mark absent students late in local tracker
   const students = getRollCallStudents();
   const rollData = getRollCallData(dateStr);
   students.forEach(function(s) {
@@ -4174,8 +4174,11 @@ function closedTestBtn() {
       }
     }
   });
-  showToast("🔴 Roll call closed — scoring opened!");
-  showScoringScreen(dateStr);
+  showToast("🔴 Roll call closed — loading scoring...");
+  // Load sheet data first, then show scorer
+  Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
+    .then(function() { showScoringScreen(dateStr); })
+    .catch(function() { showScoringScreen(dateStr); });
 }
 
 function showScoringScreen(dateStr) {
