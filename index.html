@@ -3992,53 +3992,66 @@ function renderRollCallScreen() {
     </div>`;
   }
 
-  const grade6 = students.filter(s => s.grade === 6);
-  const grade7 = students.filter(s => s.grade === 7);
-  const grade8 = students.filter(s => s.grade === 8);
-  const grade9 = students.filter(s => s.grade === 9);
+  // Group students by grade
+  const byGrade = {};
+  students.forEach(s => {
+    if (!byGrade[s.grade]) byGrade[s.grade] = [];
+    byGrade[s.grade].push(s);
+  });
+  const gradeColors = { 6:"linear-gradient(135deg,#854f0b,#f5a623)", 7:"linear-gradient(135deg,#0f6e56,#1db88a)", 8:"linear-gradient(135deg,#0a5260,#17b8d4)", 9:"linear-gradient(135deg,#993556,#e05c8a)" };
 
-  const gradeSection = (gradeNum, color, label, list) => list.length > 0 || rollCallGrade !== 78 ? `
-    <div style="margin-bottom:20px;">
-      <div style="background:${color};border-radius:14px;padding:10px 16px;margin-bottom:10px;">
-        <div style="font-size:14px;font-weight:800;color:white;">${label}</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.7);">${list.filter(s=>rollData[s.childName]==="present").length}/${list.length} present</div>
-      </div>
-      ${list.length > 0 ? renderGroup(list, color) : '<div style="color:rgba(255,255,255,0.4);font-size:13px;padding:10px;">No students yet</div>'}
-    </div>` : "";
-
-  const renderGroup = (list, color) => list.map(s => {
-    const status = rollData[s.childName];
-    const isPresent = status === "present";
+  const renderStudentCard = (s, color) => {
+    const isPresent = rollData[s.childName] === "present";
     return `
     <div style="background:${isPresent ? "linear-gradient(135deg,rgba(34,160,107,0.3),rgba(34,160,107,0.1))" : "rgba(255,255,255,0.07)"};
       border:2px solid ${isPresent ? "rgba(34,160,107,0.6)" : "rgba(255,255,255,0.15)"};
       border-radius:18px;padding:16px 18px;margin-bottom:12px;
-      display:flex;align-items:center;justify-content:space-between;gap:12px;
-      transition:all 0.3s;">
+      display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div style="display:flex;align-items:center;gap:14px;">
         <div style="width:52px;height:52px;border-radius:50%;background:${color};
           display:flex;align-items:center;justify-content:center;
-          font-size:22px;font-weight:900;color:white;
-          box-shadow:0 4px 14px rgba(0,0,0,0.3);flex-shrink:0;">
+          font-size:22px;font-weight:900;color:white;flex-shrink:0;">
           ${isPresent ? "✅" : s.childName.charAt(0)}
         </div>
         <div>
           <div style="font-size:18px;font-weight:900;color:white;">${s.childName}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">Parent: ${s.parentName}${s.phone ? ' · +1' + s.phone : ''}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">Grade ${s.grade} · ${s.parentName}${s.phone ? " · " + s.phone : ""}</div>
         </div>
       </div>
       ${isOpen ? `
-        <button onclick="markRollCall('${s.childName}','${todayStr}',${isPresent})"
-          style="padding:12px 18px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;border:none;border-radius:14px;cursor:pointer;
-          background:${isPresent ? "#a32d2d" : "#22a06b"};color:white;white-space:nowrap;
-          box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:all 0.2s;flex-shrink:0;">
+        <button onclick="markRollCall('${s.childName.replace(/'/g,"\'")}','${todayStr}',${isPresent})"
+          style="padding:12px 18px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;
+          border:none;border-radius:14px;cursor:pointer;flex-shrink:0;
+          background:${isPresent ? "#a32d2d" : "#22a06b"};color:white;white-space:nowrap;">
           ${isPresent ? "✕ Undo" : "✅ Present"}
         </button>` : `
         <div style="font-size:13px;font-weight:800;color:${isPresent ? "#22a06b" : "rgba(255,255,255,0.4)"};">
           ${isPresent ? "✅ Present" : "—"}
         </div>`}
     </div>`;
-  }).join("");
+  };
+
+  const renderGradeBlock = (g) => {
+    const list = byGrade[g] || [];
+    if (!list.length) return "";
+    const col = gradeColors[g] || "linear-gradient(135deg,#0a5260,#17b8d4)";
+    const presentCount = list.filter(s => rollData[s.childName] === "present").length;
+    const customT = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+    const raw = customT[g] || TEACHERS[g] || "";
+    const tName = raw.split(/[,&]/).map(x=>x.trim()).filter(Boolean).join(" & ");
+    return (
+      "<div style=\"margin-bottom:20px;\">" +
+        "<div style=\"background:" + col + ";border-radius:14px;padding:10px 16px;margin-bottom:10px;\">" +
+          "<div style=\"font-size:14px;font-weight:800;color:white;\">Grade " + g + (tName ? " — " + tName : "") + "</div>" +
+          "<div style=\"font-size:11px;color:rgba(255,255,255,0.7);\">" + presentCount + "/" + list.length + " present</div>" +
+        "</div>" +
+        list.map(s => renderStudentCard(s, col)).join("") +
+      "</div>"
+    );
+  };
+
+  // Collect all unique grades in this roll call session, sorted
+  const activeGrades = Object.keys(byGrade).map(Number).sort();
 
   container.innerHTML = `
     ${timerHtml}
@@ -4054,10 +4067,9 @@ function renderRollCallScreen() {
         <button onclick="seedTestStudents()" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,215,0,0.3);color:white;">🌱 Seed Students</button>
       </div>
     </div>` : ""}
-    ${rollCallGrade === 6 ? gradeSection(6, "linear-gradient(135deg,#854f0b,#f5a623)", "📙 Grade 6 — Yemane Tsegay & Amots Michael", grade6) : ""}
-    ${rollCallGrade === 78 ? gradeSection(7, "linear-gradient(135deg,#0f6e56,#1db88a)", "📗 Grade 7 — Bereket Isayas", grade7) : ""}
-    ${rollCallGrade === 78 ? gradeSection(8, "linear-gradient(135deg,#0a5260,#17b8d4)", "📘 Grade 8 — Amanuel Habte", grade8) : ""}
-    ${rollCallGrade === 9 ? gradeSection(9, "linear-gradient(135deg,#993556,#e05c8a)", "📕 Grade 9 — Ruth", grade9) : ""}
+    ${activeGrades.length === 0
+        ? '<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.4);font-size:14px;font-weight:700;">No students yet — tap 🌱 Seed Students to test</div>'
+        : activeGrades.map(renderGradeBlock).join("")}
     `;
 
   // Auto-refresh every second for countdown
