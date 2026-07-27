@@ -987,6 +987,8 @@ let mockStartReal = null;
 let mockStartTime = null;
 let rollCallInterval = null;
 let rollCallGrade = 78; // 78 = grades 7&8, 6 = grade 6, 9 = grade 9
+let cmsMode = false;       // true when parent CMS is active (post-roll-call)
+let cmsInterval = null;    // CMS refresh interval
 
 function getMockNow() {
   if (!mockOverride) return new Date();
@@ -4014,6 +4016,7 @@ function renderRollCallScreen() {
         <button onclick="setRollCallMock('open')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(34,160,107,0.4);color:white;">🟢 10:16 AM</button>
         <button onclick="setRollCallMock('closed')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(200,50,50,0.4);color:white;">🔴 10:26 AM</button>
         <button onclick="setRollCallMock('real')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);">Real Time</button>
+        <button onclick="cmsMode=true;const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];renderParentCMSScreen(m[getMockNow().getMonth()]+' '+getMockNow().getDate())" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(23,184,212,0.4);color:white;">📱 Test CMS</button>
       </div>
     </div>` : ""}
     ${rollCallGrade === 6 ? gradeSection(6, "linear-gradient(135deg,#854f0b,#f5a623)", "📙 Grade 6 — Yemane Tsegay & Amots Michael", grade6) : ""}
@@ -4031,7 +4034,9 @@ function renderRollCallScreen() {
       if (nm >= endMin) {
         clearInterval(rollCallInterval);
         await autoDeductLateStars(todayStr);
-        renderRollCallScreen();
+        // ← Auto-enable Parent CMS after roll call closes
+        cmsMode = true;
+        renderParentCMSScreen(todayStr);
       } else {
         renderRollCallScreen();
       }
@@ -4040,7 +4045,14 @@ function renderRollCallScreen() {
 
   if (isClosed) {
     const alreadyRan = localStorage.getItem("rollCallAutoDeduct__" + todayStr);
-    if (!alreadyRan) autoDeductLateStars(todayStr);
+    if (!alreadyRan) autoDeductLateStars(todayStr).then(() => {
+      cmsMode = true;
+      renderParentCMSScreen(todayStr);
+    });
+    else {
+      cmsMode = true;
+      renderParentCMSScreen(todayStr);
+    }
   }
 }
 
@@ -4094,6 +4106,151 @@ async function autoDeductLateStars(todayStr) {
   if (count > 0) {
     showToast("⏰ " + count + " student" + (count !== 1 ? "s" : "") + " marked late — saved to sheet.");
   }
+}
+
+// ── PARENT CMS (Classroom Monitor) ──────────────────────────────────────────
+const CMS_CATEGORIES = [
+  { key: "bible",       label: "📖 Bible",          desc: "Brought & used their Bible" },
+  { key: "notebook",    label: "📓 Notebook",        desc: "Has notebook & taking notes" },
+  { key: "participation", label: "🙏 Participation", desc: "Actively participating" },
+  { key: "chatter",     label: "🗣️ Chatter",         desc: "Minimal distracting talking" },
+  { key: "godly",       label: "✝️ Godly Character", desc: "Respectful & Christ-like" },
+  { key: "lateToClass", label: "⏰ Late to Class",   desc: "Arrived on time" }
+];
+
+function renderParentCMSScreen(todayStr) {
+  const container = document.getElementById("rollCallContent");
+  if (!container) return;
+
+  const students = getRollCallStudents();
+  // Present students first, then absent (late comers allowed to be evaluated)
+  const rollData = getRollCallData(todayStr);
+  const presentStudents = students.filter(s => rollData[s.childName] === "present");
+  const absentStudents  = students.filter(s => rollData[s.childName] !== "present");
+
+  // Resolve teacher name for display
+  const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  let teacherLabel = "";
+  if (rollCallGrade === 78) {
+    const t7 = customTeachersLocal[7] || TEACHERS[7] || "";
+    const t8 = customTeachersLocal[8] || TEACHERS[8] || "";
+    const all = [...new Set([...t7.split(/[,&]/).map(x=>x.trim()), ...t8.split(/[,&]/).map(x=>x.trim())].filter(Boolean))];
+    teacherLabel = all.join(" & ");
+  } else {
+    const raw = customTeachersLocal[rollCallGrade] || TEACHERS[rollCallGrade] || "";
+    teacherLabel = raw.split(/[,&]/).map(x=>x.trim()).filter(Boolean).join(" & ");
+  }
+
+  function studentCard(s) {
+    const existing = getTrackerData(s.parentName, todayStr) || {};
+    const isAbsent = rollData[s.childName] !== "present";
+
+    const starRows = CMS_CATEGORIES.map(cat => {
+      const current = (existing[cat.key] && existing[cat.key].stars) || (cat.key === "lateToClass" && isAbsent ? 1 : 5);
+      return `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div>
+              <span style="font-size:13px;font-weight:800;color:#0a3d45;">${cat.label}</span>
+              <div style="font-size:10px;color:#7b7a90;">${cat.desc}</div>
+            </div>
+            <div style="font-size:12px;font-weight:900;color:#0d7a8a;">${current}★</div>
+          </div>
+          <div style="display:flex;gap:4px;">
+            ${[1,2,3,4,5].map(n => `
+              <button onclick="cmsStar('${s.childName}','${s.parentName}','${todayStr}','${cat.key}',${n})"
+                style="flex:1;padding:8px 0;font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;
+                border:2px solid ${n <= current ? '#17b8d4' : '#e0f5f7'};
+                border-radius:8px;cursor:pointer;
+                background:${n <= current ? 'linear-gradient(135deg,#0a5260,#17b8d4)' : 'white'};
+                color:${n <= current ? 'white' : '#c0eaf0'};
+                transition:all 0.15s;">
+                ${n}
+              </button>`).join("")}
+          </div>
+        </div>`;
+    }).join("");
+
+    return `
+      <div style="background:white;border-radius:18px;padding:16px;margin-bottom:14px;
+        box-shadow:0 4px 16px rgba(13,122,138,0.10);
+        border:2px solid ${isAbsent ? '#fbbcbc' : '#c0eaf0'};">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div style="width:46px;height:46px;border-radius:50%;
+            background:${isAbsent ? '#e05c8a' : 'linear-gradient(135deg,#0a5260,#17b8d4)'};
+            display:flex;align-items:center;justify-content:center;
+            font-size:20px;font-weight:900;color:white;flex-shrink:0;">
+            ${isAbsent ? "⚠️" : s.childName.charAt(0)}
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:17px;font-weight:900;color:#0a3d45;">${s.childName}</div>
+            <div style="font-size:11px;color:#7b7a90;">Grade ${s.grade} · ${isAbsent ? "⚠️ Late / Absent" : "✅ Present"}</div>
+          </div>
+          <div style="font-size:10px;font-weight:800;color:#0d7a8a;background:#e0f5f7;padding:4px 8px;border-radius:8px;">
+            Avg: ${cmsAvgStars(existing)}★
+          </div>
+        </div>
+        ${starRows}
+      </div>`;
+  }
+
+  container.innerHTML = `
+    <!-- CMS Header Banner -->
+    <div style="background:linear-gradient(135deg,#0a5260,#17b8d4);border-radius:16px;padding:16px;margin-bottom:16px;text-align:center;">
+      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
+        📱 Parent Classroom Monitor
+      </div>
+      <div style="font-size:17px;font-weight:900;color:white;margin-bottom:2px;">Class Evaluation Active</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.75);">Rate each student using ⭐ stars (1 = poor, 5 = excellent)</div>
+      ${teacherLabel ? `<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px;">👩‍🏫 ${teacherLabel}</div>` : ""}
+    </div>
+
+    <!-- Late-comers note -->
+    <div style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;font-weight:700;color:#7b4f00;">
+      ⏰ <strong>Late comers</strong> are shown below with ⚠️ — they can still be evaluated. "Late to Class" is pre-set to 1★ for absent students.
+    </div>
+
+    <!-- Present students -->
+    ${presentStudents.length > 0 ? `
+      <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">
+        ✅ Present (${presentStudents.length})
+      </div>
+      ${presentStudents.map(studentCard).join("")}
+    ` : ""}
+
+    <!-- Absent / late students -->
+    ${absentStudents.length > 0 ? `
+      <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:10px;margin-top:${presentStudents.length > 0 ? '14px' : '0'};text-transform:uppercase;letter-spacing:1px;">
+        ⚠️ Late / Absent (${absentStudents.length})
+      </div>
+      ${absentStudents.map(studentCard).join("")}
+    ` : ""}
+
+    ${students.length === 0 ? `<div style="text-align:center;color:rgba(255,255,255,0.4);padding:40px 0;font-size:14px;">No students registered for this class</div>` : ""}
+  `;
+}
+
+function cmsAvgStars(existing) {
+  const vals = CMS_CATEGORIES.map(c => (existing[c.key] && existing[c.key].stars) || 5);
+  return (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1);
+}
+
+async function cmsStar(childName, parentName, dateStr, category, stars) {
+  // Save locally
+  const existing = getTrackerData(parentName, dateStr) || {};
+  existing[category] = { stars, comment: "Parent CMS — " + new Date().toLocaleTimeString() };
+  saveTrackerData(parentName, dateStr, existing);
+
+  // Push to sheet
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type:"tracker", parentName, date:dateStr, category, stars,
+      comment:"Parent CMS — " + new Date().toLocaleTimeString() })
+  }).catch(e => console.log("CMS star sheet error:", e));
+
+  // Re-render CMS (just update the card visually)
+  renderParentCMSScreen(dateStr);
 }
 
 function markRollCall(childName, date, isPresent) {
