@@ -987,8 +987,6 @@ let mockStartReal = null;
 let mockStartTime = null;
 let rollCallInterval = null;
 let rollCallGrade = 78; // 78 = grades 7&8, 6 = grade 6, 9 = grade 9
-let cmsMode = false;       // true when parent CMS is active (post-roll-call)
-let cmsInterval = null;    // CMS refresh interval
 
 function getMockNow() {
   if (!mockOverride) return new Date();
@@ -3946,7 +3944,6 @@ function setRollCallMock(scenario) {
   mockStartTime = null;
   clearInterval(rollCallInterval);
   rollCallInterval = null;
-  cmsMode = false;
   renderRollCallScreen();
   window.scrollTo(0, 0);
 }
@@ -4024,10 +4021,9 @@ function renderRollCallScreen() {
           border:none;border-radius:14px;cursor:pointer;flex-shrink:0;
           background:${isPresent ? "#a32d2d" : "#22a06b"};color:white;white-space:nowrap;">
           ${isPresent ? "✕ Undo" : "✅ Present"}
-        </button>` : `
-        <div style="font-size:13px;font-weight:800;color:${isPresent ? "#22a06b" : "rgba(255,255,255,0.4)"};">
-          ${isPresent ? "✅ Present" : "—"}
-        </div>`}
+        </button>` : ""}
+    </div>
+    ${isClosed ? renderStarRating(s, todayStr) : ""}
     </div>`;
   };
 
@@ -4063,8 +4059,6 @@ function renderRollCallScreen() {
         <button onclick="setRollCallMock('open')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(34,160,107,0.4);color:white;">🟢 10:16 AM</button>
         <button onclick="setRollCallMock('closed')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(200,50,50,0.4);color:white;">🔴 10:26 AM</button>
         <button onclick="setRollCallMock('real')" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);">Real Time</button>
-        <button onclick="cmsMode=true;const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];renderParentCMSScreen(m[getMockNow().getMonth()]+' '+getMockNow().getDate())" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(23,184,212,0.4);color:white;">📱 Test CMS</button>
-        <button onclick="seedTestStudents()" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:rgba(255,215,0,0.3);color:white;">🌱 Seed Students</button>
       </div>
     </div>` : ""}
     ${activeGrades.length === 0
@@ -4082,8 +4076,7 @@ function renderRollCallScreen() {
         clearInterval(rollCallInterval);
         await autoDeductLateStars(todayStr);
         // ← Auto-enable Parent CMS after roll call closes
-        cmsMode = true;
-        renderParentCMSScreen(todayStr);
+        renderRollCallScreen();
       } else {
         renderRollCallScreen();
       }
@@ -4092,14 +4085,7 @@ function renderRollCallScreen() {
 
   if (isClosed) {
     const alreadyRan = localStorage.getItem("rollCallAutoDeduct__" + todayStr);
-    if (!alreadyRan) autoDeductLateStars(todayStr).then(() => {
-      cmsMode = true;
-      renderParentCMSScreen(todayStr);
-    });
-    else {
-      cmsMode = true;
-      renderParentCMSScreen(todayStr);
-    }
+    if (!alreadyRan) autoDeductLateStars(todayStr);
   }
 }
 
@@ -4155,175 +4141,49 @@ async function autoDeductLateStars(todayStr) {
   }
 }
 
-// ── PARENT CMS (Classroom Monitor) ──────────────────────────────────────────
-const CMS_CATEGORIES = [
-  { key: "bible",       label: "📖 Bible",          desc: "Brought & used their Bible" },
-  { key: "notebook",    label: "📓 Notebook",        desc: "Has notebook & taking notes" },
-  { key: "participation", label: "🙏 Participation", desc: "Actively participating" },
-  { key: "chatter",     label: "🗣️ Chatter",         desc: "Minimal distracting talking" },
-  { key: "godly",       label: "✝️ Godly Character", desc: "Respectful & Christ-like" },
-  { key: "lateToClass", label: "⏰ Late to Class",   desc: "Arrived on time" }
+const RC_TRACKER_CATS = [
+  { key:"bible",         label:"📖 Bible",           short:"Bible" },
+  { key:"notebook",      label:"📓 Notebook",         short:"Notebook" },
+  { key:"participation", label:"🙏 Participation",    short:"Particip." },
+  { key:"chatter",       label:"🗣️ Chatter",          short:"Chatter" },
+  { key:"godly",         label:"✝️ Godly Character",  short:"Godly" },
+  { key:"lateToClass",   label:"⏰ Late to Class",    short:"Punctual" }
 ];
 
-function renderParentCMSScreen(todayStr) {
-  const container = document.getElementById("rollCallContent");
-  if (!container) return;
-
-  const students = getRollCallStudents();
-  // Present students first, then absent (late comers allowed to be evaluated)
-  const rollData = getRollCallData(todayStr);
-  const presentStudents = students.filter(s => rollData[s.childName] === "present");
-  const absentStudents  = students.filter(s => rollData[s.childName] !== "present");
-
-  // Resolve teacher name for display
-  const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  let teacherLabel = "";
-  if (rollCallGrade === 78) {
-    const t7 = customTeachersLocal[7] || TEACHERS[7] || "";
-    const t8 = customTeachersLocal[8] || TEACHERS[8] || "";
-    const all = [...new Set([...t7.split(/[,&]/).map(x=>x.trim()), ...t8.split(/[,&]/).map(x=>x.trim())].filter(Boolean))];
-    teacherLabel = all.join(" & ");
-  } else {
-    const raw = customTeachersLocal[rollCallGrade] || TEACHERS[rollCallGrade] || "";
-    teacherLabel = raw.split(/[,&]/).map(x=>x.trim()).filter(Boolean).join(" & ");
-  }
-
-  function studentCard(s) {
-    const existing = getTrackerData(s.parentName, todayStr) || {};
-    const isAbsent = rollData[s.childName] !== "present";
-
-    const starRows = CMS_CATEGORIES.map(cat => {
-      const current = (existing[cat.key] && existing[cat.key].stars) || (cat.key === "lateToClass" && isAbsent ? 1 : 5);
-      return `
-        <div style="margin-bottom:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-            <div>
-              <span style="font-size:13px;font-weight:800;color:#0a3d45;">${cat.label}</span>
-              <div style="font-size:10px;color:#7b7a90;">${cat.desc}</div>
-            </div>
-            <div style="font-size:12px;font-weight:900;color:#0d7a8a;">${current}★</div>
-          </div>
-          <div style="display:flex;gap:4px;">
-            ${[1,2,3,4,5].map(n => `
-              <button onclick="cmsStar('${s.childName}','${s.parentName}','${todayStr}','${cat.key}',${n})"
-                style="flex:1;padding:8px 0;font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;
-                border:2px solid ${n <= current ? '#17b8d4' : '#e0f5f7'};
-                border-radius:8px;cursor:pointer;
-                background:${n <= current ? 'linear-gradient(135deg,#0a5260,#17b8d4)' : 'white'};
-                color:${n <= current ? 'white' : '#c0eaf0'};
-                transition:all 0.15s;">
-                ${n}
-              </button>`).join("")}
-          </div>
-        </div>`;
-    }).join("");
-
-    return `
-      <div style="background:white;border-radius:18px;padding:16px;margin-bottom:14px;
-        box-shadow:0 4px 16px rgba(13,122,138,0.10);
-        border:2px solid ${isAbsent ? '#fbbcbc' : '#c0eaf0'};">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <div style="width:46px;height:46px;border-radius:50%;
-            background:${isAbsent ? '#e05c8a' : 'linear-gradient(135deg,#0a5260,#17b8d4)'};
-            display:flex;align-items:center;justify-content:center;
-            font-size:20px;font-weight:900;color:white;flex-shrink:0;">
-            ${isAbsent ? "⚠️" : s.childName.charAt(0)}
-          </div>
-          <div style="flex:1;">
-            <div style="font-size:17px;font-weight:900;color:#0a3d45;">${s.childName}</div>
-            <div style="font-size:11px;color:#7b7a90;">Grade ${s.grade} · ${isAbsent ? "⚠️ Late / Absent" : "✅ Present"}</div>
-          </div>
-          <div style="font-size:10px;font-weight:800;color:#0d7a8a;background:#e0f5f7;padding:4px 8px;border-radius:8px;">
-            Avg: ${cmsAvgStars(existing)}★
-          </div>
-        </div>
-        ${starRows}
-      </div>`;
-  }
-
-  container.innerHTML = `
-    <!-- CMS Header Banner -->
-    <div style="background:linear-gradient(135deg,#0a5260,#17b8d4);border-radius:16px;padding:16px;margin-bottom:16px;text-align:center;">
-      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
-        📱 Parent Classroom Monitor
-      </div>
-      <div style="font-size:17px;font-weight:900;color:white;margin-bottom:2px;">Class Evaluation Active</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.75);">Rate each student using ⭐ stars (1 = poor, 5 = excellent)</div>
-      ${teacherLabel ? `<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px;">👩‍🏫 ${teacherLabel}</div>` : ""}
-    </div>
-
-    <!-- Late-comers note -->
-    <div style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;font-weight:700;color:#7b4f00;">
-      ⏰ <strong>Late comers</strong> are shown below with ⚠️ — they can still be evaluated. "Late to Class" is pre-set to 1★ for absent students.
-    </div>
-
-    <!-- Present students -->
-    ${presentStudents.length > 0 ? `
-      <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">
-        ✅ Present (${presentStudents.length})
-      </div>
-      ${presentStudents.map(studentCard).join("")}
-    ` : ""}
-
-    <!-- Absent / late students -->
-    ${absentStudents.length > 0 ? `
-      <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:10px;margin-top:${presentStudents.length > 0 ? '14px' : '0'};text-transform:uppercase;letter-spacing:1px;">
-        ⚠️ Late / Absent (${absentStudents.length})
-      </div>
-      ${absentStudents.map(studentCard).join("")}
-    ` : ""}
-
-    ${students.length === 0 ? `<div style="text-align:center;color:rgba(255,255,255,0.4);padding:40px 0;font-size:14px;">No students registered for this class</div>` : ""}
-  `;
+function renderStarRating(s, todayStr) {
+  const existing = getTrackerData(s.parentName, todayStr) || {};
+  const isAbsent = getRollCallData(todayStr)[s.childName] !== "present";
+  const rows = RC_TRACKER_CATS.map(cat => {
+    const cur = (existing[cat.key] && existing[cat.key].stars) != null
+      ? existing[cat.key].stars
+      : (cat.key === "lateToClass" && isAbsent ? 1 : 5);
+    const stars = [1,2,3,4,5].map(n =>
+      `<button onclick="rcRate('${s.childName.replace(/'/g,"\'")}','${s.parentName.replace(/'/g,"\'")}','${todayStr}','${cat.key}',${n})"
+        style="flex:1;padding:7px 0;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;
+        border:2px solid ${n <= cur ? "#17b8d4" : "rgba(255,255,255,0.15)"};border-radius:8px;cursor:pointer;
+        background:${n <= cur ? "linear-gradient(135deg,#0a5260,#17b8d4)" : "rgba(255,255,255,0.05)"};
+        color:${n <= cur ? "white" : "rgba(255,255,255,0.3)"};">${n}</button>`
+    ).join("");
+    return `<div style="margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:4px;">${cat.label} <span style="float:right;color:#17b8d4;">${cur}★</span></div>
+      <div style="display:flex;gap:4px;">${stars}</div>
+    </div>`;
+  }).join("");
+  return `<div style="margin-top:10px;padding:12px;background:rgba(255,255,255,0.05);border-radius:14px;border:1px solid rgba(255,255,255,0.1);">
+    ${rows}
+  </div>`;
 }
 
-function cmsAvgStars(existing) {
-  const vals = CMS_CATEGORIES.map(c => (existing[c.key] && existing[c.key].stars) || 5);
-  return (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1);
-}
-
-async function cmsStar(childName, parentName, dateStr, category, stars) {
-  // Save locally
+async function rcRate(childName, parentName, dateStr, category, stars) {
   const existing = getTrackerData(parentName, dateStr) || {};
-  existing[category] = { stars, comment: "Parent CMS — " + new Date().toLocaleTimeString() };
+  existing[category] = { stars, comment: "Roll call rating — " + new Date().toLocaleTimeString() };
   saveTrackerData(parentName, dateStr, existing);
-
-  // Push to sheet
   fetch(SHEET_URL, {
-    method: "POST", mode: "no-cors",
-    headers: { "Content-Type": "text/plain" },
+    method:"POST", mode:"no-cors",
+    headers:{"Content-Type":"text/plain"},
     body: JSON.stringify({ type:"tracker", parentName, date:dateStr, category, stars,
-      comment:"Parent CMS — " + new Date().toLocaleTimeString() })
-  }).catch(e => console.log("CMS star sheet error:", e));
-
-  // Re-render CMS (just update the card visually)
-  renderParentCMSScreen(dateStr);
-}
-
-function seedTestStudents() {
-  const g1 = rollCallGrade === 6 ? 6 : rollCallGrade === 9 ? 9 : 7;
-  const g2 = rollCallGrade === 78 ? 8 : g1;
-  const testKids = [
-    { phone:"5550001", parent:"Test Parent 1", child:"Abel Tesfaye",  grade: g1 },
-    { phone:"5550002", parent:"Test Parent 2", child:"Miriam Haile",  grade: g1 },
-    { phone:"5550003", parent:"Test Parent 3", child:"Dawit Bekele",  grade: g1 },
-    { phone:"5550004", parent:"Test Parent 4", child:"Sara Gebru",    grade: g2 },
-    { phone:"5550005", parent:"Test Parent 5", child:"Yonas Tekle",   grade: g2 },
-    { phone:"5550006", parent:"Test Parent 6", child:"Eden Solomon",  grade: g2 },
-  ];
-  // Save to localStorage (persistent)
-  testKids.forEach(k => {
-    localStorage.setItem("childInfo__" + k.phone, JSON.stringify({
-      name: k.child, grade: k.grade, parentName: k.parent,
-      allChildren: [{ name: k.child, grade: k.grade }]
-    }));
-  });
-  // Also inject directly into childrenSheetData (in-memory, works immediately)
-  testKids.forEach(k => {
-    const exists = childrenSheetData.some(r => r.childName === k.child);
-    if (!exists) childrenSheetData.push({ childName: k.child, grade: k.grade, parentName: k.parent, phone: k.phone });
-  });
-  showToast("🌱 " + testKids.length + " test students seeded!");
+      comment:"Roll call rating — " + new Date().toLocaleTimeString() })
+  }).catch(()=>{});
   renderRollCallScreen();
 }
 
