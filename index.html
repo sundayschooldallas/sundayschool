@@ -314,6 +314,13 @@
       <button onclick="showVerify()" style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:white;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:7px 14px;cursor:pointer;position:relative;z-index:10;">Sign out</button>
     </div>
   </div>
+  <div style="max-width:480px;margin:0 auto;padding:0 14px 10px;">
+    <button onclick="showDutyBoard()"
+      style="width:100%;padding:14px;background:rgba(255,215,0,0.15);border:1.5px solid rgba(255,215,0,0.4);
+      border-radius:14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;color:#FFD700;cursor:pointer;margin-bottom:4px;">
+      📋 View Who is On Duty This Sunday
+    </button>
+  </div>
   <div style="max-width:480px;margin:0 auto;padding:16px 14px;">
     <div id="advocateContent"></div>
   </div>
@@ -373,7 +380,22 @@
     <div style="font-size:20px;font-weight:800;margin-bottom:4px;">Your Child's Info</div>
     <div style="font-size:13px;opacity:0.8;">This only takes a moment — fill in once</div>
   </div>
-  <div style="max-width:480px;margin:0 auto;padding:20px 16px;">
+  <!-- PUBLIC DUTY BOARD — no login needed -->
+  <div id="publicDutyBoard" style="display:none;max-width:480px;margin:0 auto;padding:16px 14px;">
+    <div style="background:linear-gradient(135deg,#0a5260,#0d7a8a);border-radius:18px;padding:16px;margin-bottom:16px;text-align:center;">
+      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📋 Parent Duty Board</div>
+      <div style="font-size:18px;font-weight:900;color:white;">Who is on duty this Sunday?</div>
+      <div id="dutyBoardDate" style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;"></div>
+    </div>
+    <div id="dutyBoardContent"></div>
+    <button onclick="hideDutyBoard()"
+      style="width:100%;margin-top:10px;padding:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+      border-radius:14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;color:white;cursor:pointer;">
+      ← Back to Login
+    </button>
+  </div>
+
+  <div id="mainLoginArea" style="max-width:480px;margin:0 auto;padding:20px 16px;">
     <div style="background:white;border-radius:20px;padding:20px;box-shadow:0 4px 20px rgba(13,122,138,0.1);">
 
       <div style="margin-bottom:16px;">
@@ -465,6 +487,100 @@ const avatarColors = [
   { bg: "#e4eefb", color: "#1a4a8a" },
   { bg: "#f0fce8", color: "#2a6b10" },
 ];
+
+function showDutyBoard() {
+  document.getElementById("publicDutyBoard").style.display = "block";
+  document.getElementById("mainLoginArea").style.display = "none";
+  const verifyScreen = document.getElementById("verifyScreen");
+  if (verifyScreen) verifyScreen.style.display = "none";
+  renderDutyBoard();
+}
+
+function hideDutyBoard() {
+  document.getElementById("publicDutyBoard").style.display = "none";
+  document.getElementById("mainLoginArea").style.display = "block";
+}
+
+function renderDutyBoard() {
+  const now = getMockNow ? getMockNow() : new Date();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+  // Find this Sunday or next Sunday
+  const dayOfWeek = now.getDay();
+  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const targetSunday = new Date(now);
+  targetSunday.setDate(now.getDate() + daysToSunday);
+  const targetStr = months[targetSunday.getMonth()] + " " + targetSunday.getDate();
+
+  const dateEl = document.getElementById("dutyBoardDate");
+  if (dateEl) dateEl.textContent = days[targetSunday.getDay()] + ", " + months[targetSunday.getMonth()] + " " + targetSunday.getDate() + ", " + targetSunday.getFullYear();
+
+  // Find the duty parents for that Sunday
+  const week = roster.find(w => w.date === targetStr);
+  const content = document.getElementById("dutyBoardContent");
+  if (!content) return;
+
+  // Get all active grades and their teachers
+  const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const gradeColors = { 6:"linear-gradient(135deg,#854f0b,#f5a623)", 7:"linear-gradient(135deg,#0f6e56,#1db88a)", 8:"linear-gradient(135deg,#0a5260,#17b8d4)", 9:"linear-gradient(135deg,#993556,#e05c8a)" };
+  const allGrades = Object.keys(TEACHERS).map(Number).sort();
+
+  let html = "";
+
+  if (!week || week.parents.length === 0) {
+    html += `<div style="background:rgba(255,255,255,0.07);border-radius:14px;padding:20px;text-align:center;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,0.6);">No parents scheduled for this Sunday yet.</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:6px;">Check back closer to Sunday or contact the class admin.</div>
+    </div>`;
+  } else {
+    // Show duty parents — one card per grade showing which parents cover that class
+    allGrades.forEach(function(g) {
+      const col = gradeColors[g] || "linear-gradient(135deg,#0a5260,#17b8d4)";
+      const rawTeacher = customTeachersLocal[g] || TEACHERS[g] || "";
+      const teacherName = rawTeacher.split(/[,&]/).map(x=>x.trim()).filter(Boolean).join(" & ");
+
+      html += `<div style="background:white;border-radius:16px;overflow:hidden;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
+        <div style="background:${col};padding:12px 16px;">
+          <div style="font-size:14px;font-weight:900;color:white;">Grade ${g}</div>
+          ${teacherName ? `<div style="font-size:11px;color:rgba(255,255,255,0.8);">👩‍🏫 ${teacherName}</div>` : ""}
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="font-size:11px;font-weight:800;color:#7b7a90;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">📋 Duty Parents This Sunday</div>`;
+
+      week.parents.forEach(function(p, idx) {
+        const color = idx === 0 ? "#e05c8a" : "#0d7a8a";
+        html += `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;${idx > 0 ? "border-top:0.5px solid #f0eefb;" : ""}">
+          <div style="width:42px;height:42px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;
+            font-size:16px;font-weight:900;color:white;flex-shrink:0;">${p.name.charAt(0)}</div>
+          <div>
+            <div style="font-size:15px;font-weight:900;color:#0a3d45;">${p.name}</div>
+            <div style="font-size:11px;color:#7b7a90;">Duty Parent ${idx+1}</div>
+          </div>
+        </div>`;
+      });
+
+      html += `</div></div>`;
+    });
+  }
+
+  // Also show NEXT Sunday's parents as a preview
+  const nextSunday = new Date(targetSunday);
+  nextSunday.setDate(targetSunday.getDate() + 7);
+  const nextStr = months[nextSunday.getMonth()] + " " + nextSunday.getDate();
+  const nextWeek = roster.find(w => w.date === nextStr);
+
+  if (nextWeek && nextWeek.parents.length > 0) {
+    html += `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px 16px;margin-top:4px;">
+      <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:8px;">🔔 Next Sunday (${nextStr}) — On Deck:</div>`;
+    nextWeek.parents.forEach(function(p) {
+      html += `<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.8);padding:3px 0;">• ${p.name}</div>`;
+    });
+    html += `</div>`;
+  }
+
+  content.innerHTML = html;
+}
 
 function normalize(p) { return String(p).replace(/\D/g, "").slice(-10); }
 function initials(name) { return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2); }
@@ -679,6 +795,50 @@ function showApp() {
 }
 
 const TEACHERS = { 6: "Yemane Tsegay & Amots Michael", 7: "Bereket Isayas", 8: "Amanuel Habte", 9: "Ruth" };
+
+// ── PROMOTION SUNDAY ── First Sunday of September each year
+// Students move up one grade on this day each year
+function getPromotionSunday(year) {
+  const d = new Date(year, 8, 1); // Sep 1
+  const day = d.getDay();
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + daysToSunday);
+  return d;
+}
+
+// ── Generate all Sundays for a given school year (Sep → Aug) ─────────────
+function generateSundaysForYear(startYear) {
+  const sundays = [];
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  // School year: Sep of startYear → Aug of startYear+1
+  const start = getPromotionSunday(startYear);
+  const end   = new Date(startYear + 1, 7, 31); // Aug 31 next year
+  const d = new Date(start);
+  while (d <= end) {
+    if (d.getDay() === 0) {
+      sundays.push(months[d.getMonth()] + " " + d.getDate());
+    }
+    d.setDate(d.getDate() + 7);
+  }
+  return sundays;
+}
+
+// ── Auto-seed calendars for all grades for N years forward ───────────────
+function seedMultiYearCalendars(grades, yearsAhead) {
+  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
+  const currentYear = new Date().getFullYear();
+  for (let y = 0; y <= yearsAhead; y++) {
+    const sundays = generateSundaysForYear(currentYear + y);
+    grades.forEach(g => {
+      if (!gradeCalendars[g]) gradeCalendars[g] = [];
+      sundays.forEach(s => {
+        if (!gradeCalendars[g].includes(s)) gradeCalendars[g].push(s);
+      });
+      gradeCalendars[g].sort((a,b) => new Date(a + " " + (currentYear + y)) - new Date(b + " " + (currentYear + y)));
+    });
+  }
+  localStorage.setItem("gradeCalendars", JSON.stringify(gradeCalendars));
+}
 let selectedGrade = null;
 
 let pendingChildren = []; // stores multiple children before saving
@@ -1872,6 +2032,17 @@ function renderSuperAdminTab() {
       <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">Only you can see and change these settings</div>
     </div>
 
+    <!-- ── ANNUAL PROMOTION ──────────────────────────────────────────── -->
+    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:900;color:white;margin-bottom:6px;">🎓 Annual Promotion</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px;">Every Promotion Sunday all students move up one grade. Calendars auto-generate 3 years forward. Graduates are archived.</div>
+      <button onclick="runAnnualPromotion()"
+        style="padding:10px 20px;background:linear-gradient(135deg,#856404,#f1c40f);color:white;border:none;border-radius:10px;
+        font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;cursor:pointer;width:100%;">
+        🎓 Run Annual Promotion
+      </button>
+    </div>
+
     <!-- ── CLASS MANAGEMENT ─────────────────────────────────────────── -->
     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(13,122,138,0.08);margin-bottom:14px;">
       <div style="background:linear-gradient(135deg,#0a5260,#0d7a8a);padding:14px 16px;">
@@ -2379,6 +2550,114 @@ function renderStudentsTab() {
   });
 
   el.innerHTML = html;
+}
+
+// ── BULK ANNUAL PROMOTION ────────────────────────────────────────────────
+function runAnnualPromotion() {
+  const today = new Date();
+  const promotionSunday = getPromotionSunday(today.getFullYear());
+  const isPromotionDay = today.toDateString() === promotionSunday.toDateString();
+
+  const allGrades = Object.keys(TEACHERS).map(Number).sort();
+  const maxGrade  = Math.max(...allGrades);
+
+  const confirm1 = confirm(
+    "🎓 ANNUAL PROMOTION\n\n" +
+    "Today is " + (isPromotionDay ? "✅ Promotion Sunday!" : "⚠️ NOT Promotion Sunday (simulating).") + "\n\n" +
+    "This will promote ALL students up one grade.\n" +
+    "Students in Grade " + maxGrade + " will be marked as graduated.\n\n" +
+    "Calendars will be auto-generated for the next 3 years.\n\n" +
+    "Are you sure you want to proceed?"
+  );
+  if (!confirm1) return;
+
+  let promoted = 0, graduated = 0;
+
+  // Promote all students in localStorage
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith("childInfo__")) continue;
+    try {
+      const ci = JSON.parse(localStorage.getItem(k));
+      if (!ci || ci.skipped) continue;
+      const g = Number(ci.grade);
+      if (!g) continue;
+      if (g >= maxGrade) {
+        ci.grade    = "graduated";
+        ci.graduated = true;
+        graduated++;
+      } else {
+        ci.grade   = g + 1;
+        ci.teacher = TEACHERS[g + 1] || "";
+        promoted++;
+      }
+      localStorage.setItem(k, JSON.stringify(ci));
+    } catch(e) {}
+  }
+
+  // Promote childrenSheetData in memory
+  childrenSheetData.forEach(row => {
+    const g = Number(row.grade);
+    if (!g) return;
+    if (g >= maxGrade) { row.grade = "graduated"; row.graduated = true; }
+    else { row.grade = g + 1; row.teacher = TEACHERS[g + 1] || ""; }
+  });
+
+  // Sync promotions to sheet
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith("childInfo__")) continue;
+    try {
+      const ci   = JSON.parse(localStorage.getItem(k));
+      const phone = k.replace("childInfo__", "");
+      fetch(SHEET_URL, {
+        method:"POST", mode:"no-cors",
+        headers:{"Content-Type":"text/plain"},
+        body: JSON.stringify({ type:"childInfo", phone,
+          parentName: ci.parentName, childName: ci.name,
+          grade: ci.grade, teacher: ci.teacher || "",
+          unassigned: false, graduated: ci.graduated || false })
+      }).catch(()=>{});
+    } catch(e) {}
+  }
+
+  // Seed calendars for next 3 years for all grades
+  seedMultiYearCalendars(allGrades, 3);
+
+  showToast("🎓 Promotion complete! " + promoted + " promoted, " + graduated + " graduated. Calendars set for 3 years ahead.");
+  renderSuperAdminTab();
+  renderClassesTab();
+}
+
+// ── Check if today is promotion Sunday and show banner ───────────────────
+function checkPromotionBanner() {
+  const today = new Date();
+  const ps    = getPromotionSunday(today.getFullYear());
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const psStr = months[ps.getMonth()] + " " + ps.getDate() + ", " + ps.getFullYear();
+
+  const isToday = today.toDateString() === ps.toDateString();
+  const banner  = document.getElementById("promotionBanner");
+  if (!banner) return;
+  if (isToday) {
+    banner.innerHTML = `
+      <div style="background:linear-gradient(135deg,#856404,#f1c40f);border-radius:14px;padding:14px 16px;margin-bottom:14px;text-align:center;">
+        <div style="font-size:15px;font-weight:900;color:white;">🎓 Today is Promotion Sunday!</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.9);margin-top:4px;">All students move up one grade today.</div>
+        <button onclick="runAnnualPromotion()"
+          style="margin-top:10px;padding:10px 20px;background:white;color:#856404;border:none;border-radius:10px;
+          font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;cursor:pointer;">
+          🎓 Run Annual Promotion
+        </button>
+      </div>`;
+    banner.style.display = "block";
+  } else {
+    banner.innerHTML = `
+      <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:10px 14px;margin-bottom:12px;text-align:center;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);font-weight:700;">🎓 Next Promotion Sunday: ${psStr}</div>
+      </div>`;
+    banner.style.display = "block";
+  }
 }
 
 function promoteStudent(phone, parentName, childName, currentGrade) {
@@ -3374,29 +3653,7 @@ function toggleClassSection(id) {
   if (arrow) arrow.textContent = isOpen ? "▶" : "▼";
 }
 
-  // Find duplicates — same child name (case-insensitive) registered under multiple parents
-  const childCount = {};
-  roster.forEach(week => {
-    week.parents.forEach(p => {
-      const ci = getChildInfoByParent(p.name);
-      if (!ci || !ci.name) return;
-      const key = ci.name.trim().toLowerCase();
-      if (!childCount[key]) childCount[key] = [];
-      childCount[key].push({ parent: p.name, h: p.h, grade: ci.grade, teacher: ci.teacher, displayName: ci.name });
-    });
-  });
-  const duplicates = Object.entries(childCount).filter(([,entries]) => entries.length > 1);
 
-  roster.forEach(week => {
-    week.parents.forEach(p => {
-      const ci = getChildInfoByParent(p.name);
-      if (!ci || !ci.name) { pending.push({ parent: p.name, h: p.h }); return; }
-      const entry = { child: ci.name, parent: p.name, teacher: ci.teacher || TEACHERS[ci.grade] || "Unknown", grade: ci.grade, h: p.h };
-      if (ci.unassigned) { unassigned.push(entry); return; }
-      if (ci.grade === 7) grade7.push(entry);
-      else if (ci.grade === 8) grade8.push(entry);
-    });
-  });
 
   const renderClass = (entries, color) => {
     if (entries.length === 0) return `<div style="font-size:13px;color:#7b7a90;padding:12px 14px;">No children registered yet.</div>`;
@@ -4210,7 +4467,7 @@ function showScoringScreen(dateStr) {
       const avgStars = Math.round(TRACKER_CATEGORIES.reduce(function(sum,cat){
         return sum + ((existing[cat.key]||{}).stars||5);
       },0) / TRACKER_CATEGORIES.length);
-      const starBar = "⭐".repeat(avgStars) + "☆".repeat(5-avgStars);
+      const starBar = avgStars + "★ avg";
 
       // Collapsed header — tap to expand
       html += `
@@ -4241,9 +4498,13 @@ function showScoringScreen(dateStr) {
               <div style="display:flex;gap:6px;margin-bottom:8px;">`;
         for (let n = 1; n <= 5; n++) {
           const filled = n <= current.stars;
-          html += `<span onclick="rcSetStar('${s.parentName.replace(/'/g,"\'")}','${dateStr}','${cat.key}',${n},'${pfx}')"
+          const colors = ["","#c0392b","#e67e22","#f1c40f","#2980b9","#27ae60"];
+          html += `<button onclick="rcSetStar('${s.parentName.replace(/'/g,"\'")}','${dateStr}','${cat.key}',${n},'${pfx}')"
               id="rcstar_${pfx}_${cat.key}_${n}"
-              style="font-size:28px;cursor:pointer;opacity:${filled?1:0.25};transition:opacity 0.15s;">⭐</span>`;
+              style="flex:1;padding:10px 0;font-family:'Nunito',sans-serif;font-size:16px;font-weight:900;cursor:pointer;
+              border:2px solid ${filled?colors[n]:"#e0e0e0"};border-radius:10px;
+              background:${filled?colors[n]:"white"};
+              color:${filled?"white":"#bbb"};transition:all 0.15s;">${n}★</button>`;
         }
         html += `</div>
               <textarea id="rccomment_${pfx}_${cat.key}" placeholder="Add a comment..." rows="2"
@@ -4278,12 +4539,16 @@ function rcToggle(pfx) {
 }
 
 function rcSetStar(parentName, date, catKey, stars, prefix) {
-  // Update star display for this student/category
+  const colors = ["","#c0392b","#e67e22","#f1c40f","#2980b9","#27ae60"];
   for (let n = 1; n <= 5; n++) {
-    const el = document.getElementById("rcstar_" + prefix.replace("rc_","") + "_" + catKey + "_" + n);
-    if (el) el.style.opacity = n <= stars ? "1" : "0.25";
+    const el = document.getElementById("rcstar_" + prefix + "_" + catKey + "_" + n);
+    if (el) {
+      el.style.background = n <= stars ? colors[n] : "white";
+      el.style.color = n <= stars ? "white" : "#bbb";
+      el.style.borderColor = n <= stars ? colors[n] : "#e0e0e0";
+    }
   }
-  const commentBox = document.getElementById("rccomment_" + prefix.replace("rc_","") + "_" + catKey);
+  const commentBox = document.getElementById("rccomment_" + prefix + "_" + catKey);
   if (commentBox) commentBox.style.display = stars < 5 ? "block" : "none";
 }
 
