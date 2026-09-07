@@ -506,80 +506,127 @@ function renderDutyBoard() {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-  // Find this Sunday or next Sunday
-  const dayOfWeek = now.getDay();
+  const dayOfWeek    = now.getDay();
   const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
   const targetSunday = new Date(now);
   targetSunday.setDate(now.getDate() + daysToSunday);
   const targetStr = months[targetSunday.getMonth()] + " " + targetSunday.getDate();
 
-  const dateEl = document.getElementById("dutyBoardDate");
-  if (dateEl) dateEl.textContent = days[targetSunday.getDay()] + ", " + months[targetSunday.getMonth()] + " " + targetSunday.getDate() + ", " + targetSunday.getFullYear();
-
-  // Find the duty parents for that Sunday
-  const week = roster.find(w => w.date === targetStr);
-  const content = document.getElementById("dutyBoardContent");
-  if (!content) return;
-
-  // Get all active grades and their teachers
-  const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  const gradeColors = { 6:"linear-gradient(135deg,#854f0b,#f5a623)", 7:"linear-gradient(135deg,#0f6e56,#1db88a)", 8:"linear-gradient(135deg,#0a5260,#17b8d4)", 9:"linear-gradient(135deg,#993556,#e05c8a)" };
-  const allGrades = Object.keys(TEACHERS).map(Number).sort();
-
-  let html = "";
-
-  if (!week || week.parents.length === 0) {
-    html += `<div style="background:rgba(255,255,255,0.07);border-radius:14px;padding:20px;text-align:center;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,0.6);">No parents scheduled for this Sunday yet.</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:6px;">Check back closer to Sunday or contact the class admin.</div>
-    </div>`;
-  } else {
-    // Show duty parents — one card per grade showing which parents cover that class
-    allGrades.forEach(function(g) {
-      const col = gradeColors[g] || "linear-gradient(135deg,#0a5260,#17b8d4)";
-      const rawTeacher = customTeachersLocal[g] || TEACHERS[g] || "";
-      const teacherName = rawTeacher.split(/[,&]/).map(x=>x.trim()).filter(Boolean).join(" & ");
-
-      html += `<div style="background:white;border-radius:16px;overflow:hidden;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
-        <div style="background:${col};padding:12px 16px;">
-          <div style="font-size:14px;font-weight:900;color:white;">Grade ${g}</div>
-          ${teacherName ? `<div style="font-size:11px;color:rgba(255,255,255,0.8);">👩‍🏫 ${teacherName}</div>` : ""}
-        </div>
-        <div style="padding:14px 16px;">
-          <div style="font-size:11px;font-weight:800;color:#7b7a90;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">📋 Duty Parents This Sunday</div>`;
-
-      week.parents.forEach(function(p, idx) {
-        const color = idx === 0 ? "#e05c8a" : "#0d7a8a";
-        html += `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;${idx > 0 ? "border-top:0.5px solid #f0eefb;" : ""}">
-          <div style="width:42px;height:42px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;
-            font-size:16px;font-weight:900;color:white;flex-shrink:0;">${p.name.charAt(0)}</div>
-          <div>
-            <div style="font-size:15px;font-weight:900;color:#0a3d45;">${p.name}</div>
-            <div style="font-size:11px;color:#7b7a90;">Duty Parent ${idx+1}</div>
-          </div>
-        </div>`;
-      });
-
-      html += `</div></div>`;
-    });
-  }
-
-  // Also show NEXT Sunday's parents as a preview
   const nextSunday = new Date(targetSunday);
   nextSunday.setDate(targetSunday.getDate() + 7);
   const nextStr = months[nextSunday.getMonth()] + " " + nextSunday.getDate();
+
+  const dateEl = document.getElementById("dutyBoardDate");
+  if (dateEl) dateEl.textContent = days[targetSunday.getDay()] + ", " + months[targetSunday.getMonth()] + " " + targetSunday.getDate() + ", " + targetSunday.getFullYear();
+
+  const thisWeek = roster.find(w => w.date === targetStr);
   const nextWeek = roster.find(w => w.date === nextStr);
+  const box = document.getElementById("dutyBoardContent");
+  if (!box) return;
 
-  if (nextWeek && nextWeek.parents.length > 0) {
-    html += `<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px 16px;margin-top:4px;">
-      <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:8px;">🔔 Next Sunday (${nextStr}) — On Deck:</div>`;
-    nextWeek.parents.forEach(function(p) {
-      html += `<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.8);padding:3px 0;">• ${p.name}</div>`;
-    });
-    html += `</div>`;
+  const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const gradeColors    = { 6:"#854f0b", 7:"#0f6e56", 8:"#0a5260", 9:"#993556" };
+  const gradeBgColors  = { 6:"linear-gradient(135deg,#854f0b,#f5a623)", 7:"linear-gradient(135deg,#0f6e56,#1db88a)", 8:"linear-gradient(135deg,#0a5260,#17b8d4)", 9:"linear-gradient(135deg,#993556,#e05c8a)" };
+  const allGrades      = Object.keys(TEACHERS).map(Number).sort();
+
+  // Build dropdown options
+  let dropdownOpts = `<option value="">— Select a class —</option>`;
+  allGrades.forEach(g => {
+    const rawTeacher = customTeachersLocal[g] || TEACHERS[g] || "";
+    const teacher    = rawTeacher.split(/[,&]/).map(x=>x.trim()).filter(Boolean)[0] || "";
+    dropdownOpts += `<option value="${g}">Grade ${g}${teacher ? " · " + teacher : ""}</option>`;
+  });
+
+  // Build per-grade detail panels (hidden by default)
+  let panels = "";
+  allGrades.forEach(g => {
+    const col        = gradeBgColors[g] || "linear-gradient(135deg,#0a5260,#17b8d4)";
+    const rawTeacher = customTeachersLocal[g] || TEACHERS[g] || "";
+    const teacherName= rawTeacher.split(/[,&]/).map(x=>x.trim()).filter(Boolean).join(" & ");
+    const thisParents= (thisWeek && thisWeek.parents) ? thisWeek.parents : [];
+    const nextParents= (nextWeek && nextWeek.parents) ? nextWeek.parents : [];
+
+    let thisHtml = "";
+    if (thisParents.length === 0) {
+      thisHtml = `<div style="font-size:13px;color:#aaa;padding:10px 0;">No parents scheduled yet.</div>`;
+    } else {
+      thisParents.forEach((p, idx) => {
+        const avatarColor = idx === 0 ? "#e05c8a" : "#0d7a8a";
+        thisHtml += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;${idx>0?"border-top:0.5px solid #f0eefb;":""}">
+          <div style="width:46px;height:46px;border-radius:50%;background:${avatarColor};display:flex;align-items:center;
+            justify-content:center;font-size:18px;font-weight:900;color:white;flex-shrink:0;">${p.name.charAt(0)}</div>
+          <div>
+            <div style="font-size:16px;font-weight:900;color:#0a3d45;">${p.name}</div>
+            <div style="font-size:11px;color:#7b7a90;">Duty Parent ${idx+1} · ${targetStr}</div>
+          </div>
+        </div>`;
+      });
+    }
+
+    let nextHtml = "";
+    if (nextParents.length > 0) {
+      nextParents.forEach((p,idx) => {
+        nextHtml += `<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.85);padding:3px 0;">• ${p.name}</div>`;
+      });
+    } else {
+      nextHtml = `<div style="font-size:12px;color:rgba(255,255,255,0.4);">Not scheduled yet</div>`;
+    }
+
+    panels += `
+      <div id="dutyPanel_${g}" style="display:none;">
+        <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.10);margin-bottom:12px;">
+          <div style="background:${col};padding:14px 16px;">
+            <div style="font-size:16px;font-weight:900;color:white;">Grade ${g}</div>
+            ${teacherName ? `<div style="font-size:12px;color:rgba(255,255,255,0.85);">👩‍🏫 ${teacherName}</div>` : ""}
+          </div>
+          <div style="padding:14px 16px;">
+            <div style="font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📋 This Sunday — ${targetStr}</div>
+            ${thisHtml}
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;">
+          <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:8px;">🔔 Next Sunday — ${nextStr}</div>
+          ${nextHtml}
+        </div>
+      </div>`;
+  });
+
+  box.innerHTML = `
+    <div style="margin-bottom:14px;">
+      <select id="dutyGradeSelect" onchange="dutySelectGrade(this.value)"
+        style="width:100%;padding:14px 16px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;
+        border:2px solid rgba(255,255,255,0.2);border-radius:14px;background:rgba(255,255,255,0.1);
+        color:white;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;
+        background-image:url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'8\'><path d=\'M0 0l6 8 6-8z\' fill=\'white\'/></svg>');
+        background-repeat:no-repeat;background-position:right 16px center;">
+        ${dropdownOpts}
+      </select>
+    </div>
+    <div id="dutyPanelsContainer">
+      <div style="text-align:center;padding:24px;color:rgba(255,255,255,0.35);font-size:13px;font-weight:700;">
+        👆 Select a class above to see who is on duty
+      </div>
+      ${panels}
+    </div>`;
+}
+
+function dutySelectGrade(val) {
+  const allGrades = Object.keys(TEACHERS).map(Number);
+  // Hide all panels
+  allGrades.forEach(g => {
+    const p = document.getElementById("dutyPanel_" + g);
+    if (p) p.style.display = "none";
+  });
+  // Hide placeholder
+  const placeholder = document.querySelector("#dutyPanelsContainer > div:first-child");
+  // Show selected
+  if (val) {
+    if (placeholder) placeholder.style.display = "none";
+    const selected = document.getElementById("dutyPanel_" + val);
+    if (selected) selected.style.display = "block";
+  } else {
+    if (placeholder) placeholder.style.display = "block";
   }
-
-  content.innerHTML = html;
 }
 
 function normalize(p) { return String(p).replace(/\D/g, "").slice(-10); }
