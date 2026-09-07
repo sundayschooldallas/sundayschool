@@ -519,108 +519,132 @@ function renderDutyBoard() {
   const dateEl = document.getElementById("dutyBoardDate");
   if (dateEl) dateEl.textContent = days[targetSunday.getDay()] + ", " + months[targetSunday.getMonth()] + " " + targetSunday.getDate() + ", " + targetSunday.getFullYear();
 
-  const thisWeek = roster.find(w => w.date === targetStr);
-  const nextWeek = roster.find(w => w.date === nextStr);
+  const thisWeek = roster.find(function(w){ return w.date === targetStr; });
+  const nextWeek = roster.find(function(w){ return w.date === nextStr; });
   const box = document.getElementById("dutyBoardContent");
   if (!box) return;
 
   const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  const gradeColors    = { 6:"#854f0b", 7:"#0f6e56", 8:"#0a5260", 9:"#993556" };
-  const gradeBgColors  = { 6:"linear-gradient(135deg,#854f0b,#f5a623)", 7:"linear-gradient(135deg,#0f6e56,#1db88a)", 8:"linear-gradient(135deg,#0a5260,#17b8d4)", 9:"linear-gradient(135deg,#993556,#e05c8a)" };
-  const allGrades      = Object.keys(TEACHERS).map(Number).sort();
+  const allGrades = Object.keys(TEACHERS).map(Number).sort();
+  const gradeBg   = { 6:"#854f0b", 7:"#0f6e56", 8:"#0a5260", 9:"#993556" };
 
-  // Build dropdown options
-  let dropdownOpts = `<option value="">— Select a class —</option>`;
-  allGrades.forEach(g => {
-    const rawTeacher = customTeachersLocal[g] || TEACHERS[g] || "";
-    const teacher    = rawTeacher.split(/[,&]/).map(x=>x.trim()).filter(Boolean)[0] || "";
-    dropdownOpts += `<option value="${g}">Grade ${g}${teacher ? " · " + teacher : ""}</option>`;
+  // Build dropdown
+  var sel = document.createElement("select");
+  sel.id = "dutyGradeSelect";
+  sel.style.cssText = "width:100%;padding:14px 16px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:2px solid rgba(255,255,255,0.25);border-radius:14px;background:rgba(255,255,255,0.12);color:white;outline:none;cursor:pointer;margin-bottom:14px;display:block;";
+  sel.onchange = function(){ dutySelectGrade(this.value); };
+
+  var defaultOpt = document.createElement("option");
+  defaultOpt.value = "";
+  defaultOpt.textContent = "— Select a class —";
+  sel.appendChild(defaultOpt);
+
+  allGrades.forEach(function(g) {
+    var rawT = customTeachersLocal[g] || TEACHERS[g] || "";
+    var teacher = rawT.split(/[,&]/)[0].trim();
+    var opt = document.createElement("option");
+    opt.value = g;
+    opt.textContent = "Grade " + g + (teacher ? " · " + teacher : "");
+    sel.appendChild(opt);
   });
 
-  // Build per-grade detail panels (hidden by default)
-  let panels = "";
-  allGrades.forEach(g => {
-    const col        = gradeBgColors[g] || "linear-gradient(135deg,#0a5260,#17b8d4)";
-    const rawTeacher = customTeachersLocal[g] || TEACHERS[g] || "";
-    const teacherName= rawTeacher.split(/[,&]/).map(x=>x.trim()).filter(Boolean).join(" & ");
-    const thisParents= (thisWeek && thisWeek.parents) ? thisWeek.parents : [];
-    const nextParents= (nextWeek && nextWeek.parents) ? nextWeek.parents : [];
+  // Build placeholder
+  var placeholder = document.createElement("div");
+  placeholder.id = "dutyPlaceholder";
+  placeholder.style.cssText = "text-align:center;padding:24px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;";
+  placeholder.textContent = "👆 Select a class above to see who is on duty";
 
-    let thisHtml = "";
+  // Build one panel per grade
+  var container = document.createElement("div");
+  container.id = "dutyPanelsContainer";
+  container.appendChild(placeholder);
+
+  allGrades.forEach(function(g) {
+    var panel = document.createElement("div");
+    panel.id = "dutyPanel_" + g;
+    panel.style.display = "none";
+
+    var rawT = customTeachersLocal[g] || TEACHERS[g] || "";
+    var teacherName = rawT.split(/[,&]/).map(function(x){ return x.trim(); }).filter(Boolean).join(" & ");
+    var bg = gradeBg[g] || "#0a5260";
+
+    // Header
+    var header = document.createElement("div");
+    header.style.cssText = "background:" + bg + ";border-radius:14px 14px 0 0;padding:14px 16px;margin-bottom:0;";
+    header.innerHTML = "<div style='font-size:16px;font-weight:900;color:white;'>Grade " + g + "</div>" +
+      (teacherName ? "<div style='font-size:12px;color:rgba(255,255,255,0.85);'>&#128105;&#8205;&#127979; " + teacherName + "</div>" : "");
+
+    // This Sunday body
+    var body = document.createElement("div");
+    body.style.cssText = "background:white;border-radius:0 0 14px 14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);";
+
+    var label = document.createElement("div");
+    label.style.cssText = "font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;";
+    label.textContent = "📋 This Sunday — " + targetStr;
+    body.appendChild(label);
+
+    var thisParents = (thisWeek && thisWeek.parents) ? thisWeek.parents : [];
     if (thisParents.length === 0) {
-      thisHtml = `<div style="font-size:13px;color:#aaa;padding:10px 0;">No parents scheduled yet.</div>`;
+      var none = document.createElement("div");
+      none.style.cssText = "font-size:13px;color:#aaa;padding:8px 0;";
+      none.textContent = "No parents scheduled yet.";
+      body.appendChild(none);
     } else {
-      thisParents.forEach((p, idx) => {
-        const avatarColor = idx === 0 ? "#e05c8a" : "#0d7a8a";
-        thisHtml += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;${idx>0?"border-top:0.5px solid #f0eefb;":""}">
-          <div style="width:46px;height:46px;border-radius:50%;background:${avatarColor};display:flex;align-items:center;
-            justify-content:center;font-size:18px;font-weight:900;color:white;flex-shrink:0;">${p.name.charAt(0)}</div>
-          <div>
-            <div style="font-size:16px;font-weight:900;color:#0a3d45;">${p.name}</div>
-            <div style="font-size:11px;color:#7b7a90;">Duty Parent ${idx+1} · ${targetStr}</div>
-          </div>
-        </div>`;
+      thisParents.forEach(function(p, idx) {
+        var row = document.createElement("div");
+        row.style.cssText = "display:flex;align-items:center;gap:12px;padding:10px 0;" + (idx > 0 ? "border-top:0.5px solid #f0eefb;" : "");
+        var avatarColor = idx === 0 ? "#e05c8a" : "#0d7a8a";
+        row.innerHTML = "<div style='width:44px;height:44px;border-radius:50%;background:" + avatarColor + ";display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;color:white;flex-shrink:0;'>" + p.name.charAt(0) + "</div>" +
+          "<div><div style='font-size:15px;font-weight:900;color:#0a3d45;'>" + p.name + "</div><div style='font-size:11px;color:#7b7a90;'>Duty Parent " + (idx+1) + " · " + targetStr + "</div></div>";
+        body.appendChild(row);
       });
     }
 
-    let nextHtml = "";
-    if (nextParents.length > 0) {
-      nextParents.forEach((p,idx) => {
-        nextHtml += `<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.85);padding:3px 0;">• ${p.name}</div>`;
-      });
+    // Next Sunday preview
+    var nextBox = document.createElement("div");
+    nextBox.style.cssText = "background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:12px 14px;margin-top:4px;margin-bottom:16px;";
+    var nextLabel = document.createElement("div");
+    nextLabel.style.cssText = "font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:6px;";
+    nextLabel.textContent = "🔔 Next Sunday — " + nextStr;
+    nextBox.appendChild(nextLabel);
+
+    var nextParents = (nextWeek && nextWeek.parents) ? nextWeek.parents : [];
+    if (nextParents.length === 0) {
+      var np = document.createElement("div");
+      np.style.cssText = "font-size:12px;color:rgba(255,255,255,0.4);";
+      np.textContent = "Not scheduled yet";
+      nextBox.appendChild(np);
     } else {
-      nextHtml = `<div style="font-size:12px;color:rgba(255,255,255,0.4);">Not scheduled yet</div>`;
+      nextParents.forEach(function(p) {
+        var np = document.createElement("div");
+        np.style.cssText = "font-size:13px;font-weight:700;color:rgba(255,255,255,0.85);padding:2px 0;";
+        np.textContent = "• " + p.name;
+        nextBox.appendChild(np);
+      });
     }
 
-    panels += `
-      <div id="dutyPanel_${g}" style="display:none;">
-        <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.10);margin-bottom:12px;">
-          <div style="background:${col};padding:14px 16px;">
-            <div style="font-size:16px;font-weight:900;color:white;">Grade ${g}</div>
-            ${teacherName ? `<div style="font-size:12px;color:rgba(255,255,255,0.85);">👩‍🏫 ${teacherName}</div>` : ""}
-          </div>
-          <div style="padding:14px 16px;">
-            <div style="font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📋 This Sunday — ${targetStr}</div>
-            ${thisHtml}
-          </div>
-        </div>
-        <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;">
-          <div style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:8px;">🔔 Next Sunday — ${nextStr}</div>
-          ${nextHtml}
-        </div>
-      </div>`;
+    panel.appendChild(header);
+    panel.appendChild(body);
+    panel.appendChild(nextBox);
+    container.appendChild(panel);
   });
 
-  box.innerHTML = `
-    <div style="margin-bottom:14px;">
-      <select id="dutyGradeSelect" onchange="dutySelectGrade(this.value)"
-        style="width:100%;padding:14px 16px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;
-        border:2px solid rgba(255,255,255,0.2);border-radius:14px;background:rgba(255,255,255,0.12);
-        color:white;outline:none;cursor:pointer;">
-        ${dropdownOpts}
-      </select>
-    </div>
-    <div id="dutyPanelsContainer">
-      <div style="text-align:center;padding:24px;color:rgba(255,255,255,0.35);font-size:13px;font-weight:700;">
-        👆 Select a class above to see who is on duty
-      </div>
-      ${panels}
-    </div>`;
+  // Clear and rebuild
+  box.innerHTML = "";
+  box.appendChild(sel);
+  box.appendChild(container);
 }
 
 function dutySelectGrade(val) {
   const allGrades = Object.keys(TEACHERS).map(Number);
-  // Hide all panels
-  allGrades.forEach(g => {
-    const p = document.getElementById("dutyPanel_" + g);
+  allGrades.forEach(function(g) {
+    var p = document.getElementById("dutyPanel_" + g);
     if (p) p.style.display = "none";
   });
-  // Hide placeholder
-  const placeholder = document.querySelector("#dutyPanelsContainer > div:first-child");
-  // Show selected
+  var placeholder = document.getElementById("dutyPlaceholder");
   if (val) {
     if (placeholder) placeholder.style.display = "none";
-    const selected = document.getElementById("dutyPanel_" + val);
+    var selected = document.getElementById("dutyPanel_" + val);
     if (selected) selected.style.display = "block";
   } else {
     if (placeholder) placeholder.style.display = "block";
