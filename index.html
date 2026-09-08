@@ -3743,9 +3743,11 @@ function renderClassesTab() {
 
   // Determine which grades this admin "owns"
   const isMyGrade = (g) => {
-    if (!adminGrade || adminRole === "admin" || adminRole === "superadmin") return true;
-    if (adminGrade) return g === adminGrade;
-    return g === adminGrade;
+    // superadmin and admin see ALL grades as "mine" (full edit everywhere)
+    if (adminRole === "superadmin" || adminRole === "admin") return true;
+    // gradeadmin only owns their exact grade
+    if (adminRole === "gradeadmin") return g === adminGrade;
+    return false;
   };
 
   const editRowHTML = (e, color) => `
