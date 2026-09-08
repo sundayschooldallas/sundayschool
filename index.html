@@ -2395,6 +2395,29 @@ function renderSuperAdminTab() {
           <div style="font-size:12px;font-weight:800;color:#0d7a8a;background:#e0f5f7;padding:4px 10px;border-radius:8px;">${u.pw}</div>
         </div>`).join("")}
     </div>`;
+
+  // ── Append Archives section via DOM (outside the template) ──────────
+  const archDiv = document.createElement("div");
+  archDiv.style.cssText = "background:rgba(34,197,94,0.1);border:2px solid rgba(34,197,94,0.35);border-radius:14px;padding:14px 16px;margin-bottom:14px;margin-top:14px;";
+  archDiv.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:14px;font-weight:900;color:#7effd4;">📁 Year Archives &amp; Reports</div>
+      <button onclick="loadArchivesFromSheet()"
+        style="padding:12px 20px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:10px;
+        font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;color:white;cursor:pointer;
+        box-shadow:0 4px 14px rgba(34,197,94,0.5);">
+        📊 Load Reports
+      </button>
+    </div>
+    <div id="archivesTabContent">
+      <div style="text-align:center;padding:16px;">
+        <div style="font-size:28px;margin-bottom:6px;">📊</div>
+        <div style="font-size:13px;font-weight:800;color:#7effd4;">Tap the green button to load archived year reports</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">Data is read directly from Google Sheets</div>
+      </div>
+    </div>`;
+  el.appendChild(archDiv);
+  checkPromotionBanner();
 }
 
 function getTeacherListHtml(grade, teacherStr, color) {
