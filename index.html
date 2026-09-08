@@ -2204,6 +2204,25 @@ function renderSuperAdminTab() {
       </button>
     </div>
 
+    <!-- ── ARCHIVES ─────────────────────────────────────────────────── -->
+    <div style="background:rgba(34,197,94,0.1);border:2px solid rgba(34,197,94,0.35);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:900;color:#7effd4;">📁 Year Archives &amp; Reports</div>
+        <button onclick="loadArchivesFromSheet()" id="loadReportsBtn"
+          style="padding:12px 20px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:10px;
+          font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;color:white;cursor:pointer;
+          box-shadow:0 4px 14px rgba(34,197,94,0.5);">
+          📊 Load Reports
+        </button>
+      </div>
+      <div id="archivesTabContent">
+        <div style="text-align:center;padding:16px;">
+          <div style="font-size:28px;margin-bottom:6px;">📊</div>
+          <div style="font-size:13px;font-weight:800;color:#7effd4;">Tap the green button to load archived year reports</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── CLASS MANAGEMENT ─────────────────────────────────────────── -->
     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(13,122,138,0.08);margin-bottom:14px;">
       <div style="background:linear-gradient(135deg,#0a5260,#0d7a8a);padding:14px 16px;">
@@ -2710,28 +2729,6 @@ function renderStudentsTab() {
       </div>
     </div>`;
   });
-
-  // ── Add Archives section ─────────────────────────────────────────────
-  let archiveHtml = `
-    <div style="background:rgba(34,197,94,0.08);border:2px solid rgba(34,197,94,0.3);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:14px;font-weight:900;color:#7effd4;">📁 Year Archives &amp; Reports</div>
-        <button onclick="loadArchivesFromSheet()"
-          style="padding:12px 20px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:10px;
-          font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;color:white;cursor:pointer;
-          box-shadow:0 4px 12px rgba(34,197,94,0.4);">
-          📊 Load Reports
-        </button>
-      </div>
-      <div id="archivesTabContent" style="min-height:60px;">
-        <div style="text-align:center;padding:20px;">
-          <div style="font-size:32px;margin-bottom:8px;">📊</div>
-          <div style="font-size:14px;font-weight:800;color:#7effd4;">Tap the green button above to load archived reports</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:6px;">Reports are stored in Google Sheets and loaded on demand</div>
-        </div>
-      </div>
-    </div>`;
-  html += archiveHtml;
 
   el.innerHTML = html;
 }
