@@ -3818,15 +3818,19 @@ async function loadChildrenFromSheet() {
         return g === adminGrade;
       });
       childrenSheetData = filtered;
-      // Also save to local cache
+      // Sheet is source of truth — always update localStorage from sheet
       data.forEach(row => {
         if (row.phone) {
           const key = "childInfo__" + row.phone;
-          const existing = localStorage.getItem(key);
-          // Only update if not already set locally
-          if (!existing || JSON.parse(existing).skipped) {
-            localStorage.setItem(key, JSON.stringify({ name: row.childName, grade: row.grade, teacher: row.teacher, unassigned: row.unassigned }));
-          }
+          // Always overwrite with sheet data — sheet wins
+          localStorage.setItem(key, JSON.stringify({
+            name: row.name || row.childName || "",
+            grade: row.grade,
+            teacher: row.teacher || "",
+            parentName: row.parentName || "",
+            unassigned: row.unassigned || false,
+            graduated: row.graduated || false
+          }));
         }
       });
     }
