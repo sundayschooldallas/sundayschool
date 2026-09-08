@@ -2190,13 +2190,28 @@ function renderSuperAdminTab() {
 
     <!-- ── ANNUAL PROMOTION ──────────────────────────────────────────── -->
     <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
-      <div style="font-size:14px;font-weight:900;color:white;margin-bottom:6px;">🎓 Annual Promotion</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px;">Every Promotion Sunday all students move up one grade. Calendars auto-generate 3 years forward. Graduates are archived.</div>
+      <div style="font-size:14px;font-weight:900;color:white;margin-bottom:6px;">🎓 Annual Promotion + Archive</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px;">Archives all data for the year, promotes students, clears tracker/roster/PINs, and generates the next year's calendar up to the following Promotion Sunday.</div>
       <button onclick="runAnnualPromotion()"
         style="padding:10px 20px;background:linear-gradient(135deg,#856404,#f1c40f);color:white;border:none;border-radius:10px;
         font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;cursor:pointer;width:100%;">
-        🎓 Run Annual Promotion
+        🎓 Run Annual Promotion + Archive
       </button>
+    </div>
+
+    <!-- ── ARCHIVES ──────────────────────────────────────────────────── -->
+    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:900;color:white;">📁 Year Archives & Reports</div>
+        <button onclick="renderArchivesTab()"
+          style="padding:6px 12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;
+          font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">
+          🔄 Refresh
+        </button>
+      </div>
+      <div id="archivesTabContent">
+        <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35);font-size:13px;font-weight:700;">Loading archives...</div>
+      </div>
     </div>
 
     <!-- ── CLASS MANAGEMENT ─────────────────────────────────────────── -->
@@ -2710,27 +2725,140 @@ function renderStudentsTab() {
 }
 
 // ── BULK ANNUAL PROMOTION ────────────────────────────────────────────────
+// ── Annual Promotion + Full Archive System ───────────────────────────────
+// Archive key prefix: "archive__YYYY__"
+// Archives stored: attendance, tracker, students, parents, rollcall
+
+function getArchiveYear() {
+  // Returns the school year label e.g. "2025-2026"
+  const now = new Date();
+  const ps  = getPromotionSunday(now.getFullYear());
+  // If today is before promotion Sunday, school year started last Sep
+  const startYear = now < ps ? now.getFullYear() - 1 : now.getFullYear();
+  return startYear + "-" + (startYear + 1);
+}
+
+function archiveData(yearLabel) {
+  // Collect everything into a snapshot
+  const snapshot = {
+    yearLabel,
+    archivedAt: new Date().toISOString(),
+    // Students — all childInfo__ records
+    students: [],
+    // Tracker — all tracker__ records
+    tracker: {},
+    // Roll call — all rollcall__ records
+    rollcall: {},
+    // Roster — parent volunteer schedule
+    roster: JSON.parse(JSON.stringify(roster)),
+    // Parent info from newParents / roster
+    parents: []
+  };
+
+  // Collect students
+  const parentsSeen = new Set();
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    if (k.startsWith("childInfo__")) {
+      try {
+        const ci = JSON.parse(localStorage.getItem(k));
+        if (ci && !ci.skipped) snapshot.students.push({ phone: k.replace("childInfo__",""), ...ci });
+      } catch(e) {}
+    } else if (k.startsWith("tracker__")) {
+      try { snapshot.tracker[k] = JSON.parse(localStorage.getItem(k)); } catch(e) {}
+    } else if (k.startsWith("rollcall__")) {
+      try { snapshot.rollcall[k] = JSON.parse(localStorage.getItem(k)); } catch(e) {}
+    }
+  }
+
+  // Collect parents from roster
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      if (!parentsSeen.has(p.h)) {
+        parentsSeen.add(p.h);
+        snapshot.parents.push({ name: p.name, phone: p.h, email: p.e || "" });
+      }
+    });
+  });
+
+  // Save archive
+  const archiveKey = "archive__" + yearLabel;
+  const existing = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
+  if (!existing.includes(yearLabel)) existing.push(yearLabel);
+  localStorage.setItem("archiveIndex", JSON.stringify(existing));
+  localStorage.setItem(archiveKey, JSON.stringify(snapshot));
+  return snapshot;
+}
+
+function clearAfterArchive(allGrades) {
+  // Clear tracker data
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    if (k.startsWith("tracker__") || k.startsWith("rollcall__")) keysToRemove.push(k);
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // Clear volunteer swap and PIN assignments
+  allGrades.forEach(g => localStorage.removeItem("gradeSwap_" + g));
+  localStorage.removeItem("gradeSwap_78");
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith("pin__") || k === "pinAssignments")) localStorage.removeItem(k);
+  }
+
+  // Clear roster (parent schedule) — keep master list but wipe weekly slots
+  // Save master parent list before clearing
+  const masterParents = [];
+  const seen = new Set();
+  roster.forEach(week => {
+    week.parents.forEach(p => {
+      if (!seen.has(p.h)) { seen.add(p.h); masterParents.push(p); }
+    });
+  });
+  localStorage.setItem("masterParentList", JSON.stringify(masterParents));
+
+  // Clear the live roster slots
+  roster.length = 0;
+
+  // Sync cleared roster to sheet
+  fetch(SHEET_URL, {
+    method:"POST", mode:"no-cors",
+    headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ type:"clearRoster" })
+  }).catch(()=>{});
+}
+
 function runAnnualPromotion() {
   const today = new Date();
   const promotionSunday = getPromotionSunday(today.getFullYear());
   const isPromotionDay = today.toDateString() === promotionSunday.toDateString();
+  const yearLabel = getArchiveYear();
 
   const allGrades = Object.keys(TEACHERS).map(Number).sort();
   const maxGrade  = Math.max(...allGrades);
 
   const confirm1 = confirm(
-    "🎓 ANNUAL PROMOTION\n\n" +
+    "🎓 ANNUAL PROMOTION + ARCHIVE\n\n" +
     "Today is " + (isPromotionDay ? "✅ Promotion Sunday!" : "⚠️ NOT Promotion Sunday (simulating).") + "\n\n" +
-    "This will promote ALL students up one grade.\n" +
-    "Students in Grade " + maxGrade + " will be marked as graduated.\n\n" +
-    "Calendars will be auto-generated for the next 3 years.\n\n" +
+    "School year to archive: " + yearLabel + "\n\n" +
+    "This will:\n" +
+    "  ✅ Archive attendance, tracker, students, parents\n" +
+    "  ✅ Promote all students up one grade\n" +
+    "  ✅ Graduate Grade " + maxGrade + " students\n" +
+    "  ✅ Clear tracker, roll call, roster, PINs\n" +
+    "  ✅ Generate calendars 1 year forward\n\n" +
     "Are you sure you want to proceed?"
   );
   if (!confirm1) return;
 
+  // ── Step 1: Archive this year's data BEFORE changing anything ──────
+  const snapshot = archiveData(yearLabel);
   let promoted = 0, graduated = 0;
 
-  // ── Promote all students ─────────────────────────────────────────────
+  // ── Step 2: Promote all students ─────────────────────────────────────
   const customTeachersMap = JSON.parse(localStorage.getItem("customTeachers") || "{}");
 
   for (let i = 0; i < localStorage.length; i++) {
@@ -2741,69 +2869,170 @@ function runAnnualPromotion() {
       if (!ci || ci.skipped) continue;
       const g = Number(ci.grade);
       if (!g) continue;
-      const oldGrade = g;
       if (g >= maxGrade) {
-        ci.grade     = "graduated";
-        ci.graduated = true;
-        graduated++;
+        ci.grade = "graduated"; ci.graduated = true; graduated++;
       } else {
-        ci.grade   = g + 1;
-        ci.teacher = customTeachersMap[g + 1] || TEACHERS[g + 1] || "";
-        promoted++;
+        ci.grade = g + 1; ci.teacher = customTeachersMap[g+1] || TEACHERS[g+1] || ""; promoted++;
       }
       localStorage.setItem(k, JSON.stringify(ci));
     } catch(e) {}
   }
 
-  // ── Promote childrenSheetData in memory ──────────────────────────────
+  // ── Step 3: Promote in-memory childrenSheetData ───────────────────────
   childrenSheetData.forEach(row => {
     const g = Number(row.grade);
     if (!g) return;
     if (g >= maxGrade) { row.grade = "graduated"; row.graduated = true; }
-    else { row.grade = g + 1; row.teacher = customTeachersMap[g + 1] || TEACHERS[g + 1] || ""; }
+    else { row.grade = g + 1; row.teacher = customTeachersMap[g+1] || TEACHERS[g+1] || ""; }
   });
 
-  // ── Transfer roster slots — parents follow their child to next grade ──
-  // Build new roster: for each Sunday slot, update which parents belong
-  // Each parent's grade is now updated in childInfo, roster just holds names
-  // The grade-filtered views will automatically show correct parents
-  // Clear volunteer swap data for fresh new year
-  allGrades.forEach(function(g) {
-    const swapKey = "gradeSwap_" + g;
-    localStorage.removeItem(swapKey);
-  });
-  // Also clear the legacy combined swap
-  localStorage.removeItem("gradeSwap_78");
+  // ── Step 4: Clear tracker, rollcall, roster, PINs ────────────────────
+  clearAfterArchive(allGrades);
 
-  // ── Sync promotions to Google Sheet ──────────────────────────────────
+  // ── Step 5: Sync promoted students to Google Sheet ───────────────────
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k || !k.startsWith("childInfo__")) continue;
     try {
-      const ci    = JSON.parse(localStorage.getItem(k));
-      const phone = k.replace("childInfo__", "");
+      const ci = JSON.parse(localStorage.getItem(k));
+      const phone = k.replace("childInfo__","");
       fetch(SHEET_URL, {
         method:"POST", mode:"no-cors",
         headers:{"Content-Type":"text/plain"},
-        body: JSON.stringify({
-          type:"childInfo", phone,
-          parentName:  ci.parentName || "",
-          childName:   ci.name || "",
-          grade:       ci.grade,
-          teacher:     ci.teacher || "",
-          unassigned:  false,
-          graduated:   ci.graduated || false
-        })
+        body: JSON.stringify({ type:"childInfo", phone,
+          parentName: ci.parentName || "", childName: ci.name || "",
+          grade: ci.grade, teacher: ci.teacher || "",
+          unassigned: false, graduated: ci.graduated || false })
       }).catch(()=>{});
     } catch(e) {}
   }
 
-  // ── Seed calendars 3 years forward ───────────────────────────────────
-  seedMultiYearCalendars(allGrades, 3);
+  // ── Step 6: Generate calendar — 1 year forward from next Promotion Sunday
+  const nextPS = getPromotionSunday(today.getFullYear() + (today >= promotionSunday ? 1 : 0));
+  const nextPSYear = nextPS.getFullYear();
+  seedMultiYearCalendars(allGrades, 1);
 
-  showToast("🎓 Promotion complete! " + promoted + " promoted, " + graduated + " graduated. Volunteer swap cleared for new year.");
+  // ── Step 7: Store next promotion date ─────────────────────────────────
+  localStorage.setItem("nextPromotionDate", nextPS.toISOString());
+
+  showToast("🎓 Archived " + yearLabel + " · " + promoted + " promoted · " + graduated + " graduated · Next promotion: " + nextPS.toDateString());
   renderSuperAdminTab();
   renderClassesTab();
+}
+
+// ── Render Archives Tab ───────────────────────────────────────────────────
+function renderArchivesTab() {
+  const container = document.getElementById("archivesTabContent");
+  if (!container) return;
+  const index = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
+  if (index.length === 0) {
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.4);font-size:14px;font-weight:700;">No archives yet. Run Annual Promotion to create the first archive.</div>`;
+    return;
+  }
+  let html = `<div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:14px;font-weight:700;">📁 ${index.length} year(s) archived. Tap a year to view the full report.</div>`;
+  index.slice().reverse().forEach(yearLabel => {
+    const raw = localStorage.getItem("archive__" + yearLabel);
+    if (!raw) return;
+    try {
+      const snap = JSON.parse(raw);
+      const studentCount = snap.students ? snap.students.length : 0;
+      const parentCount  = snap.parents  ? snap.parents.length  : 0;
+      const trackerCount = Object.keys(snap.tracker || {}).length;
+      html += `
+      <div style="background:white;border-radius:16px;overflow:hidden;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,0.08);">
+        <div onclick="toggleArchiveSection('arch_${yearLabel.replace('-','_')}')"
+          style="background:linear-gradient(135deg,#0a5260,#0d7a8a);padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:16px;font-weight:900;color:white;">📅 ${yearLabel}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.8);">Archived ${new Date(snap.archivedAt).toDateString()} · ${studentCount} students · ${parentCount} parents</div>
+          </div>
+          <div id="arch_${yearLabel.replace('-','_')}_arrow" style="font-size:18px;color:white;">▶</div>
+        </div>
+        <div id="arch_${yearLabel.replace('-','_')}" style="display:none;padding:16px;">
+          ${renderArchiveDetail(snap)}
+        </div>
+      </div>`;
+    } catch(e) {}
+  });
+  container.innerHTML = html;
+}
+
+function toggleArchiveSection(id) {
+  const el    = document.getElementById(id);
+  const arrow = document.getElementById(id + "_arrow");
+  if (!el) return;
+  const open = el.style.display !== "none";
+  el.style.display = open ? "none" : "block";
+  if (arrow) arrow.textContent = open ? "▶" : "▼";
+}
+
+function renderArchiveDetail(snap) {
+  let html = "";
+  // ── Students ──────────────────────────────────────────────────────────
+  html += `<div style="font-size:13px;font-weight:900;color:#0a3d45;margin-bottom:8px;border-bottom:1px solid #e0f5f7;padding-bottom:6px;">👦 Students (${(snap.students||[]).length})</div>`;
+  const byGrade = {};
+  (snap.students||[]).forEach(s => {
+    const g = s.grade || "Unknown";
+    if (!byGrade[g]) byGrade[g] = [];
+    byGrade[g].push(s);
+  });
+  Object.keys(byGrade).sort().forEach(g => {
+    html += `<div style="font-size:12px;font-weight:800;color:#0a5260;margin:8px 0 4px;">Grade ${g} (${byGrade[g].length})</div>`;
+    byGrade[g].forEach(s => {
+      html += `<div style="font-size:12px;color:#333;padding:3px 0 3px 12px;border-left:2px solid #e0f5f7;">• ${s.name || "—"} &nbsp;<span style="color:#999;font-size:11px;">Parent: ${s.parentName||"—"}</span></div>`;
+    });
+  });
+  // ── Parents ───────────────────────────────────────────────────────────
+  html += `<div style="font-size:13px;font-weight:900;color:#0a3d45;margin:14px 0 8px;border-bottom:1px solid #e0f5f7;padding-bottom:6px;">👨‍👩‍👧 Parents (${(snap.parents||[]).length})</div>`;
+  (snap.parents||[]).forEach(p => {
+    html += `<div style="font-size:12px;color:#333;padding:3px 0;">• ${p.name} &nbsp;<span style="color:#999;font-size:11px;">${p.phone ? "+1"+p.phone : ""}</span></div>`;
+  });
+  // ── Tracker Summary ───────────────────────────────────────────────────
+  const trackerKeys = Object.keys(snap.tracker||{});
+  html += `<div style="font-size:13px;font-weight:900;color:#0a3d45;margin:14px 0 8px;border-bottom:1px solid #e0f5f7;padding-bottom:6px;">⭐ Tracker Records (${trackerKeys.length} entries)</div>`;
+  if (trackerKeys.length === 0) {
+    html += `<div style="font-size:12px;color:#999;">No tracker data for this year.</div>`;
+  } else {
+    // Show average per category across all records
+    const cats = { bible:[], notebook:[], participation:[], chatter:[], character:[], punctuality:[] };
+    trackerKeys.forEach(k => {
+      const rec = snap.tracker[k] || {};
+      Object.keys(cats).forEach(cat => { if (rec[cat] && rec[cat].stars) cats[cat].push(rec[cat].stars); });
+    });
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">`;
+    const labels = { bible:"📖 Bible", notebook:"📓 Notebook", participation:"🙏 Participation", chatter:"🗣️ Chatter", character:"✝️ Character", punctuality:"⏰ Punctuality" };
+    Object.keys(cats).forEach(cat => {
+      const arr = cats[cat];
+      const avg = arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : "—";
+      html += `<div style="background:#f0fdf4;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:800;color:#0a5260;">${labels[cat]}<br><span style="font-size:16px;color:#0d7a8a;">${avg}★</span></div>`;
+    });
+    html += `</div>`;
+  }
+  // ── Attendance ────────────────────────────────────────────────────────
+  const rosterWeeks = (snap.roster||[]).length;
+  html += `<div style="font-size:13px;font-weight:900;color:#0a3d45;margin:14px 0 8px;border-bottom:1px solid #e0f5f7;padding-bottom:6px;">📋 Attendance (${rosterWeeks} Sundays scheduled)</div>`;
+  html += `<div style="font-size:12px;color:#555;">This year had ${rosterWeeks} scheduled Sunday${rosterWeeks!==1?"s":""} in the volunteer roster.</div>`;
+  return html;
+}
+
+function downloadArchiveCSV(yearLabel) {
+  const raw = localStorage.getItem("archive__" + yearLabel);
+  if (!raw) return;
+  try {
+    const snap = JSON.parse(raw);
+    let csv = "Year,Type,Name,Grade,Parent,Phone\n";
+    (snap.students||[]).forEach(s => {
+      csv += [yearLabel,"Student",s.name||"",s.grade||"",s.parentName||"",s.phone||""].join(",") + "\n";
+    });
+    (snap.parents||[]).forEach(p => {
+      csv += [yearLabel,"Parent",p.name||"","","",p.phone||""].join(",") + "\n";
+    });
+    const blob = new Blob([csv], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "FaithShift_Archive_" + yearLabel + ".csv";
+    a.click();
+  } catch(e) {}
 }
 
 // ── Check if today is promotion Sunday and show banner ───────────────────
