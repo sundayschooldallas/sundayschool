@@ -1530,11 +1530,11 @@ function showToast(msg) {
 const ADMIN_PASSWORD = "Jesusislord";
 const SUPER_ADMIN_PASSWORD = "Jesusislord4SuperAdmin";
 const ADVOCATE_PASSWORD = "Jesusislord4Lemlem";
-const ROLL_CALL_PASSWORD    = "JesusislordForGrade7"; // Grade 7 (legacy key kept)
-const ROLL_CALL_PASSWORD_G6 = "JesusislordForGrade6"; // Grade 6
-const ROLL_CALL_PASSWORD_G7 = "JesusislordForGrade7"; // Grade 7
-const ROLL_CALL_PASSWORD_G8 = "JesusislordForGrade8"; // Grade 8
-const ROLL_CALL_PASSWORD_G9 = "JesusislordForGrade9"; // Grade 9
+const ROLL_CALL_PASSWORD    = "JesusislordAdmin7RC"; // Grade 7 (legacy key kept)
+const ROLL_CALL_PASSWORD_G6 = "JesusislordAdmin6RC"; // Grade 6
+const ROLL_CALL_PASSWORD_G7 = "JesusislordAdmin7RC"; // Grade 7
+const ROLL_CALL_PASSWORD_G8 = "JesusislordAdmin8RC"; // Grade 8
+const ROLL_CALL_PASSWORD_G9 = "JesusislordAdmin9RC"; // Grade 9
 const GRADE_ADMIN_PASSWORDS = {
   6: "JesusislordAdmin6",
   7: "JesusislordAdmin7",
@@ -1609,7 +1609,7 @@ async function verifyAdmin() {
     } else if (pw === ROLL_CALL_PASSWORD_G6) {
       document.getElementById("adminLogin").style.display = "none";
       showRollCallDash(6);
-    } else if (pw === ROLL_CALL_PASSWORD_G7 || pw === "JesusislordRollCall") {
+    } else if (pw === ROLL_CALL_PASSWORD_G7 || pw === "JesusislordRollCall" || pw === "JesusislordAdmin7RC") {
       document.getElementById("adminLogin").style.display = "none";
       showRollCallDash(7);
     } else if (pw === ROLL_CALL_PASSWORD_G8) {
@@ -2086,19 +2086,17 @@ function renderSuperAdminTab() {
   const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
   // built-in static accounts (display only, not deletable)
   const builtinAccounts = [
-    { label:"👑 Super Admin",          key:"superadmin",       pw:"Jesusislord4SuperAdmin",      deletable:false },
-    { label:"🛡️ Admin",               key:"admin",            pw:adminPw,                       deletable:false },
-    { label:"💚 Advocate (Lemlem)",    key:"lemlem",           pw:"Jesusislord4Lemlem",          deletable:false },
-    { label:"📋 Roll Call — Grade 6",   key:"rollcall_6",       pw:"JesusislordForGrade6",        deletable:false },
-    { label:"📋 Roll Call — Grade 7",   key:"rollcall_7",       pw:"JesusislordForGrade7",        deletable:false },
-    { label:"📋 Roll Call — Grade 8",   key:"rollcall_8",       pw:"JesusislordForGrade8",        deletable:false },
-    { label:"📋 Roll Call — Grade 9",   key:"rollcall_9",       pw:"JesusislordForGrade9",        deletable:false },
-    { label:"📋 Roll Call — Grade 6",  key:"rollcall_6",       pw:"JesusislordForGrade6",        deletable:false },
-    { label:"📋 Roll Call — Grade 9",  key:"rollcall_9",       pw:"JesusislordForGrade9",        deletable:false },
-    { label:"📚 Grade 6 Teacher",      key:"gradeadmin_6",     pw:customPws.gradeadmin_6||"JesusislordAdmin6",  deletable:false },
-    { label:"📚 Grade 7 Teacher",      key:"gradeadmin_7",     pw:customPws.gradeadmin_7||"JesusislordAdmin7",  deletable:false },
-    { label:"📚 Grade 8 Teacher",      key:"gradeadmin_8",     pw:customPws.gradeadmin_8||"JesusislordAdmin8",  deletable:false },
-    { label:"📚 Grade 9 Teacher",      key:"gradeadmin_9",     pw:customPws.gradeadmin_9||"JesusislordAdmin9",  deletable:false },
+    { label:"👑 Super Admin",          key:"superadmin",       pw:"Jesusislord4SuperAdmin",                       deletable:false },
+    { label:"🛡️ Admin",               key:"admin",            pw:adminPw,                                        deletable:false },
+    { label:"💚 Advocate (Lemlem)",    key:"lemlem",           pw:"Jesusislord4Lemlem",                           deletable:false },
+    { label:"📚 Grade 6 Teacher",      key:"gradeadmin_6",     pw:customPws.gradeadmin_6||"JesusislordAdmin6",    deletable:false },
+    { label:"📚 Grade 7 Teacher",      key:"gradeadmin_7",     pw:customPws.gradeadmin_7||"JesusislordAdmin7",    deletable:false },
+    { label:"📚 Grade 8 Teacher",      key:"gradeadmin_8",     pw:customPws.gradeadmin_8||"JesusislordAdmin8",    deletable:false },
+    { label:"📚 Grade 9 Teacher",      key:"gradeadmin_9",     pw:customPws.gradeadmin_9||"JesusislordAdmin9",    deletable:false },
+    { label:"📋 Roll Call — Grade 6",  key:"rollcall_6",       pw:"JesusislordAdmin6RC",                         deletable:false },
+    { label:"📋 Roll Call — Grade 7",  key:"rollcall_7",       pw:"JesusislordAdmin7RC",                         deletable:false },
+    { label:"📋 Roll Call — Grade 8",  key:"rollcall_8",       pw:"JesusislordAdmin8RC",                         deletable:false },
+    { label:"📋 Roll Call — Grade 9",  key:"rollcall_9",       pw:"JesusislordAdmin9RC",                         deletable:false },
   ];
 
   const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
