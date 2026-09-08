@@ -653,6 +653,61 @@ function dutySelectGrade(val) {
   }
 }
 
+// ── DYNAMIC GRADE HELPERS ─────────────────────────────────────────────────
+// Returns all active grades in order — works for any number of classes
+function getActiveGrades() {
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  return Object.keys({...TEACHERS, ...customTeachers}).map(Number).sort();
+}
+
+// Returns the next grade above the given one (for swap button)
+function getAdjacentGrade(grade) {
+  const grades = getActiveGrades();
+  const idx = grades.indexOf(Number(grade));
+  if (idx === -1) return grade;
+  // Cycle: if last grade, go to first; otherwise go to next
+  return grades[(idx + 1) % grades.length];
+}
+
+// Returns grade color for any grade number
+function getGradeColor(g) {
+  const map = {
+    6:"linear-gradient(135deg,#854f0b,#f5a623)",
+    7:"linear-gradient(135deg,#0f6e56,#1db88a)",
+    8:"linear-gradient(135deg,#0a5260,#17b8d4)",
+    9:"linear-gradient(135deg,#993556,#e05c8a)"
+  };
+  // Auto-generate color for grades beyond 9
+  const extras = ["linear-gradient(135deg,#5c4ac7,#8b5cf6)","linear-gradient(135deg,#b45309,#f59e0b)","linear-gradient(135deg,#065f46,#10b981)"];
+  return map[g] || extras[(Number(g) - 10) % extras.length] || extras[0];
+}
+
+// Get teacher name(s) for a grade dynamically
+function getTeacherForGrade(g) {
+  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  return customTeachers[g] || TEACHERS[g] || "";
+}
+
+// Get roll call password for any grade
+function getRollCallPasswordForGrade(g) {
+  const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+  return customPws["rollcall_" + g] || ("JesusislordAdmin" + g + "RC");
+}
+
+// Get teacher admin password for any grade
+function getTeacherPasswordForGrade(g) {
+  const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+  return customPws["gradeadmin_" + g] || GRADE_ADMIN_PASSWORDS[g] || ("JesusislordAdmin" + g);
+}
+
+// When a new class is created, auto-register its passwords and roll call
+function registerNewGradePasswords(g, teacherPw) {
+  const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+  customPws["gradeadmin_" + g] = teacherPw || ("JesusislordAdmin" + g);
+  customPws["rollcall_" + g]   = (teacherPw || ("JesusislordAdmin" + g)) + "RC";
+  localStorage.setItem("customAdminPws", JSON.stringify(customPws));
+}
+
 function normalize(p) { return String(p).replace(/\D/g, "").slice(-10); }
 function initials(name) { return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2); }
 
@@ -1869,19 +1924,13 @@ function renderAdminTodayHero() {
     // Resolve teacher name(s) for this grade
     const customTeachersHero = JSON.parse(localStorage.getItem("customTeachers") || "{}");
     let teacherNameHero = "";
-    if (adminGrade === 78) {
-      const rawT7 = customTeachersHero[7] || TEACHERS[7] || "";
-      const rawT8 = customTeachersHero[8] || TEACHERS[8] || "";
-      // Combine all unique teachers from both grades
-      const allT = [...new Set([...rawT7.split(/[,&]/).map(s=>s.trim()), ...rawT8.split(/[,&]/).map(s=>s.trim())].filter(Boolean))];
-      teacherNameHero = allT.join(" & ");
-    } else {
+    if (true) {
       teacherNameHero = customTeachersHero[adminGrade] || TEACHERS[adminGrade] || "";
     }
 
     if (heroEl) heroEl.innerHTML = `
       <div style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:14px;padding:14px 16px;text-align:center;">
-        <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📚 Grade ${adminGrade === 78 ? "7 & 8" : adminGrade} · Teacher Dashboard</div>
+        <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📚 Grade ${adminGrade} · Teacher Dashboard</div>
         <div style="font-size:20px;font-weight:900;color:white;margin-bottom:4px;">${teacherNameHero || "—"}</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.5);">Use the tabs below to manage your class</div>
       </div>`;
@@ -1983,19 +2032,18 @@ function renderAdminDash() {
   const roleTitle = document.getElementById("adminRoleTitle");
   const roleSub = document.getElementById("adminRoleSubtitle");
   if (roleIcon) roleIcon.textContent = isSuperAdmin ? "👑" : isGradeAdmin ? "📚" : "🛡️";
-  if (roleTitle) roleTitle.textContent = isSuperAdmin ? "Super Admin" : isGradeAdmin ? "Grade " + (adminGrade === 78 ? "7 & 8" : adminGrade) + " Dashboard" : "Admin Dashboard";
-  if (roleSub) roleSub.style.color = isSuperAdmin ? "rgba(255,215,0,0.8)" : "rgba(255,255,255,0.6)";
+  if (roleTitle) roleTitle.textContent = isSuperAdmin ? "Super Admin" : isGradeAdmin ? "Grade " + adminGrade + " Dashboard" : "Admin Dashboard";
+  if (roleSub) {
+    roleSub.style.color = isSuperAdmin ? "rgba(255,215,0,0.8)" : "rgba(255,255,255,0.6)";
+    roleSub.textContent = isSuperAdmin ? "Full System Access" : isGradeAdmin ? "Sunday School — Grade " + adminGrade : "Sunday School — All Grades";
+  }
 
   // Show teacher name below title for grade admins
   const teacherSubEl = document.getElementById("adminTeacherName");
   if (teacherSubEl) {
     if (isGradeAdmin) {
       let tName = "";
-      if (adminGrade === 78) {
-        const t7 = customTeachers[7] || TEACHERS[7] || "";
-        const t8 = customTeachers[8] || TEACHERS[8] || "";
-        tName = t7 === t8 ? t7 : [t7, t8].filter(Boolean).join(" & ");
-      } else {
+      if (true) {
         tName = customTeachers[adminGrade] || TEACHERS[adminGrade] || "";
       }
       teacherSubEl.textContent = tName ? "👩‍🏫 " + tName : "";
@@ -2597,7 +2645,8 @@ function renderStudentsTab() {
     return;
   }
 
-  const gradeColor = g => g === 7 ? "linear-gradient(135deg,#0f6e56,#1db88a)" : "linear-gradient(135deg,#0a5260,#17b8d4)";
+  const gradeColorMapLocal = {6:"linear-gradient(135deg,#854f0b,#f5a623)",7:"linear-gradient(135deg,#0f6e56,#1db88a)",8:"linear-gradient(135deg,#0a5260,#17b8d4)",9:"linear-gradient(135deg,#993556,#e05c8a)"};
+  const gradeColor = g => gradeColorMapLocal[g] || "linear-gradient(135deg,#5c4ac7,#8b5cf6)";
 
   let html = `<div style="background:#e8e4fb;border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px;color:#0a5260;font-weight:700;">👦 Edit student names — changes update roll call immediately.</div>`;
 
@@ -2836,7 +2885,7 @@ function renderAttendanceTab(isSunday, isPastCheck) {
           const ci = getChildInfoByParent(p.name);
           if (!ci || !ci.grade) return;
           const g = Number(ci.grade);
-          if (adminGrade === 78 && g !== 7 && g !== 8) return;
+          if (adminGrade && g !== adminGrade) return;
           if (adminGrade && g !== adminGrade) return;
         }
         if (getStatus(week.date, p.name) !== "confirmed") noShows.push({ ...p, date: week.date });
@@ -2869,7 +2918,7 @@ function renderAttendanceTab(isSunday, isPastCheck) {
       const ci = getChildInfoByParent(p.name);
       if (!ci || !ci.grade) return false;
       const g = Number(ci.grade);
-      if (adminGrade === 78) return g === 7 || g === 8;
+      if (adminGrade) return g === adminGrade;
       return g === adminGrade;
     }) : week.parents;
 
@@ -2912,7 +2961,7 @@ function renderSwapTab() {
         const ci = getChildInfoByParent(p.name);
         if (!ci || !ci.grade) return;
         const g = Number(ci.grade);
-        if (adminGrade === 78 && g !== 7 && g !== 8) return;
+        if (adminGrade && g !== adminGrade) return;
         if (adminGrade && g !== adminGrade) return;
       }
       parentOptions += `<option value="${week.date}|${p.name}">${p.name} — currently ${week.date}</option>`;
@@ -2940,7 +2989,7 @@ function renderSwapTab() {
       const ci = getChildInfoByParent(p.name);
       if (!ci || !ci.grade) return false;
       const g = Number(ci.grade);
-      if (adminGrade === 78) return g === 7 || g === 8;
+      if (adminGrade) return g === adminGrade;
       return g === adminGrade;
     });
     return gradeParents.length === 2;
@@ -3035,7 +3084,7 @@ function renderPinTab() {
         const ci = getChildInfoByParent(p.name);
         if (!ci || !ci.grade) return;
         const g = Number(ci.grade);
-        if (adminGrade === 78 && g !== 7 && g !== 8) return;
+        if (adminGrade && g !== adminGrade) return;
         if (adminGrade && g !== adminGrade) return;
       }
       const currentPin = customPins[p.name] || p.pin;
@@ -3341,7 +3390,7 @@ async function loadChildrenFromSheet() {
       const filtered = data.filter(row => {
         if (!adminGrade) return true;
         const g = Number(row.grade);
-        if (adminGrade === 78) return g === 7 || g === 8;
+        if (adminGrade) return g === adminGrade;
         return g === adminGrade;
       });
       childrenSheetData = filtered;
@@ -3368,7 +3417,7 @@ function getChildInfoByParent(parentName) {
     // If grade admin, only return if grade matches
     if (adminGrade) {
       const g = Number(fromSheet.grade);
-      if (adminGrade === 78 && g !== 7 && g !== 8) return null;
+      if (adminGrade && g !== adminGrade) return null;
       if (adminGrade && g !== adminGrade) return null;
     }
     return { name: fromSheet.childName, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned };
@@ -3386,7 +3435,7 @@ function getChildInfoByParent(parentName) {
   // If grade admin, only return if grade matches
   if (adminGrade && ci.grade) {
     const g = Number(ci.grade);
-    if (adminGrade === 78 && g !== 7 && g !== 8) return null;
+    if (adminGrade && g !== adminGrade) return null;
     if (adminGrade && g !== adminGrade) return null;
   }
   return ci;
@@ -3408,7 +3457,7 @@ function renderParentsTab() {
   // Filter roster to only relevant slots
   const relevantRoster = adminGrade
     ? roster.filter(w => w.date.startsWith(gradePrefix))
-    : adminGrade === 78
+    : adminGrade
     ? roster.filter(w => !w.date.startsWith("G6-") && !w.date.startsWith("G9-"))
     : roster;
 
@@ -3426,7 +3475,7 @@ function renderParentsTab() {
 
   const gradeNote = adminGrade ? `
     <div style="background:#e4f7ef;border-radius:14px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#0e6b47;font-weight:700;">
-      📚 Adding parents for Grade ${adminGrade === 78 ? "7 & 8" : adminGrade}. Once added, ask them to log in and register their child in Grade ${adminGrade === 78 ? "7 or 8" : adminGrade}.
+      📚 Adding parents for Grade ${adminGrade}. Once added, ask them to log in and register their child in Grade ${adminGrade}.
     </div>` : "";
 
   let html = `
@@ -3642,17 +3691,29 @@ function renderClassesTab() {
     });
   });
 
-  const gradeConfig = {
-    6:  { color: "linear-gradient(135deg,#854f0b,#f5a623)", label: "Grade 6", teacher: TEACHERS[6] || "Yemane Tsegay & Amots Michael" },
-    7:  { color: "linear-gradient(135deg,#0f6e56,#1db88a)", label: "Grade 7", teacher: TEACHERS[7] || "Bereket Isayas" },
-    8:  { color: "linear-gradient(135deg,#0a5260,#17b8d4)", label: "Grade 8", teacher: TEACHERS[8] || "Amanuel Habte" },
-    9:  { color: "linear-gradient(135deg,#993556,#e05c8a)", label: "Grade 9", teacher: TEACHERS[9] || "Ruth" }
+  // Fully dynamic gradeConfig — works for any grade including new ones
+  const gradeColorMap = {
+    6: "linear-gradient(135deg,#854f0b,#f5a623)",
+    7: "linear-gradient(135deg,#0f6e56,#1db88a)",
+    8: "linear-gradient(135deg,#0a5260,#17b8d4)",
+    9: "linear-gradient(135deg,#993556,#e05c8a)"
   };
+  const defaultGradeColor = "linear-gradient(135deg,#5c4ac7,#8b5cf6)";
+  const customTeachersNow = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const allActiveGrades = Object.keys({...TEACHERS, ...customTeachersNow}).map(Number).sort();
+  const gradeConfig = {};
+  allActiveGrades.forEach(g => {
+    gradeConfig[g] = {
+      color:   gradeColorMap[g] || defaultGradeColor,
+      label:   "Grade " + g,
+      teacher: customTeachersNow[g] || TEACHERS[g] || ""
+    };
+  });
 
   // Determine which grades this admin "owns"
   const isMyGrade = (g) => {
     if (!adminGrade || adminRole === "admin" || adminRole === "superadmin") return true;
-    if (adminGrade === 78) return g === 7 || g === 8;
+    if (adminGrade) return g === adminGrade;
     return g === adminGrade;
   };
 
@@ -3764,9 +3825,9 @@ function toggleClassSection(id) {
           <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
-          <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${e.grade === 7 ? 8 : 7})"
+          <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${adjG})"
             style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e0f5f7;color:#0a5260;white-space:nowrap;">
-            → ${e.grade === 7 ? "Gr.8" : "Gr.7"}
+            → Gr.${adjG}
           </button>
           <button onclick="unassignStudent('${e.h}','${e.child}')"
             style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;white-space:nowrap;">
@@ -3893,8 +3954,6 @@ function renderTrackerTab() {
   const presentStudents = getRollCallStudents().filter(s => {
     if (rollData[s.childName] !== "present") return false;
     if (!adminGrade) return true;
-    if (adminGrade === 7) return s.grade === 7;
-  if (adminGrade === 8) return s.grade === 8;
     return s.grade === adminGrade;
   });
 
@@ -3906,7 +3965,7 @@ function renderTrackerTab() {
       if (adminGrade) {
         const ci = getChildInfoByParent(p.name);
         const g = ci ? Number(ci.grade) : null;
-        if (adminGrade === 78 && g !== 7 && g !== 8) return;
+        if (adminGrade && g !== adminGrade) return;
         if (adminGrade && g !== adminGrade) return;
       }
       allParents.push(p);
@@ -4198,9 +4257,7 @@ function getRollCallStudents() {
   const seen = new Set();
 
   function gradeAllowed(g) {
-    if (rollCallGrade === 6  && g !== 6) return false;
-    if (rollCallGrade === 9  && g !== 9) return false;
-    if (rollCallGrade === 78 && g !== 7 && g !== 8) return false;
+    if (rollCallGrade && g !== rollCallGrade) return false;
     return true;
   }
   function addStudent(childName, parentName, grade, phone) {
@@ -4280,6 +4337,8 @@ function saveRollCallEntry(date, childName, status) {
 function showRollCallDash(grade) {
   if (grade !== undefined) rollCallGrade = grade;
   document.getElementById("rollCallDash").style.display = "block";
+  const rcSub = document.getElementById("rcSubtitle");
+  if (rcSub) rcSub.textContent = "Sunday School — Grade " + rollCallGrade;
   renderRollCallScreen();
   Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
     .then(() => renderRollCallScreen())
@@ -4694,7 +4753,7 @@ function markRollCall(childName, date, isPresent) {
       <div style="font-size:24px;">📋</div>
       <div>
         <div style="font-size:17px;font-weight:800;color:white;">Roll Call</div>
-        <div class="rc-subtitle" style="font-size:11px;color:rgba(255,255,255,0.6);">Sunday School — Grade 7 & 8</div>
+        <div class="rc-subtitle" style="font-size:11px;color:rgba(255,255,255,0.6);" id="rcSubtitle">Sunday School — Grade</div>
       </div>
     </div>
     <button onclick="showVerify()" style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:white;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:7px 14px;cursor:pointer;">Sign out</button>
