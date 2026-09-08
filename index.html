@@ -1217,7 +1217,7 @@ let mockOverride = null;
 let mockStartReal = null;
 let mockStartTime = null;
 let rollCallInterval = null;
-let rollCallGrade = 78; // 78 = grades 7&8, 6 = grade 6, 9 = grade 9
+let rollCallGrade = 7; // 6, 7, 8, or 9 — each grade has its own roll call
 
 function getMockNow() {
   if (!mockOverride) return new Date();
@@ -1530,9 +1530,11 @@ function showToast(msg) {
 const ADMIN_PASSWORD = "Jesusislord";
 const SUPER_ADMIN_PASSWORD = "Jesusislord4SuperAdmin";
 const ADVOCATE_PASSWORD = "Jesusislord4Lemlem";
-const ROLL_CALL_PASSWORD = "JesusislordRollCall";
-const ROLL_CALL_PASSWORD_G6 = "JesusislordForGrade6";
-const ROLL_CALL_PASSWORD_G9 = "JesusislordForGrade9";
+const ROLL_CALL_PASSWORD    = "JesusislordForGrade7"; // Grade 7 (legacy key kept)
+const ROLL_CALL_PASSWORD_G6 = "JesusislordForGrade6"; // Grade 6
+const ROLL_CALL_PASSWORD_G7 = "JesusislordForGrade7"; // Grade 7
+const ROLL_CALL_PASSWORD_G8 = "JesusislordForGrade8"; // Grade 8
+const ROLL_CALL_PASSWORD_G9 = "JesusislordForGrade9"; // Grade 9
 const GRADE_ADMIN_PASSWORDS = {
   6: "JesusislordAdmin6",
   7: "JesusislordAdmin7",
@@ -1586,7 +1588,7 @@ async function verifyAdmin() {
       if (pw === effective) gradeMatch = Number(grade);
     });
     if (gradeMatch !== null) {
-      await loginAdmin("gradeadmin", gradeMatch === 7 || gradeMatch === 8 ? 78 : gradeMatch);
+      await loginAdmin("gradeadmin", gradeMatch);
     } else {
       // Check custom admin users from localStorage
       const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
@@ -1596,7 +1598,7 @@ async function verifyAdmin() {
           await loginAdmin("admin", null);
         } else if (found.role === "gradeadmin") {
           const g = Number(found.grade);
-          await loginAdmin("gradeadmin", g === 7 || g === 8 ? 78 : g);
+          await loginAdmin("gradeadmin", g);
         }
       } else if (pw === ADVOCATE_PASSWORD) {
       document.getElementById("adminLogin").style.display = "none";
@@ -1604,12 +1606,15 @@ async function verifyAdmin() {
       document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">⏳ Loading data from server...</div>`;
       await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
       await renderAdvocateDash();
-    } else if (pw === ROLL_CALL_PASSWORD) {
-      document.getElementById("adminLogin").style.display = "none";
-      showRollCallDash(7);
     } else if (pw === ROLL_CALL_PASSWORD_G6) {
       document.getElementById("adminLogin").style.display = "none";
       showRollCallDash(6);
+    } else if (pw === ROLL_CALL_PASSWORD_G7 || pw === "JesusislordRollCall") {
+      document.getElementById("adminLogin").style.display = "none";
+      showRollCallDash(7);
+    } else if (pw === ROLL_CALL_PASSWORD_G8) {
+      document.getElementById("adminLogin").style.display = "none";
+      showRollCallDash(8);
     } else if (pw === ROLL_CALL_PASSWORD_G9) {
       document.getElementById("adminLogin").style.display = "none";
       showRollCallDash(9);
@@ -2084,7 +2089,10 @@ function renderSuperAdminTab() {
     { label:"👑 Super Admin",          key:"superadmin",       pw:"Jesusislord4SuperAdmin",      deletable:false },
     { label:"🛡️ Admin",               key:"admin",            pw:adminPw,                       deletable:false },
     { label:"💚 Advocate (Lemlem)",    key:"lemlem",           pw:"Jesusislord4Lemlem",          deletable:false },
-    { label:"📋 Roll Call — Grade 7&8",key:"rollcall_78",      pw:"JesusislordRollCall",         deletable:false },
+    { label:"📋 Roll Call — Grade 6",   key:"rollcall_6",       pw:"JesusislordForGrade6",        deletable:false },
+    { label:"📋 Roll Call — Grade 7",   key:"rollcall_7",       pw:"JesusislordForGrade7",        deletable:false },
+    { label:"📋 Roll Call — Grade 8",   key:"rollcall_8",       pw:"JesusislordForGrade8",        deletable:false },
+    { label:"📋 Roll Call — Grade 9",   key:"rollcall_9",       pw:"JesusislordForGrade9",        deletable:false },
     { label:"📋 Roll Call — Grade 6",  key:"rollcall_6",       pw:"JesusislordForGrade6",        deletable:false },
     { label:"📋 Roll Call — Grade 9",  key:"rollcall_9",       pw:"JesusislordForGrade9",        deletable:false },
     { label:"📚 Grade 6 Teacher",      key:"gradeadmin_6",     pw:customPws.gradeadmin_6||"JesusislordAdmin6",  deletable:false },
@@ -2644,7 +2652,9 @@ function runAnnualPromotion() {
 
   let promoted = 0, graduated = 0;
 
-  // Promote all students in localStorage
+  // ── Promote all students ─────────────────────────────────────────────
+  const customTeachersMap = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k || !k.startsWith("childInfo__")) continue;
@@ -2653,49 +2663,67 @@ function runAnnualPromotion() {
       if (!ci || ci.skipped) continue;
       const g = Number(ci.grade);
       if (!g) continue;
+      const oldGrade = g;
       if (g >= maxGrade) {
-        ci.grade    = "graduated";
+        ci.grade     = "graduated";
         ci.graduated = true;
         graduated++;
       } else {
         ci.grade   = g + 1;
-        ci.teacher = TEACHERS[g + 1] || "";
+        ci.teacher = customTeachersMap[g + 1] || TEACHERS[g + 1] || "";
         promoted++;
       }
       localStorage.setItem(k, JSON.stringify(ci));
     } catch(e) {}
   }
 
-  // Promote childrenSheetData in memory
+  // ── Promote childrenSheetData in memory ──────────────────────────────
   childrenSheetData.forEach(row => {
     const g = Number(row.grade);
     if (!g) return;
     if (g >= maxGrade) { row.grade = "graduated"; row.graduated = true; }
-    else { row.grade = g + 1; row.teacher = TEACHERS[g + 1] || ""; }
+    else { row.grade = g + 1; row.teacher = customTeachersMap[g + 1] || TEACHERS[g + 1] || ""; }
   });
 
-  // Sync promotions to sheet
+  // ── Transfer roster slots — parents follow their child to next grade ──
+  // Build new roster: for each Sunday slot, update which parents belong
+  // Each parent's grade is now updated in childInfo, roster just holds names
+  // The grade-filtered views will automatically show correct parents
+  // Clear volunteer swap data for fresh new year
+  allGrades.forEach(function(g) {
+    const swapKey = "gradeSwap_" + g;
+    localStorage.removeItem(swapKey);
+  });
+  // Also clear the legacy combined swap
+  localStorage.removeItem("gradeSwap_78");
+
+  // ── Sync promotions to Google Sheet ──────────────────────────────────
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k || !k.startsWith("childInfo__")) continue;
     try {
-      const ci   = JSON.parse(localStorage.getItem(k));
+      const ci    = JSON.parse(localStorage.getItem(k));
       const phone = k.replace("childInfo__", "");
       fetch(SHEET_URL, {
         method:"POST", mode:"no-cors",
         headers:{"Content-Type":"text/plain"},
-        body: JSON.stringify({ type:"childInfo", phone,
-          parentName: ci.parentName, childName: ci.name,
-          grade: ci.grade, teacher: ci.teacher || "",
-          unassigned: false, graduated: ci.graduated || false })
+        body: JSON.stringify({
+          type:"childInfo", phone,
+          parentName:  ci.parentName || "",
+          childName:   ci.name || "",
+          grade:       ci.grade,
+          teacher:     ci.teacher || "",
+          unassigned:  false,
+          graduated:   ci.graduated || false
+        })
       }).catch(()=>{});
     } catch(e) {}
   }
 
-  // Seed calendars for next 3 years for all grades
+  // ── Seed calendars 3 years forward ───────────────────────────────────
   seedMultiYearCalendars(allGrades, 3);
 
-  showToast("🎓 Promotion complete! " + promoted + " promoted, " + graduated + " graduated. Calendars set for 3 years ahead.");
+  showToast("🎓 Promotion complete! " + promoted + " promoted, " + graduated + " graduated. Volunteer swap cleared for new year.");
   renderSuperAdminTab();
   renderClassesTab();
 }
@@ -2811,7 +2839,7 @@ function renderAttendanceTab(isSunday, isPastCheck) {
           if (!ci || !ci.grade) return;
           const g = Number(ci.grade);
           if (adminGrade === 78 && g !== 7 && g !== 8) return;
-          if (adminGrade !== 78 && g !== adminGrade) return;
+          if (adminGrade && g !== adminGrade) return;
         }
         if (getStatus(week.date, p.name) !== "confirmed") noShows.push({ ...p, date: week.date });
       });
@@ -2887,7 +2915,7 @@ function renderSwapTab() {
         if (!ci || !ci.grade) return;
         const g = Number(ci.grade);
         if (adminGrade === 78 && g !== 7 && g !== 8) return;
-        if (adminGrade !== 78 && g !== adminGrade) return;
+        if (adminGrade && g !== adminGrade) return;
       }
       parentOptions += `<option value="${week.date}|${p.name}">${p.name} — currently ${week.date}</option>`;
     });
@@ -3010,7 +3038,7 @@ function renderPinTab() {
         if (!ci || !ci.grade) return;
         const g = Number(ci.grade);
         if (adminGrade === 78 && g !== 7 && g !== 8) return;
-        if (adminGrade !== 78 && g !== adminGrade) return;
+        if (adminGrade && g !== adminGrade) return;
       }
       const currentPin = customPins[p.name] || p.pin;
       const safeId = p.name.replace(/\s|\./g,'_');
@@ -3343,7 +3371,7 @@ function getChildInfoByParent(parentName) {
     if (adminGrade) {
       const g = Number(fromSheet.grade);
       if (adminGrade === 78 && g !== 7 && g !== 8) return null;
-      if (adminGrade !== 78 && g !== adminGrade) return null;
+      if (adminGrade && g !== adminGrade) return null;
     }
     return { name: fromSheet.childName, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned };
   }
@@ -3361,7 +3389,7 @@ function getChildInfoByParent(parentName) {
   if (adminGrade && ci.grade) {
     const g = Number(ci.grade);
     if (adminGrade === 78 && g !== 7 && g !== 8) return null;
-    if (adminGrade !== 78 && g !== adminGrade) return null;
+    if (adminGrade && g !== adminGrade) return null;
   }
   return ci;
 }
@@ -3377,10 +3405,10 @@ const ALL_SUNDAYS = [
 // ── PARENTS TAB ───────────────────────────────────────
 function renderParentsTab() {
   // For grade admins — only show their grade's slots
-  const gradePrefix = adminGrade && adminGrade !== 78 ? "G" + adminGrade + "-" : null;
+  const gradePrefix = adminGrade ? "G" + adminGrade + "-" : null;
 
   // Filter roster to only relevant slots
-  const relevantRoster = adminGrade && adminGrade !== 78
+  const relevantRoster = adminGrade
     ? roster.filter(w => w.date.startsWith(gradePrefix))
     : adminGrade === 78
     ? roster.filter(w => !w.date.startsWith("G6-") && !w.date.startsWith("G9-"))
@@ -3393,7 +3421,7 @@ function renderParentsTab() {
 
   const allDatesHTML = relevantRoster.map(w =>
     `<option value="${w.date}">📅 ${w.date} (${w.parents.length}/2 parents)</option>`
-  ).join("") + (adminGrade && adminGrade !== 78 ? "" :
+  ).join("") + (adminGrade ? "" :
     `<option value="new_aug16">📅 Aug 16 — new date</option>
      <option value="new_aug23">📅 Aug 23 — new date</option>
      <option value="new_aug30">📅 Aug 30 — new date</option>`);
@@ -3495,7 +3523,7 @@ function addNewParent() {
   let assignedWeek = null;
 
   if (dateChoice === "auto") {
-    if (adminGrade && adminGrade !== 78) {
+    if (adminGrade) {
       // Grade admin — find a slot that has < 2 parents from THIS grade only
       // or create a brand new grade-specific date
       const gradePrefix = "G" + adminGrade + "-";
@@ -3867,7 +3895,8 @@ function renderTrackerTab() {
   const presentStudents = getRollCallStudents().filter(s => {
     if (rollData[s.childName] !== "present") return false;
     if (!adminGrade) return true;
-    if (adminGrade === 78) return s.grade === 7 || s.grade === 8;
+    if (adminGrade === 7) return s.grade === 7;
+  if (adminGrade === 8) return s.grade === 8;
     return s.grade === adminGrade;
   });
 
@@ -3880,7 +3909,7 @@ function renderTrackerTab() {
         const ci = getChildInfoByParent(p.name);
         const g = ci ? Number(ci.grade) : null;
         if (adminGrade === 78 && g !== 7 && g !== 8) return;
-        if (adminGrade !== 78 && g !== adminGrade) return;
+        if (adminGrade && g !== adminGrade) return;
       }
       allParents.push(p);
     });
