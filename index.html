@@ -2712,90 +2712,27 @@ function renderStudentsTab() {
   });
 
   // ── Add Archives section ─────────────────────────────────────────────
-  const archiveIndex = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
   let archiveHtml = `
     <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <div style="font-size:14px;font-weight:900;color:white;">📁 Year Archives &amp; Reports</div>
-        <button onclick="buildArchiveContent()"
-          style="padding:6px 12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;
-          font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">
-          🔄 Refresh
+        <button onclick="loadArchivesFromSheet()"
+          style="padding:8px 16px;background:linear-gradient(135deg,#0a5260,#0d7a8a);border:none;border-radius:8px;
+          font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+          📊 Load Reports
         </button>
       </div>
-      <div id="archivesTabContent">`;
-
-  if (archiveIndex.length === 0) {
-    archiveHtml += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:16px;text-align:center;">
-      <div style="font-size:13px;color:rgba(255,255,255,0.5);font-weight:700;">No archives found yet.</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:6px;">Run Annual Promotion + Archive above to create the first archive. Data is saved to Google Sheets tab "Archive_YYYY-YYYY".</div>
+      <div id="archivesTabContent" style="min-height:60px;">
+        <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.4);font-size:13px;">
+          Tap <strong style="color:#7effd4;">📊 Load Reports</strong> to view all archived years
+        </div>
+      </div>
     </div>`;
-  } else {
-    archiveHtml += `<div style="font-size:12px;color:#7effd4;margin-bottom:12px;font-weight:800;">✅ ${archiveIndex.length} year(s) archived — tap any year to view the full report</div>`;
-    archiveIndex.slice().reverse().forEach(yearLabel => {
-      const safeId = "arch_" + yearLabel.replace(/-/g,"_");
-      const raw = localStorage.getItem("archive__" + yearLabel);
-      if (!raw) {
-        archiveHtml += `<div style="font-size:12px;color:#f87171;padding:8px;">⚠️ ${yearLabel} — index entry exists but data not found</div>`;
-        return;
-      }
-      try {
-        const snap = JSON.parse(raw);
-        const sCount = (snap.students||[]).length;
-        const pCount = (snap.parents||[]).length;
-        const tCount = Object.keys(snap.tracker||{}).length;
-        archiveHtml += `
-          <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;margin-bottom:10px;overflow:hidden;">
-            <div onclick="toggleArchiveSection('${safeId}')"
-              style="padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-              <div>
-                <div style="font-size:15px;font-weight:900;color:white;">📅 School Year ${yearLabel}</div>
-                <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:3px;">
-                  Archived ${new Date(snap.archivedAt).toDateString()}
-                </div>
-                <div style="display:flex;gap:10px;margin-top:6px;">
-                  <span style="font-size:11px;font-weight:800;color:#7effd4;">👦 ${sCount} students</span>
-                  <span style="font-size:11px;font-weight:800;color:#7effd4;">👨‍👩‍👧 ${pCount} parents</span>
-                  <span style="font-size:11px;font-weight:800;color:#7effd4;">⭐ ${tCount} tracker records</span>
-                </div>
-              </div>
-              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-                <button onclick="event.stopPropagation();downloadArchiveCSV('${yearLabel}')"
-                  style="padding:6px 12px;background:linear-gradient(135deg,#0a5260,#0d7a8a);border:none;border-radius:8px;
-                  font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">
-                  ⬇ Export CSV
-                </button>
-                <span id="${safeId}_arrow" style="font-size:16px;color:rgba(255,255,255,0.7);">▼ View Report</span>
-              </div>
-            </div>
-            <div id="${safeId}" style="display:block;padding:14px;border-top:1px solid rgba(255,255,255,0.1);">
-              <div style="font-size:12px;color:rgba(255,255,255,0.5);">📊 Full report is in your Google Sheet under tab: <strong style="color:#7effd4;">Archive_${yearLabel}</strong></div>
-              <div style="margin-top:8px;font-size:12px;color:#cde;">Students: ${sCount} &nbsp;·&nbsp; Parents: ${pCount} &nbsp;·&nbsp; Tracker: ${tCount} records</div>
-            </div>
-          </div>`;
-      } catch(e) {
-        archiveHtml += `<div style="font-size:12px;color:#f87171;padding:8px;">⚠️ ${yearLabel} — data corrupted: ${e.message}</div>`;
-      }
-    });
-  }
-  archiveHtml += `</div></div>`;
   html += archiveHtml;
 
   el.innerHTML = html;
-
-  // Now populate archive detail sections (after innerHTML is set)
-  // Populate detail sections after innerHTML is set
-  setTimeout(() => {
-    archiveIndex.slice().reverse().forEach(yearLabel => {
-      const safeId = "arch_" + yearLabel.replace(/-/g,"_");
-      const detailEl = document.getElementById(safeId);
-      if (!detailEl || detailEl.innerHTML.trim()) return;
-      const raw = localStorage.getItem("archive__" + yearLabel);
-      if (!raw) return;
-      try { detailEl.innerHTML = renderArchiveDetail(JSON.parse(raw)); } catch(e) {}
-    });
-  }, 100);
 }
+
 
 // ── BULK ANNUAL PROMOTION ────────────────────────────────────────────────
 // ── Annual Promotion + Full Archive System ───────────────────────────────
@@ -2990,6 +2927,114 @@ function runAnnualPromotion() {
 
 // ── Render Archives Tab ───────────────────────────────────────────────────
 function buildArchiveContent() { renderSuperAdminTab(); }
+
+async function loadArchivesFromSheet() {
+  const container = document.getElementById("archivesTabContent");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);font-size:13px;">⏳ Loading archives from Google Sheets...</div>`;
+
+  try {
+    // Get archive index from sheet
+    const res = await fetch(SHEET_URL + "?type=archiveIndex&nocache=" + Date.now(), { mode:"cors" });
+    const years = await res.json();
+
+    if (!Array.isArray(years) || years.length === 0) {
+      container.innerHTML = `<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.4);font-size:13px;font-weight:700;">
+        No archives found in Google Sheets yet.<br>
+        <span style="font-size:11px;font-weight:400;">Run Annual Promotion + Archive to create the first archive.</span>
+      </div>`;
+      return;
+    }
+
+    let html = `<div style="font-size:12px;color:#7effd4;margin-bottom:12px;font-weight:800;">✅ ${years.length} year(s) archived in Google Sheets</div>`;
+
+    for (const yearLabel of years.slice().reverse()) {
+      const safeId = "arch_" + yearLabel.replace(/-/g,"_");
+      html += `
+        <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;margin-bottom:12px;overflow:hidden;">
+          <div style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:15px;font-weight:900;color:white;">📅 School Year ${yearLabel}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:3px;">Saved in Google Sheets · Tab: Archive_${yearLabel}</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+              <button onclick="viewArchiveReport('${yearLabel}','${safeId}')"
+                style="padding:8px 14px;background:linear-gradient(135deg,#0f6e56,#1db88a);border:none;border-radius:8px;
+                font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+                📊 View Report
+              </button>
+              <button onclick="downloadArchiveCSV('${yearLabel}')"
+                style="padding:8px 14px;background:linear-gradient(135deg,#0a5260,#0d7a8a);border:none;border-radius:8px;
+                font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+                ⬇ CSV
+              </button>
+            </div>
+          </div>
+          <div id="${safeId}" style="display:none;padding:14px;border-top:1px solid rgba(255,255,255,0.1);">
+            <div style="color:rgba(255,255,255,0.4);font-size:12px;">Tap View Report to load...</div>
+          </div>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+
+  } catch(err) {
+    container.innerHTML = `<div style="text-align:center;padding:20px;color:#f87171;font-size:13px;">❌ Could not load from Google Sheets.<br><span style="font-size:11px;">${err.message}</span></div>`;
+  }
+}
+
+async function viewArchiveReport(yearLabel, safeId) {
+  const panel = document.getElementById(safeId);
+  if (!panel) return;
+
+  // Toggle if already open with content
+  if (panel.style.display === "block" && panel.innerHTML.trim() && !panel.innerHTML.includes("Tap View Report")) {
+    panel.style.display = "none";
+    return;
+  }
+
+  panel.style.display = "block";
+  panel.innerHTML = `<div style="color:rgba(255,255,255,0.4);font-size:12px;">⏳ Loading report from Google Sheets...</div>`;
+
+  try {
+    const res = await fetch(SHEET_URL + "?type=getArchive&year=" + encodeURIComponent(yearLabel) + "&nocache=" + Date.now(), { mode:"cors" });
+    const snap = await res.json();
+
+    if (snap.error) {
+      panel.innerHTML = `<div style="color:#f87171;font-size:12px;">❌ ${snap.error}</div>`;
+      return;
+    }
+
+    panel.innerHTML = renderArchiveDetail(snap);
+
+  } catch(err) {
+    panel.innerHTML = `<div style="color:#f87171;font-size:12px;">❌ Failed to load: ${err.message}</div>`;
+  }
+}
+
+async function downloadArchiveCSV(yearLabel) {
+  try {
+    const res = await fetch(SHEET_URL + "?type=getArchive&year=" + encodeURIComponent(yearLabel) + "&nocache=" + Date.now(), { mode:"cors" });
+    const snap = await res.json();
+    if (snap.error) { showToast("❌ " + snap.error); return; }
+
+    let csv = "Year,Section,Name,Grade,Parent/Detail,Phone\n";
+    (snap.students||[]).forEach(s => {
+      csv += [yearLabel,"Student",s.name||"",s.grade||"",s.parentName||"",s.phone||""].join(",") + "\n";
+    });
+    (snap.parents||[]).forEach(p => {
+      csv += [yearLabel,"Parent",p.name||"","","",p.phone||""].join(",") + "\n";
+    });
+
+    const blob = new Blob([csv], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "FaithShift_Archive_" + yearLabel + ".csv";
+    a.click();
+  } catch(err) {
+    showToast("❌ CSV export failed: " + err.message);
+  }
+}
 
 function renderArchivesTab() {
   const container = document.getElementById("archivesTabContent");
