@@ -2721,7 +2721,68 @@ function renderStudentsTab() {
     </div>`;
   });
 
+  // ── Add Archives section ─────────────────────────────────────────────
+  const archiveIndex = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
+  let archiveHtml = `
+    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:900;color:white;">📁 Year Archives &amp; Reports</div>
+        <button onclick="buildArchiveContent()"
+          style="padding:6px 12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;
+          font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">
+          🔄 Refresh
+        </button>
+      </div>
+      <div id="archivesTabContent">`;
+
+  if (archiveIndex.length === 0) {
+    archiveHtml += `<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35);font-size:13px;font-weight:700;">No archives yet. Run Annual Promotion to create the first archive.</div>`;
+  } else {
+    archiveHtml += `<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:10px;font-weight:700;">📁 ${archiveIndex.length} year(s) archived. Tap a year to expand.</div>`;
+    archiveIndex.slice().reverse().forEach(yearLabel => {
+      const safeId = "arch_" + yearLabel.replace(/-/g,"_");
+      const raw = localStorage.getItem("archive__" + yearLabel);
+      if (!raw) return;
+      try {
+        const snap = JSON.parse(raw);
+        const sCount = (snap.students||[]).length;
+        const pCount = (snap.parents||[]).length;
+        archiveHtml += `
+          <div style="background:rgba(255,255,255,0.08);border-radius:12px;margin-bottom:10px;overflow:hidden;">
+            <div onclick="toggleArchiveSection('${safeId}')"
+              style="padding:12px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);">
+              <div>
+                <div style="font-size:14px;font-weight:900;color:white;">📅 ${yearLabel}</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.6);">Archived ${new Date(snap.archivedAt).toDateString()} &middot; ${sCount} students &middot; ${pCount} parents</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button onclick="event.stopPropagation();downloadArchiveCSV('${yearLabel}')"
+                  style="padding:4px 10px;background:rgba(255,255,255,0.15);border:none;border-radius:6px;
+                  font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;color:white;cursor:pointer;">
+                  ⬇ CSV
+                </button>
+                <span id="${safeId}_arrow" style="font-size:16px;color:white;">▶</span>
+              </div>
+            </div>
+            <div id="${safeId}" style="display:none;padding:14px;"></div>
+          </div>`;
+      } catch(e) {}
+    });
+  }
+  archiveHtml += `</div></div>`;
+  html += archiveHtml;
+
   el.innerHTML = html;
+
+  // Now populate archive detail sections (after innerHTML is set)
+  archiveIndex.slice().reverse().forEach(yearLabel => {
+    const safeId = "arch_" + yearLabel.replace(/-/g,"_");
+    const detailEl = document.getElementById(safeId);
+    if (!detailEl) return;
+    const raw = localStorage.getItem("archive__" + yearLabel);
+    if (!raw) return;
+    try { detailEl.innerHTML = renderArchiveDetail(JSON.parse(raw)); } catch(e) {}
+  });
 }
 
 // ── BULK ANNUAL PROMOTION ────────────────────────────────────────────────
@@ -2921,6 +2982,8 @@ function runAnnualPromotion() {
 }
 
 // ── Render Archives Tab ───────────────────────────────────────────────────
+function buildArchiveContent() { renderSuperAdminTab(); }
+
 function renderArchivesTab() {
   const container = document.getElementById("archivesTabContent");
   if (!container) return;
