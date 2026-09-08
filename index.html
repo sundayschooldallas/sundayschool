@@ -2197,6 +2197,11 @@ function renderSuperAdminTab() {
         font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;cursor:pointer;width:100%;">
         🎓 Run Annual Promotion + Archive
       </button>
+      <button onclick="runManualArchiveOnly()"
+        style="margin-top:10px;padding:10px 20px;background:linear-gradient(135deg,#0a5260,#0d7a8a);color:white;border:none;border-radius:10px;
+        font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;cursor:pointer;width:100%;">
+        📁 Archive Current Data Now (without promoting)
+      </button>
     </div>
 
     <!-- ── CLASS MANAGEMENT ─────────────────────────────────────────── -->
@@ -2720,13 +2725,10 @@ function renderStudentsTab() {
       </div>
       <div id="archivesTabContent">`;
 
-  // Debug info
-  archiveHtml += `<div style="font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:8px;">Archive index: ${archiveIndex.length} year(s) · Key: "archiveIndex"</div>`;
-
   if (archiveIndex.length === 0) {
     archiveHtml += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:16px;text-align:center;">
       <div style="font-size:13px;color:rgba(255,255,255,0.5);font-weight:700;">No archives found yet.</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:6px;">Run Annual Promotion + Archive above to create your first archive.</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:6px;">Run Annual Promotion + Archive above to create the first archive. Data is saved to Google Sheets tab "Archive_YYYY-YYYY".</div>
     </div>`;
   } else {
     archiveHtml += `<div style="font-size:12px;color:#7effd4;margin-bottom:12px;font-weight:800;">✅ ${archiveIndex.length} year(s) archived — tap any year to view the full report</div>`;
@@ -2766,7 +2768,10 @@ function renderStudentsTab() {
                 <span id="${safeId}_arrow" style="font-size:16px;color:rgba(255,255,255,0.7);">▼ View Report</span>
               </div>
             </div>
-            <div id="${safeId}" style="display:block;padding:14px;border-top:1px solid rgba(255,255,255,0.1);"></div>
+            <div id="${safeId}" style="display:block;padding:14px;border-top:1px solid rgba(255,255,255,0.1);">
+              <div style="font-size:12px;color:rgba(255,255,255,0.5);">📊 Full report is in your Google Sheet under tab: <strong style="color:#7effd4;">Archive_${yearLabel}</strong></div>
+              <div style="margin-top:8px;font-size:12px;color:#cde;">Students: ${sCount} &nbsp;·&nbsp; Parents: ${pCount} &nbsp;·&nbsp; Tracker: ${tCount} records</div>
+            </div>
           </div>`;
       } catch(e) {
         archiveHtml += `<div style="font-size:12px;color:#f87171;padding:8px;">⚠️ ${yearLabel} — data corrupted: ${e.message}</div>`;
@@ -2806,73 +2811,44 @@ function getArchiveYear() {
   return startYear + "-" + (startYear + 1);
 }
 
+function runManualArchiveOnly() {
+  const yearLabel = getArchiveYear();
+  if (!confirm("📁 Archive current data for " + yearLabel + "?\n\nThis saves a snapshot of all current students, parents, tracker, and roll call data WITHOUT promoting or clearing anything.")) return;
+  const snap = archiveData(yearLabel);
+  const sCount = (snap.students||[]).length;
+  const pCount = (snap.parents||[]).length;
+  const tCount = Object.keys(snap.tracker||{}).length;
+  showToast("✅ Archived " + yearLabel + " — " + sCount + " students, " + pCount + " parents, " + tCount + " tracker records");
+  renderSuperAdminTab();
+}
+
 function archiveData(yearLabel) {
-  // Collect everything into a snapshot
-  const snapshot = {
-    yearLabel,
-    archivedAt: new Date().toISOString(),
-    // Students — all childInfo__ records
-    students: [],
-    // Tracker — all tracker__ records
-    tracker: {},
-    // Roll call — all rollcall__ records
-    rollcall: {},
-    // Roster — parent volunteer schedule
-    roster: JSON.parse(JSON.stringify(roster)),
-    // Parent info from newParents / roster
-    parents: []
-  };
+  // Count attendance weeks
+  const attendanceWeeks = roster.length;
 
-  // Collect students
-  const parentsSeen = new Set();
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k) continue;
-    if (k.startsWith("childInfo__")) {
-      try {
-        const ci = JSON.parse(localStorage.getItem(k));
-        if (ci && !ci.skipped) snapshot.students.push({ phone: k.replace("childInfo__",""), ...ci });
-      } catch(e) {}
-    } else if (k.startsWith("tracker__")) {
-      try { snapshot.tracker[k] = JSON.parse(localStorage.getItem(k)); } catch(e) {}
-    } else if (k.startsWith("rollcall__")) {
-      try { snapshot.rollcall[k] = JSON.parse(localStorage.getItem(k)); } catch(e) {}
-    }
-  }
-
-  // Collect parents from roster
-  roster.forEach(week => {
-    week.parents.forEach(p => {
-      if (!parentsSeen.has(p.h)) {
-        parentsSeen.add(p.h);
-        snapshot.parents.push({ name: p.name, phone: p.h, email: p.e || "" });
-      }
-    });
-  });
-
-  // Save archive — try/catch for localStorage quota
-  const archiveKey = "archive__" + yearLabel;
-  try {
-    const existing = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
-    if (!existing.includes(yearLabel)) existing.push(yearLabel);
-    localStorage.setItem("archiveIndex", JSON.stringify(existing));
-    localStorage.setItem(archiveKey, JSON.stringify(snapshot));
-    console.log("✅ Archive saved:", archiveKey, "size:", JSON.stringify(snapshot).length, "bytes");
-  } catch(e) {
-    console.error("❌ Archive save failed:", e);
-    // Try saving a lightweight version if full version fails
-    const lite = { yearLabel, archivedAt: snapshot.archivedAt,
-      students: snapshot.students, parents: snapshot.parents,
-      tracker: {}, rollcall: {}, roster: [] };
+  // Send archive request to Google Sheets — ALL data is read from the sheet server-side
+  return fetch(SHEET_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "archive", yearLabel, attendanceWeeks })
+  })
+  .then(() => {
+    // Also store archive index in localStorage as a lightweight index only
     try {
-      const existing2 = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
-      if (!existing2.includes(yearLabel)) existing2.push(yearLabel);
-      localStorage.setItem("archiveIndex", JSON.stringify(existing2));
-      localStorage.setItem(archiveKey, JSON.stringify(lite));
-      console.log("✅ Lite archive saved");
-    } catch(e2) { console.error("❌ Even lite archive failed:", e2); }
-  }
-  return snapshot;
+      const existing = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
+      if (!existing.includes(yearLabel)) existing.push(yearLabel);
+      localStorage.setItem("archiveIndex", JSON.stringify(existing));
+      localStorage.setItem("archive_meta__" + yearLabel, JSON.stringify({
+        yearLabel, archivedAt: new Date().toISOString(), attendanceWeeks
+      }));
+    } catch(e) {}
+    showToast("✅ Archive saved to Google Sheets — tab: Archive_" + yearLabel);
+  })
+  .catch(err => {
+    console.error("Archive to sheets failed:", err);
+    showToast("⚠️ Archive may not have saved — check Google Sheets");
+  });
 }
 
 function clearAfterArchive(allGrades) {
@@ -2907,11 +2883,18 @@ function clearAfterArchive(allGrades) {
   // Clear the live roster slots
   roster.length = 0;
 
-  // Sync cleared roster to sheet
+  // Clear roster on Google Sheets
   fetch(SHEET_URL, {
     method:"POST", mode:"no-cors",
     headers:{"Content-Type":"text/plain"},
     body: JSON.stringify({ type:"clearRoster" })
+  }).catch(()=>{});
+
+  // Clear Tracker on Google Sheets
+  fetch(SHEET_URL, {
+    method:"POST", mode:"no-cors",
+    headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ type:"clearTracker" })
   }).catch(()=>{});
 }
 
@@ -2938,8 +2921,9 @@ function runAnnualPromotion() {
   );
   if (!confirm1) return;
 
-  // ── Step 1: Archive this year's data BEFORE changing anything ──────
-  const snapshot = archiveData(yearLabel);
+  // ── Step 1: Archive this year's data to Google Sheets BEFORE changing anything
+  showToast("📁 Archiving to Google Sheets...");
+  archiveData(yearLabel); // async — fires and continues
   let promoted = 0, graduated = 0;
 
   // ── Step 2: Promote all students ─────────────────────────────────────
