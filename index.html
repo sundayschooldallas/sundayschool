@@ -2713,18 +2713,21 @@ function renderStudentsTab() {
 
   // ── Add Archives section ─────────────────────────────────────────────
   let archiveHtml = `
-    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+    <div style="background:rgba(34,197,94,0.08);border:2px solid rgba(34,197,94,0.3);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:14px;font-weight:900;color:white;">📁 Year Archives &amp; Reports</div>
+        <div style="font-size:14px;font-weight:900;color:#7effd4;">📁 Year Archives &amp; Reports</div>
         <button onclick="loadArchivesFromSheet()"
-          style="padding:8px 16px;background:linear-gradient(135deg,#0a5260,#0d7a8a);border:none;border-radius:8px;
-          font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+          style="padding:12px 20px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:10px;
+          font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;color:white;cursor:pointer;
+          box-shadow:0 4px 12px rgba(34,197,94,0.4);">
           📊 Load Reports
         </button>
       </div>
       <div id="archivesTabContent" style="min-height:60px;">
-        <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.4);font-size:13px;">
-          Tap <strong style="color:#7effd4;">📊 Load Reports</strong> to view all archived years
+        <div style="text-align:center;padding:20px;">
+          <div style="font-size:32px;margin-bottom:8px;">📊</div>
+          <div style="font-size:14px;font-weight:800;color:#7effd4;">Tap the green button above to load archived reports</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:6px;">Reports are stored in Google Sheets and loaded on demand</div>
         </div>
       </div>
     </div>`;
