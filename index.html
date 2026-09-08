@@ -2720,38 +2720,57 @@ function renderStudentsTab() {
       </div>
       <div id="archivesTabContent">`;
 
+  // Debug info
+  archiveHtml += `<div style="font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:8px;">Archive index: ${archiveIndex.length} year(s) · Key: "archiveIndex"</div>`;
+
   if (archiveIndex.length === 0) {
-    archiveHtml += `<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.35);font-size:13px;font-weight:700;">No archives yet. Run Annual Promotion to create the first archive.</div>`;
+    archiveHtml += `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:16px;text-align:center;">
+      <div style="font-size:13px;color:rgba(255,255,255,0.5);font-weight:700;">No archives found yet.</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:6px;">Run Annual Promotion + Archive above to create your first archive.</div>
+    </div>`;
   } else {
-    archiveHtml += `<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:10px;font-weight:700;">📁 ${archiveIndex.length} year(s) archived. Tap a year to expand.</div>`;
+    archiveHtml += `<div style="font-size:12px;color:#7effd4;margin-bottom:12px;font-weight:800;">✅ ${archiveIndex.length} year(s) archived — tap any year to view the full report</div>`;
     archiveIndex.slice().reverse().forEach(yearLabel => {
       const safeId = "arch_" + yearLabel.replace(/-/g,"_");
       const raw = localStorage.getItem("archive__" + yearLabel);
-      if (!raw) return;
+      if (!raw) {
+        archiveHtml += `<div style="font-size:12px;color:#f87171;padding:8px;">⚠️ ${yearLabel} — index entry exists but data not found</div>`;
+        return;
+      }
       try {
         const snap = JSON.parse(raw);
         const sCount = (snap.students||[]).length;
         const pCount = (snap.parents||[]).length;
+        const tCount = Object.keys(snap.tracker||{}).length;
         archiveHtml += `
-          <div style="background:rgba(255,255,255,0.08);border-radius:12px;margin-bottom:10px;overflow:hidden;">
+          <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;margin-bottom:10px;overflow:hidden;">
             <div onclick="toggleArchiveSection('${safeId}')"
-              style="padding:12px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);">
+              style="padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
               <div>
-                <div style="font-size:14px;font-weight:900;color:white;">📅 ${yearLabel}</div>
-                <div style="font-size:11px;color:rgba(255,255,255,0.6);">Archived ${new Date(snap.archivedAt).toDateString()} &middot; ${sCount} students &middot; ${pCount} parents</div>
+                <div style="font-size:15px;font-weight:900;color:white;">📅 School Year ${yearLabel}</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:3px;">
+                  Archived ${new Date(snap.archivedAt).toDateString()}
+                </div>
+                <div style="display:flex;gap:10px;margin-top:6px;">
+                  <span style="font-size:11px;font-weight:800;color:#7effd4;">👦 ${sCount} students</span>
+                  <span style="font-size:11px;font-weight:800;color:#7effd4;">👨‍👩‍👧 ${pCount} parents</span>
+                  <span style="font-size:11px;font-weight:800;color:#7effd4;">⭐ ${tCount} tracker records</span>
+                </div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;">
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
                 <button onclick="event.stopPropagation();downloadArchiveCSV('${yearLabel}')"
-                  style="padding:4px 10px;background:rgba(255,255,255,0.15);border:none;border-radius:6px;
-                  font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;color:white;cursor:pointer;">
-                  ⬇ CSV
+                  style="padding:6px 12px;background:linear-gradient(135deg,#0a5260,#0d7a8a);border:none;border-radius:8px;
+                  font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">
+                  ⬇ Export CSV
                 </button>
-                <span id="${safeId}_arrow" style="font-size:16px;color:white;">▶</span>
+                <span id="${safeId}_arrow" style="font-size:16px;color:rgba(255,255,255,0.7);">▼ View Report</span>
               </div>
             </div>
-            <div id="${safeId}" style="display:none;padding:14px;"></div>
+            <div id="${safeId}" style="display:block;padding:14px;border-top:1px solid rgba(255,255,255,0.1);"></div>
           </div>`;
-      } catch(e) {}
+      } catch(e) {
+        archiveHtml += `<div style="font-size:12px;color:#f87171;padding:8px;">⚠️ ${yearLabel} — data corrupted: ${e.message}</div>`;
+      }
     });
   }
   archiveHtml += `</div></div>`;
@@ -2760,14 +2779,17 @@ function renderStudentsTab() {
   el.innerHTML = html;
 
   // Now populate archive detail sections (after innerHTML is set)
-  archiveIndex.slice().reverse().forEach(yearLabel => {
-    const safeId = "arch_" + yearLabel.replace(/-/g,"_");
-    const detailEl = document.getElementById(safeId);
-    if (!detailEl) return;
-    const raw = localStorage.getItem("archive__" + yearLabel);
-    if (!raw) return;
-    try { detailEl.innerHTML = renderArchiveDetail(JSON.parse(raw)); } catch(e) {}
-  });
+  // Populate detail sections after innerHTML is set
+  setTimeout(() => {
+    archiveIndex.slice().reverse().forEach(yearLabel => {
+      const safeId = "arch_" + yearLabel.replace(/-/g,"_");
+      const detailEl = document.getElementById(safeId);
+      if (!detailEl || detailEl.innerHTML.trim()) return;
+      const raw = localStorage.getItem("archive__" + yearLabel);
+      if (!raw) return;
+      try { detailEl.innerHTML = renderArchiveDetail(JSON.parse(raw)); } catch(e) {}
+    });
+  }, 100);
 }
 
 // ── BULK ANNUAL PROMOTION ────────────────────────────────────────────────
@@ -2828,12 +2850,28 @@ function archiveData(yearLabel) {
     });
   });
 
-  // Save archive
+  // Save archive — try/catch for localStorage quota
   const archiveKey = "archive__" + yearLabel;
-  const existing = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
-  if (!existing.includes(yearLabel)) existing.push(yearLabel);
-  localStorage.setItem("archiveIndex", JSON.stringify(existing));
-  localStorage.setItem(archiveKey, JSON.stringify(snapshot));
+  try {
+    const existing = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
+    if (!existing.includes(yearLabel)) existing.push(yearLabel);
+    localStorage.setItem("archiveIndex", JSON.stringify(existing));
+    localStorage.setItem(archiveKey, JSON.stringify(snapshot));
+    console.log("✅ Archive saved:", archiveKey, "size:", JSON.stringify(snapshot).length, "bytes");
+  } catch(e) {
+    console.error("❌ Archive save failed:", e);
+    // Try saving a lightweight version if full version fails
+    const lite = { yearLabel, archivedAt: snapshot.archivedAt,
+      students: snapshot.students, parents: snapshot.parents,
+      tracker: {}, rollcall: {}, roster: [] };
+    try {
+      const existing2 = JSON.parse(localStorage.getItem("archiveIndex") || "[]");
+      if (!existing2.includes(yearLabel)) existing2.push(yearLabel);
+      localStorage.setItem("archiveIndex", JSON.stringify(existing2));
+      localStorage.setItem(archiveKey, JSON.stringify(lite));
+      console.log("✅ Lite archive saved");
+    } catch(e2) { console.error("❌ Even lite archive failed:", e2); }
+  }
   return snapshot;
 }
 
