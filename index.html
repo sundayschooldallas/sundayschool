@@ -1028,6 +1028,37 @@ function saveChildInfo() {
   const name = document.getElementById("childNameInput").value.trim();
   // Add current child if filled
   if (name && selectedGrade) {
+    // Check for duplicate full name across ALL grades and parents
+    const nameLower = name.trim().toLowerCase();
+    let isDuplicate = false;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith("childInfo__")) continue;
+      try {
+        const ci = JSON.parse(localStorage.getItem(k));
+        if (!ci || !ci.name) continue;
+        // Check primary child name
+        if (ci.name.trim().toLowerCase() === nameLower) { isDuplicate = true; break; }
+        // Check allChildren array too
+        if (ci.allChildren) {
+          for (const c of ci.allChildren) {
+            if (c.name && c.name.trim().toLowerCase() === nameLower) { isDuplicate = true; break; }
+          }
+        }
+        if (isDuplicate) break;
+      } catch(e) {}
+    }
+    // Also check childrenSheetData
+    if (!isDuplicate && childrenSheetData) {
+      for (const row of childrenSheetData) {
+        if (row.name && row.name.trim().toLowerCase() === nameLower) { isDuplicate = true; break; }
+      }
+    }
+    if (isDuplicate) {
+      const errEl = document.getElementById("childInfoError");
+      if (errEl) { errEl.textContent = "A student named \"" + name + "\" is already registered. Please check the full name and try again."; errEl.style.display = "block"; }
+      return;
+    }
     pendingChildren.push({ name, grade: selectedGrade, teacher: TEACHERS[selectedGrade] });
   }
   if (pendingChildren.length === 0) {
@@ -3726,7 +3757,7 @@ function renderClassesTab() {
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
         ${adminRole === "superadmin" ? `
-        <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${e.grade===7?8:e.grade===6?7:e.grade===8?9:8})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e0f5f7;color:#0a5260;">→ Gr.${e.grade===7?8:e.grade===6?7:e.grade===8?9:8}</button>
+        
         <button onclick="unassignStudent('${e.h}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;">⏸ Unassign</button>
         <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">🗑️ Delete</button>
         ` : `<div style="font-size:11px;color:#22a06b;font-weight:700;">✅ Your class</div>`}
@@ -3745,7 +3776,7 @@ function renderClassesTab() {
 
   let html = `<div style="background:#e8e4fb;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#0a5260;font-weight:700;">🎓 Your class has full edit rights. Other classes are read-only and collapsible.</div>`;
 
-  [6, 7, 8, 9].forEach(g => {
+  Object.keys(gradeConfig).map(Number).sort().forEach(g => {
     const cfg = gradeConfig[g];
     const students = allGrades[g];
     const mine = isMyGrade(g);
@@ -3815,7 +3846,12 @@ function toggleClassSection(id) {
 
   const renderClass = (entries, color) => {
     if (entries.length === 0) return `<div style="font-size:13px;color:#7b7a90;padding:12px 14px;">No children registered yet.</div>`;
-    return entries.map(e => `
+    return entries.map(e => {
+      const adjG2 = getAdjacentGrade(e.grade);
+      const swapBtnHtml = (adminRole === "superadmin")
+        ? `<button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${adjG2})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e0f5f7;color:#0a5260;white-space:nowrap;">→ Gr.${adjG2}</button>`
+        : "";
+      return `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
         <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">
           ${e.child.charAt(0).toUpperCase()}
@@ -3825,10 +3861,7 @@ function toggleClassSection(id) {
           <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
-          <button onclick="swapStudentTeacher('${e.h}','${e.parent}','${e.child}',${adjG})"
-            style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e0f5f7;color:#0a5260;white-space:nowrap;">
-            → Gr.${adjG}
-          </button>
+          ${swapBtnHtml}
           <button onclick="unassignStudent('${e.h}','${e.child}')"
             style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;white-space:nowrap;">
             ⏸ Unassign
@@ -3838,7 +3871,8 @@ function toggleClassSection(id) {
             ✕ Remove
           </button>
         </div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   };
 
 function keepThisEntry(keepPh, keepParent, childName, removePhs) {
@@ -4337,12 +4371,16 @@ function saveRollCallEntry(date, childName, status) {
 function showRollCallDash(grade) {
   if (grade !== undefined) rollCallGrade = grade;
   document.getElementById("rollCallDash").style.display = "block";
-  const rcSub = document.getElementById("rcSubtitle");
-  if (rcSub) rcSub.textContent = "Sunday School — Grade " + rollCallGrade;
+  function _setRCTitle() {
+    const el = document.getElementById("rcSubtitle");
+    if (el) el.textContent = "Sunday School — Grade " + rollCallGrade;
+  }
+  _setRCTitle();
   renderRollCallScreen();
+  _setRCTitle(); // set again after render in case element was recreated
   Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
-    .then(() => renderRollCallScreen())
-    .catch(() => {});
+    .then(() => { renderRollCallScreen(); _setRCTitle(); })
+    .catch(() => { _setRCTitle(); });
 }
 
 function setRollCallMock(scenario) {
