@@ -3619,25 +3619,7 @@ function renderArchiveDetail(snap) {
   return html;
 }
 
-function downloadArchiveCSV(yearLabel) {
-  const raw = localStorage.getItem("archive__" + yearLabel);
-  if (!raw) return;
-  try {
-    const snap = JSON.parse(raw);
-    let csv = "Year,Type,Name,Grade,Parent,Phone\n";
-    (snap.students||[]).forEach(s => {
-      csv += [yearLabel,"Student",s.name||"",s.grade||"",s.parentName||"",s.phone||""].join(",") + "\n";
-    });
-    (snap.parents||[]).forEach(p => {
-      csv += [yearLabel,"Parent",p.name||"","","",p.phone||""].join(",") + "\n";
-    });
-    const blob = new Blob([csv], { type:"text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "FaithShift_Archive_" + yearLabel + ".csv";
-    a.click();
-  } catch(e) {}
-}
+// downloadArchiveCSV moved to async version above
 
 // ── Check if today is promotion Sunday and show banner ───────────────────
 function checkPromotionBanner() {
@@ -4889,17 +4871,31 @@ function renderTrackerTab() {
     return s.grade === adminGrade;
   });
 
-  // Get all unique parents from roster — filtered by grade if grade admin
+  // Get all unique parents — use childrenSheetData as primary source filtered by grade
   const allParents = [];
+  const seenParents = new Set();
+
+  // Primary: from sheet data filtered by grade
+  childrenSheetData.forEach(row => {
+    const g = Number(row.grade);
+    if (!row.parentName || !g || g < 1) return;
+    if (adminGrade && g !== adminGrade) return;
+    if (seenParents.has(row.parentName)) return;
+    seenParents.add(row.parentName);
+    const norm = row.phone ? String(row.phone).replace(/\D/g,"").slice(-10) : "";
+    allParents.push({ name: row.parentName, h: norm, e: norm ? btoa("+1"+norm) : "", pin: "" });
+  });
+
+  // Secondary: from roster (in case parent not in sheet)
   roster.forEach(week => {
     week.parents.forEach(p => {
-      if (allParents.find(x => x.name === p.name)) return;
+      if (seenParents.has(p.name)) return;
       if (adminGrade) {
         const ci = getChildInfoByParent(p.name);
         const g = ci ? Number(ci.grade) : null;
-        if (adminGrade && g !== adminGrade) return;
-        if (adminGrade && g !== adminGrade) return;
+        if (g !== adminGrade) return;
       }
+      seenParents.add(p.name);
       allParents.push(p);
     });
   });
