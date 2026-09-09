@@ -2732,9 +2732,13 @@ function renderStudentsTab() {
   const all = [];
   const seen = new Set();
   childrenSheetData.forEach(row => {
-    if (!row.childName || seen.has(row.childName.toLowerCase())) return;
-    seen.add(row.childName.toLowerCase());
-    all.push({ childName: row.childName, parentName: row.parentName, grade: row.grade, phone: row.phone });
+    const childName = (row.childName || row.name || "").trim();
+    if (!childName || seen.has(childName.toLowerCase())) return;
+    const g = Number(row.grade);
+    if (adminGrade && g !== adminGrade) return; // strict grade filter
+    if (!g || g < 1) return; // skip unassigned
+    seen.add(childName.toLowerCase());
+    all.push({ childName, parentName: row.parentName || "", grade: g, phone: row.phone || "" });
   });
   roster.forEach(week => {
     week.parents.forEach(p => {
@@ -4220,13 +4224,10 @@ async function loadChildrenFromSheet() {
     if (!res.ok) throw new Error("Bad response");
     const data = await res.json();
     if (Array.isArray(data)) {
-      // Filter by adminGrade if grade admin — grade 6 and 9 only see their own students
-      const filtered = data.filter(row => {
-        if (!adminGrade) return true;
-        const g = Number(row.grade);
-        if (adminGrade) return g === adminGrade;
-        return g === adminGrade;
-      });
+      // Filter by adminGrade if grade admin
+      const filtered = adminGrade
+        ? data.filter(row => Number(row.grade) === adminGrade)
+        : data;
       childrenSheetData = filtered;
       // Sheet is source of truth — always update localStorage from sheet
       data.forEach(row => {
