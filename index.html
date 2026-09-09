@@ -3041,7 +3041,11 @@ async function loadMasterStudentList() {
     }
 
     const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-    const allGradeNums = Object.keys({...TEACHERS, ...customTeachersLocal}).map(Number).sort();
+    // Build grade list — always include base grades even if customTeachers is empty
+    const baseGrades = Object.keys(TEACHERS).map(Number);
+    const customGrades = Object.keys(customTeachersLocal).map(Number);
+    const allGradeNums = [...new Set([...baseGrades, ...customGrades])].filter(g => g > 0).sort((a,b)=>a-b);
+    console.log("allGradeNums:", allGradeNums);
 
     // Group by grade
     const byGrade = {};
@@ -3120,9 +3124,11 @@ function renderMasterStudentRow(s, allGradeNums, currentGrade) {
   const parentName = s.parentName || "";
   const phone = s.phone || "";
   const assigned = currentGrade > 0;
+  // Fallback to default grades if allGradeNums is empty
+  const gradeList = (allGradeNums && allGradeNums.length > 0) ? allGradeNums : [6,7,8,9];
   const gradeOptions = [
     `<option value="0">— Select Grade —</option>`,
-    ...allGradeNums.map(g =>
+    ...gradeList.map(g =>
       `<option value="${g}" ${g === currentGrade ? "selected" : ""}>Grade ${g}</option>`)
   ].join("");
 
