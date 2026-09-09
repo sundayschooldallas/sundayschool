@@ -3388,6 +3388,7 @@ async function assignStudentToClass(btn) {
   btn.disabled = false;
   const moveMsg = oldGrade && oldGrade !== chosenGrade ? " moved from Grade " + oldGrade : "";
   showToast("✅ " + childName + " → Grade " + chosenGrade + (moveMsg ? " (" + moveMsg + ")" : "") + (sheetOk ? " · Saved to Sheets ✓" : " · Saved locally"));
+  try { renderPinTab(); } catch(e) {}
   setTimeout(() => loadMasterStudentList(), 1000);
 }
 
@@ -3744,6 +3745,7 @@ function clearAllRosterData() {
 
   showToast("✅ Roster cleared. Ready for new parent assignments.");
   renderAttendanceTab(false, false);
+  try { renderPinTab(); } catch(e) {}
 }
 
 function renderAttendanceTab(isSunday, isPastCheck) {
@@ -4535,6 +4537,9 @@ function addNewParent() {
   // Clear form
   document.getElementById("newParentName").value = "";
   document.getElementById("newParentPhone").value = "";
+
+  // Refresh PIN tab immediately so it's never stale
+  try { renderPinTab(); } catch(e) {}
 
   // Refresh tab
   setTimeout(() => renderParentsTab(), 1500);
