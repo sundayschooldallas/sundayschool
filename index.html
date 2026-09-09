@@ -3131,9 +3131,9 @@ function renderMasterStudentRow(s, allGradeNums, currentGrade) {
     ...Object.keys(_ct).map(Number)
   ])].filter(g => g > 0).sort((a,b) => a-b);
   const gradeOptions = [
-    `<option value="0">— Select Grade —</option>`,
+    `<option value="0" style="color:#333;background:white;">— Select Grade —</option>`,
     ..._grades.map(g =>
-      `<option value="${g}" ${g === currentGrade ? "selected" : ""}>Grade ${g}</option>`)
+      `<option value="${g}" style="color:#333;background:white;" ${g === currentGrade ? "selected" : ""}>Grade ${g}</option>`)
   ].join("");
 
   const assignedBadge = assigned
@@ -3159,8 +3159,8 @@ function renderMasterStudentRow(s, allGradeNums, currentGrade) {
       </div>
     </div>
     <select id="sel_${phone||name.replace(/[^a-zA-Z0-9]/g,"_")}"
-      style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.12);
-      color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;outline:none;">
+      style="padding:8px 12px;border-radius:8px;border:2px solid #0d7a8a;background:white;
+      color:#0a3d45;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;outline:none;min-width:120px;">
       ${gradeOptions}
     </select>
     <div style="display:flex;gap:6px;">
