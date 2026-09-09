@@ -2405,11 +2405,18 @@ function renderSuperAdminTab() {
         <div style="font-size:14px;font-weight:900;color:white;">📋 Master Student List</div>
         <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">Load all students from Google Sheets and assign them to their classes</div>
       </div>
-      <button onclick="loadMasterStudentList()"
-        style="padding:10px 16px;background:linear-gradient(135deg,#0a5260,#0d7a8a);border:none;border-radius:10px;
-        font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:white;cursor:pointer;">
-        📥 Load Students
-      </button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="loadMasterStudentList()"
+          style="padding:10px 16px;background:linear-gradient(135deg,#0a5260,#0d7a8a);border:none;border-radius:10px;
+          font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:white;cursor:pointer;">
+          📥 Load Students
+        </button>
+        <button onclick="clearAllClassAssignments()"
+          style="padding:10px 16px;background:linear-gradient(135deg,#991b1b,#ef4444);border:none;border-radius:10px;
+          font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:white;cursor:pointer;">
+          🗑️ Clear All
+        </button>
+      </div>
     </div>
     <div id="masterStudentListContent">
       <div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35);font-size:12px;">
@@ -2974,6 +2981,28 @@ function runAnnualPromotion() {
 function buildArchiveContent() { renderSuperAdminTab(); }
 
 // ── MASTER STUDENT LIST ───────────────────────────────────────────────────
+function clearAllClassAssignments() {
+  if (!confirm("🗑️ Clear ALL class assignments?\n\nThis removes all students from their classes and clears the volunteer roster.\n\nStudent data stays in Google Sheets — you can reassign anytime.\n\nAre you sure?")) return;
+
+  // Clear all childInfo__ from localStorage
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith("childInfo__")) keysToRemove.push(k);
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // Clear roster
+  roster.length = 0;
+
+  // Clear Google Sheet roster
+  fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ type:"clearRoster" }) }).catch(()=>{});
+
+  showToast("✅ All assignments cleared. Ready to reassign.");
+  loadMasterStudentList();
+}
+
 async function loadMasterStudentList() {
   const container = document.getElementById("masterStudentListContent");
   if (!container) return;
@@ -3041,40 +3070,115 @@ async function loadMasterStudentList() {
   }
 }
 
+function isStudentAssigned(phone, name) {
+  // Check localStorage first
+  const key = "childInfo__" + (phone || name.replace(/\s/g,"_"));
+  const ci = localStorage.getItem(key);
+  if (ci) {
+    try {
+      const parsed = JSON.parse(ci);
+      if (parsed.grade && Number(parsed.grade) > 0 && !parsed.unassigned) return true;
+    } catch(e) {}
+  }
+  // Check childrenSheetData
+  const fromSheet = childrenSheetData.find(r =>
+    (phone && String(r.phone) === String(phone)) ||
+    (r.name && r.name.toLowerCase() === name.toLowerCase())
+  );
+  if (fromSheet && fromSheet.grade && Number(fromSheet.grade) > 0) return true;
+  return false;
+}
+
 function renderMasterStudentRow(s, allGradeNums, currentGrade) {
   const name = s.name || s.childName || "Unknown";
   const parentName = s.parentName || "";
   const phone = s.phone || "";
-  const gradeOptions = allGradeNums.map(g =>
-    `<option value="${g}" ${g === currentGrade ? "selected" : ""}>Grade ${g}</option>`
-  ).join("");
+  const assigned = currentGrade > 0;
+  const gradeOptions = [
+    `<option value="0">— Select Grade —</option>`,
+    ...allGradeNums.map(g =>
+      `<option value="${g}" ${g === currentGrade ? "selected" : ""}>Grade ${g}</option>`)
+  ].join("");
 
-  return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:0.5px solid rgba(255,255,255,0.08);flex-wrap:wrap;">
+  const assignedBadge = assigned
+    ? `<span style="background:rgba(34,197,94,0.2);color:#7effd4;border:1px solid rgba(34,197,94,0.4);
+        border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;">✅ In Grade ${currentGrade}</span>`
+    : `<span style="background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.3);
+        border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;">⚠️ Not assigned</span>`;
+
+  const btnLabel = assigned ? "🔄 Move" : "➕ Assign";
+  const btnColor = assigned
+    ? "linear-gradient(135deg,#1d4ed8,#3b82f6)"
+    : "linear-gradient(135deg,#15803d,#22c55e)";
+
+  return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:0.5px solid rgba(255,255,255,0.08);flex-wrap:wrap;
+    ${assigned ? "background:rgba(34,197,94,0.04);" : ""}">
     <div style="flex:1;min-width:120px;">
-      <div style="font-size:14px;font-weight:800;color:white;">${name}</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5);">Parent: ${parentName||"—"} ${phone ? "· +1"+phone : ""}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px;">
+        <div style="font-size:14px;font-weight:800;color:white;">${name}</div>
+        ${assignedBadge}
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);">
+        Parent: ${parentName||"—"} ${phone ? " · +1"+phone : ""}
+      </div>
     </div>
-    <select onchange="this.dataset.grade=this.value"
-      data-grade="${currentGrade}" data-phone="${phone}" data-name="${name}" data-parent="${parentName}"
-      style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);
+    <select id="sel_${phone||name.replace(/[^a-zA-Z0-9]/g,"_")}"
+      style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.12);
       color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;outline:none;">
       ${gradeOptions}
     </select>
-    <button onclick="assignStudentToClass(this)"
-      data-phone="${phone}" data-name="${name.replace(/'/g,"&#39;")}" data-parent="${parentName.replace(/'/g,"&#39;")}"
-      data-grade="${currentGrade}"
-      style="padding:8px 14px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:8px;
-      font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;white-space:nowrap;">
-      ➕ Assign
-    </button>
+    <div style="display:flex;gap:6px;">
+      <button onclick="assignStudentToClass(this)"
+        data-phone="${phone}" data-name="${name.replace(/'/g,"&#39;")}" data-parent="${parentName.replace(/'/g,"&#39;")}"
+        data-oldgrade="${currentGrade}"
+        data-selid="sel_${phone||name.replace(/[^a-zA-Z0-9]/g,"_")}"
+        style="padding:8px 12px;background:${btnColor};border:none;border-radius:8px;
+        font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;white-space:nowrap;">
+        ${btnLabel}
+      </button>
+      ${assigned ? `<button onclick="unassignStudentFromMaster('${phone}','${name.replace(/'/g,"&#39;")}','${parentName.replace(/'/g,"&#39;")}')"
+        style="padding:8px 12px;background:linear-gradient(135deg,#991b1b,#ef4444);border:none;border-radius:8px;
+        font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+        🗑️
+      </button>` : ""}
+    </div>
   </div>`;
 }
 
+async function unassignStudentFromMaster(phone, name, parentName) {
+  if (!confirm("Remove " + name + " from their class?\n\nThis will also remove " + (parentName||"their parent") + " from the volunteer roster for that class.")) return;
+
+  // Clear from localStorage
+  const key = "childInfo__" + (phone || name.replace(/\s/g,"_"));
+  localStorage.removeItem(key);
+
+  // Update sheet — set grade to 0
+  await fetch(SHEET_URL, {
+    method:"POST", mode:"no-cors",
+    headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ type:"childInfo", phone, parentName, childName:name, grade:0, teacher:"", unassigned:true, graduated:false })
+  }).catch(()=>{});
+
+  // Remove parent from roster
+  if (phone) {
+    const norm = String(phone).replace(/\D/g,"").slice(-10);
+    roster.forEach(week => {
+      week.parents = week.parents.filter(p => p.h !== norm);
+    });
+    // Clean up empty weeks
+    roster.splice(0, roster.length, ...roster.filter(w => w.parents.length > 0));
+  }
+
+  showToast("✅ " + name + " removed from class");
+  loadMasterStudentList();
+}
+
 async function assignStudentToClass(btn) {
-  // Get the select element sibling to get chosen grade
-  const row = btn.closest ? btn.closest("div[style]") : btn.parentElement;
-  const select = row ? row.querySelector("select") : null;
-  const chosenGrade = select ? Number(select.value) : Number(btn.dataset.grade);
+  // Get grade from the linked select element
+  const selId = btn.dataset.selid;
+  const select = selId ? document.getElementById(selId) : null;
+  const chosenGrade = select ? Number(select.value) : Number(btn.dataset.oldgrade);
+  const oldGrade = Number(btn.dataset.oldgrade) || 0;
   const phone = btn.dataset.phone;
   const childName = btn.dataset.name;
   const parentName = btn.dataset.parent;
@@ -3106,7 +3210,19 @@ async function assignStudentToClass(btn) {
     teacher, parentName, unassigned:false, graduated:false
   }));
 
-  // ── 3. Add parent to roster if not already there ──────────────────
+  // ── 3. Remove parent from OLD grade roster if moving ────────────────
+  if (oldGrade && oldGrade !== chosenGrade && phone) {
+    const norm = String(phone).replace(/\D/g,"").slice(-10);
+    const oldPrefix = "G" + oldGrade + "-";
+    roster.forEach(week => {
+      if (week.date.startsWith(oldPrefix)) {
+        week.parents = week.parents.filter(p => p.h !== norm);
+      }
+    });
+    roster.splice(0, roster.length, ...roster.filter(w => w.parents.length > 0));
+  }
+
+  // ── 4. Add parent to roster if not already there ──────────────────
   if (parentName && phone) {
     const norm = String(phone).replace(/\D/g,"").slice(-10);
     const encoded = btoa("+1" + norm);
@@ -3129,7 +3245,7 @@ async function assignStudentToClass(btn) {
       roster.push({ date: slotDate, parents: [newParent] });
     }
 
-    // ── 4. Save parent to Google Sheet ────────────────────────────
+    // ── 5. Save parent to Google Sheet ────────────────────────────
     await fetch(SHEET_URL, {
       method:"POST", mode:"no-cors",
       headers:{"Content-Type":"text/plain"},
@@ -3142,7 +3258,10 @@ async function assignStudentToClass(btn) {
 
   btn.textContent = "✅ Done";
   btn.style.background = "linear-gradient(135deg,#065f46,#10b981)";
-  showToast("✅ " + childName + " assigned to Grade " + chosenGrade + " · Parent added to roster");
+  const moveMsg = oldGrade && oldGrade !== chosenGrade ? " (moved from Grade " + oldGrade + ")" : "";
+  showToast("✅ " + childName + " → Grade " + chosenGrade + moveMsg + " · Parent roster updated");
+  // Reload list to show updated assigned status
+  setTimeout(() => loadMasterStudentList(), 800);
 }
 
 async function loadArchivesFromSheet() {
