@@ -1680,20 +1680,9 @@ async function verifyAdmin() {
     });
     if (gradeMatch !== null) {
       await loginAdmin("gradeadmin", gradeMatch);
-    } else {
-      // Check custom admin users from localStorage
-      const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
-      const found = adminUsers.find(u => u.pw === pw);
-      if (found) {
-        if (found.role === "admin") {
-          await loginAdmin("admin", null);
-        } else if (found.role === "gradeadmin") {
-          const g = Number(found.grade);
-          await loginAdmin("gradeadmin", g);
-        }
-      } else if (pw === ADVOCATE_PASSWORD) {
-        document.getElementById("adminLogin").style.display = "none";
-        document.getElementById("advocateDash").style.display = "block";
+    } else if (pw === ADVOCATE_PASSWORD) {
+      document.getElementById("adminLogin").style.display = "none";
+      document.getElementById("advocateDash").style.display = "block";
       document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">⏳ Loading data from server...</div>`;
       await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
       await renderAdvocateDash();
@@ -1710,17 +1699,28 @@ async function verifyAdmin() {
       document.getElementById("adminLogin").style.display = "none";
       showRollCallDash(9);
     } else {
-      // Check custom roll call passwords for any grade not in defaults
-      let rcGradeMatch = null;
-      Object.keys(customPws).filter(k => k.startsWith("rollcall_")).forEach(k => {
-        if (customPws[k] === pw) rcGradeMatch = Number(k.replace("rollcall_",""));
-      });
-      if (rcGradeMatch) {
-        document.getElementById("adminLogin").style.display = "none";
-        showRollCallDash(rcGradeMatch);
-        return;
+      // Check custom admin users
+      const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
+      const found = adminUsers.find(u => u.pw === pw);
+      if (found) {
+        if (found.role === "admin") {
+          await loginAdmin("admin", null);
+        } else if (found.role === "gradeadmin") {
+          await loginAdmin("gradeadmin", Number(found.grade));
+        }
+      } else {
+        // Check custom roll call passwords
+        let rcGradeMatch = null;
+        Object.keys(customPws).filter(k => k.startsWith("rollcall_")).forEach(k => {
+          if (customPws[k] === pw) rcGradeMatch = Number(k.replace("rollcall_",""));
+        });
+        if (rcGradeMatch) {
+          document.getElementById("adminLogin").style.display = "none";
+          showRollCallDash(rcGradeMatch);
+        } else {
+          document.getElementById("adminError").style.display = "block";
+        }
       }
-      document.getElementById("adminError").style.display = "block";
     }
   }
 }
@@ -5680,7 +5680,6 @@ function markRollCall(childName, date, isPresent) {
   saveRollCallEntry(date, childName, isPresent ? null : "present");
   renderRollCallScreen();
   if (!isPresent) showToast("✅ " + childName + " marked present!");
-}
 }
 </script>
 
