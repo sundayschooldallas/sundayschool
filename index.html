@@ -3210,94 +3210,112 @@ async function unassignStudentFromMaster(phone, name, parentName) {
 }
 
 async function assignStudentToClass(btn) {
-  // Get grade from the linked select element
   const selId = btn.dataset.selid;
   const select = selId ? document.getElementById(selId) : null;
-  const chosenGrade = select ? Number(select.value) : Number(btn.dataset.oldgrade);
+  const chosenGrade = select ? Number(select.value) : 0;
   const oldGrade = Number(btn.dataset.oldgrade) || 0;
-  const phone = btn.dataset.phone;
-  const childName = btn.dataset.name;
-  const parentName = btn.dataset.parent;
+  const phone = (btn.dataset.phone || "").trim();
+  const childName = (btn.dataset.name || "").trim();
+  const parentName = (btn.dataset.parent || "").trim();
 
-  if (!chosenGrade) { showToast("⚠️ Please select a grade first"); return; }
-  if (!childName)   { showToast("⚠️ No student name found"); return; }
+  if (!chosenGrade || chosenGrade < 1) { showToast("⚠️ Please select a grade from the dropdown first"); return; }
+  if (!childName) { showToast("⚠️ No student name found"); return; }
 
   const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
   const teacher = customTeachersLocal[chosenGrade] || TEACHERS[chosenGrade] || "";
+  const norm = phone ? String(phone).replace(/\D/g,"").slice(-10) : "";
+  const phoneKey = norm || childName.replace(/[^a-zA-Z0-9]/g,"_");
 
-  btn.textContent = "⏳...";
+  btn.textContent = "⏳ Saving...";
   btn.disabled = true;
 
-  // ── 1. Save child info to Google Sheet ────────────────────────────
-  await fetch(SHEET_URL, {
-    method:"POST", mode:"no-cors",
-    headers:{"Content-Type":"text/plain"},
-    body: JSON.stringify({
-      type:"childInfo", phone: phone||childName,
-      parentName, childName, grade: chosenGrade,
-      teacher, unassigned:false, graduated:false
-    })
-  }).catch(()=>{});
+  let sheetOk = false;
 
-  // ── 2. Save to localStorage ───────────────────────────────────────
-  const ciKey = "childInfo__" + (phone||childName.replace(/\s/g,"_"));
+  // ── Save to Google Sheet with cors so we can confirm ──────────────
+  try {
+    const res = await fetch(SHEET_URL, {
+      method: "POST",
+      mode: "cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        type: "childInfo",
+        phone: norm || childName,
+        parentName, childName,
+        grade: chosenGrade,
+        teacher,
+        unassigned: false,
+        graduated: false
+      })
+    });
+    const result = await res.json();
+    sheetOk = result.ok === true;
+    console.log("childInfo save:", result);
+  } catch(e) {
+    console.warn("Sheet save failed, saving locally only:", e);
+  }
+
+  // ── Always save to localStorage regardless ────────────────────────
+  const ciKey = "childInfo__" + phoneKey;
   localStorage.setItem(ciKey, JSON.stringify({
     name: childName, grade: chosenGrade,
-    teacher, parentName, unassigned:false, graduated:false
+    teacher, parentName,
+    unassigned: false, graduated: false
   }));
 
-  // ── 3. Remove parent from OLD grade roster if moving ────────────────
-  if (oldGrade && oldGrade !== chosenGrade && phone) {
-    const norm = String(phone).replace(/\D/g,"").slice(-10);
+  // Also update childrenSheetData in memory immediately
+  const existing = childrenSheetData.find(r =>
+    (norm && String(r.phone) === norm) ||
+    (r.name && r.name.toLowerCase() === childName.toLowerCase())
+  );
+  if (existing) {
+    existing.grade = chosenGrade;
+    existing.teacher = teacher;
+    existing.unassigned = false;
+  }
+
+  // ── Remove from old grade roster if moving ────────────────────────
+  if (oldGrade && oldGrade !== chosenGrade && norm) {
     const oldPrefix = "G" + oldGrade + "-";
-    roster.forEach(week => {
-      if (week.date.startsWith(oldPrefix)) {
-        week.parents = week.parents.filter(p => p.h !== norm);
-      }
+    roster.forEach(w => {
+      if (w.date.startsWith(oldPrefix)) w.parents = w.parents.filter(p => p.h !== norm);
     });
     roster.splice(0, roster.length, ...roster.filter(w => w.parents.length > 0));
   }
 
-  // ── 4. Add parent to roster if not already there ──────────────────
-  if (parentName && phone) {
-    const norm = String(phone).replace(/\D/g,"").slice(-10);
-    const encoded = btoa("+1" + norm);
-
-    // Generate PIN
+  // ── Add parent to grade roster ────────────────────────────────────
+  if (parentName) {
+    const encoded = norm ? btoa("+1" + norm) : btoa(parentName);
     const usedPins = new Set(roster.flatMap(w => w.parents.map(p => p.pin)));
     let newPin = "";
-    while (!newPin || usedPins.has(newPin)) { newPin = String(Math.floor(1000 + Math.random() * 9000)); }
-
-    const newParent = { name: parentName, h: norm, e: encoded, pin: newPin };
-
-    // Add to grade-specific roster slot
-    const gradePrefix = "G" + chosenGrade + "-";
-    let gradeWeek = roster.find(w => w.date.startsWith(gradePrefix) && w.parents.length < 2);
-    if (gradeWeek) {
-      if (!gradeWeek.parents.find(p => p.h === norm)) gradeWeek.parents.push(newParent);
-    } else {
-      const slotNum = roster.filter(w => w.date.startsWith(gradePrefix)).length + 1;
-      const slotDate = gradePrefix + "Slot" + slotNum;
-      roster.push({ date: slotDate, parents: [newParent] });
+    while (!newPin || usedPins.has(newPin)) {
+      newPin = String(Math.floor(1000 + Math.random() * 9000));
     }
-
-    // ── 5. Save parent to Google Sheet ────────────────────────────
-    await fetch(SHEET_URL, {
-      method:"POST", mode:"no-cors",
-      headers:{"Content-Type":"text/plain"},
-      body: JSON.stringify({
-        type:"newParent", name:parentName, phone:norm,
-        h:norm, e:encoded, pin:newPin, date:"assigned"
-      })
-    }).catch(()=>{});
+    const newParent = { name: parentName, h: norm || parentName, e: encoded, pin: newPin };
+    const gradePrefix = "G" + chosenGrade + "-";
+    const alreadyInRoster = roster.some(w => w.parents.some(p => p.h === newParent.h));
+    if (!alreadyInRoster) {
+      let gradeWeek = roster.find(w => w.date.startsWith(gradePrefix) && w.parents.length < 2);
+      if (gradeWeek) {
+        gradeWeek.parents.push(newParent);
+      } else {
+        const slotNum = roster.filter(w => w.date.startsWith(gradePrefix)).length + 1;
+        roster.push({ date: gradePrefix + "Slot" + slotNum, parents: [newParent] });
+      }
+      // Save parent to sheet
+      fetch(SHEET_URL, {
+        method: "POST", mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ type:"newParent", name:parentName, phone:norm, h:norm||parentName, e:encoded, pin:newPin, date:"assigned" })
+      }).catch(()=>{});
+    }
   }
 
   btn.textContent = "✅ Done";
   btn.style.background = "linear-gradient(135deg,#065f46,#10b981)";
-  const moveMsg = oldGrade && oldGrade !== chosenGrade ? " (moved from Grade " + oldGrade + ")" : "";
-  showToast("✅ " + childName + " → Grade " + chosenGrade + moveMsg + " · Parent roster updated");
-  // Reload list to show updated assigned status
-  setTimeout(() => loadMasterStudentList(), 800);
+  btn.disabled = false;
+  const moveMsg = oldGrade && oldGrade !== chosenGrade ? " moved from Grade " + oldGrade : "";
+  showToast("✅ " + childName + " → Grade " + chosenGrade + (moveMsg ? " (" + moveMsg + ")" : "") + (sheetOk ? " · Saved to Sheets ✓" : " · Saved locally"));
+  setTimeout(() => loadMasterStudentList(), 1000);
 }
 
 async function loadArchivesFromSheet() {
