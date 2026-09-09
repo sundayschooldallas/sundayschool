@@ -3001,21 +3001,30 @@ async function clearAllClassAssignments() {
     console.error("clearAllGrades error:", e);
   }
 
-  // Clear localStorage childInfo
+  // Aggressively clear ALL localStorage keys that could hold student/grade data
   const keysToRemove = [];
-  for (let i = 0; i < localStorage.length; i++) {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
     const k = localStorage.key(i);
-    if (k && k.startsWith("childInfo__")) keysToRemove.push(k);
+    if (!k) continue;
+    if (
+      k.startsWith("childInfo__") ||
+      k.startsWith("tracker__") ||
+      k.startsWith("rollcall__") ||
+      k.startsWith("gradeSwap_") ||
+      k === "childrenData" ||
+      k === "rosterData"
+    ) keysToRemove.push(k);
   }
   keysToRemove.forEach(k => localStorage.removeItem(k));
+  console.log("Cleared localStorage keys:", keysToRemove.length);
 
-  // Clear in-memory data
-  childrenSheetData.forEach(r => { r.grade = 0; r.teacher = ""; r.unassigned = true; });
+  // Clear ALL in-memory data
+  childrenSheetData.length = 0;
   roster.length = 0;
 
-  showToast("✅ All assignments cleared. Ready to reassign.");
-  // Wait a moment then reload to confirm
-  setTimeout(() => loadMasterStudentList(), 1000);
+  showToast("✅ All assignments cleared — " + keysToRemove.length + " local records removed. Reloading...");
+  // Wait then reload fresh from sheet
+  setTimeout(() => loadMasterStudentList(), 1500);
 }
 
 async function loadMasterStudentList() {
@@ -3041,7 +3050,9 @@ async function loadMasterStudentList() {
       if (!row.name && !row.childName) return;
       const name = row.name || row.childName || "";
       const g = Number(row.grade);
-      if (!g || isNaN(g)) { ungraded.push({...row, name}); return; }
+      // Treat 0, NaN, null, blank, "graduated" as ungraded
+      const isAssigned = g && !isNaN(g) && g > 0 && !row.graduated && !row.unassigned;
+      if (!isAssigned) { ungraded.push({...row, name, grade:0}); return; }
       if (!byGrade[g]) byGrade[g] = [];
       byGrade[g].push({...row, name});
     });
