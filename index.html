@@ -4558,13 +4558,12 @@ function renderClassesTab() {
   });
 
   // ── PRIMARY SOURCE: Load directly from childrenSheetData ──────────
-  // This ensures students show even if their parent is not yet in the roster
+  // Shows ALL grades — edit rights controlled by isMyGrade()
   childrenSheetData.forEach(row => {
     const childName = row.name || row.childName || "";
     const parentName = row.parentName || "";
     const g = Number(row.grade);
     if (!childName || !g || g < 1 || row.graduated || row.unassigned) return;
-    if (adminGrade && g !== adminGrade) return;
     const seenKey = childName.toLowerCase();
     if (seen.has(seenKey)) return;
     seen.add(seenKey);
@@ -4574,17 +4573,15 @@ function renderClassesTab() {
     allGrades[g].push(entry);
   });
 
-  // ── SECONDARY SOURCE: Also check roster parents for any not in sheet ──
+  // ── SECONDARY SOURCE: Roster parents not yet in sheet data ────────
   roster.forEach(week => {
     week.parents.forEach(p => {
-      if (seen.has(p.name.toLowerCase())) return;
       const ci = fullChildMap[p.name];
       if (!ci || !ci.name) {
         if (!adminGrade) pending.push({ parent: p.name, h: p.h });
         return;
       }
       const g = Number(ci.grade);
-      if (adminGrade && g !== adminGrade) return;
       const seenKey = ci.name.toLowerCase();
       if (seen.has(seenKey)) return;
       seen.add(seenKey);
