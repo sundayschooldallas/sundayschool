@@ -3297,8 +3297,51 @@ function updateStudentName(inputId, oldName, parentName, phone) {
   loadChildrenFromSheet().then(() => renderStudentsTab()).catch(() => renderStudentsTab());
 }
 
+function clearAllRosterData() {
+  if (!confirm("🗑️ Clear ALL roster data?\n\nThis will remove all parent duty assignments from both the app and Google Sheets.\n\nThis cannot be undone. Are you sure?")) return;
+
+  // Clear local roster array
+  roster.length = 0;
+
+  // Clear all localStorage roster/status keys
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith("status__") || k.startsWith("rollcall__") || k === "roster")) {
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // Clear Google Sheet roster
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "clearRoster" })
+  }).catch(() => {});
+
+  showToast("✅ Roster cleared. Ready for new parent assignments.");
+  renderAttendanceTab(false, false);
+}
+
 function renderAttendanceTab(isSunday, isPastCheck) {
   let html = "";
+
+  // ── Clear Roster button for admin/superadmin ───────────────────────────
+  if (adminRole === "superadmin" || adminRole === "admin") {
+    html += `<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,0,0,0.2);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:13px;font-weight:800;color:white;">🗑️ Clear All Roster Data</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">Wipes all parent duty assignments for a fresh start</div>
+      </div>
+      <button onclick="clearAllRosterData()"
+        style="padding:8px 14px;background:linear-gradient(135deg,#991b1b,#ef4444);border:none;border-radius:8px;
+        font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+        🗑️ Clear Roster
+      </button>
+    </div>`;
+  }
+
   const todayWeeks = getTodayRosterWeeks();
   if (isSunday && isPastCheck && todayWeeks.length > 0) {
     const noShows = [];
