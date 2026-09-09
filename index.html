@@ -2396,6 +2396,28 @@ function renderSuperAdminTab() {
         </div>`).join("")}
     </div>`;
 
+  // ── Append Master Student List section ──────────────────────────────
+  const masterDiv = document.createElement("div");
+  masterDiv.style.cssText = "background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px 16px;margin-bottom:14px;";
+  masterDiv.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div>
+        <div style="font-size:14px;font-weight:900;color:white;">📋 Master Student List</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">Load all students from Google Sheets and assign them to their classes</div>
+      </div>
+      <button onclick="loadMasterStudentList()"
+        style="padding:10px 16px;background:linear-gradient(135deg,#0a5260,#0d7a8a);border:none;border-radius:10px;
+        font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:white;cursor:pointer;">
+        📥 Load Students
+      </button>
+    </div>
+    <div id="masterStudentListContent">
+      <div style="text-align:center;padding:16px;color:rgba(255,255,255,0.35);font-size:12px;">
+        Tap Load Students to pull all students from Google Sheets
+      </div>
+    </div>`;
+  el.appendChild(masterDiv);
+
   // ── Append Archives section via DOM (outside the template) ──────────
   const archDiv = document.createElement("div");
   archDiv.style.cssText = "background:rgba(34,197,94,0.1);border:2px solid rgba(34,197,94,0.35);border-radius:14px;padding:14px 16px;margin-bottom:14px;margin-top:14px;";
@@ -2950,6 +2972,178 @@ function runAnnualPromotion() {
 
 // ── Render Archives Tab ───────────────────────────────────────────────────
 function buildArchiveContent() { renderSuperAdminTab(); }
+
+// ── MASTER STUDENT LIST ───────────────────────────────────────────────────
+async function loadMasterStudentList() {
+  const container = document.getElementById("masterStudentListContent");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.5);font-size:13px;">⏳ Loading from Google Sheets...</div>`;
+
+  try {
+    const res = await fetch(SHEET_URL + "?type=children&nocache=" + Date.now(), { mode:"cors" });
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      container.innerHTML = `<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.4);font-size:13px;">No students found in Google Sheets Children tab.</div>`;
+      return;
+    }
+
+    const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+    const allGradeNums = Object.keys({...TEACHERS, ...customTeachersLocal}).map(Number).sort();
+
+    // Group by grade
+    const byGrade = {};
+    const ungraded = [];
+    data.forEach(row => {
+      if (!row.name && !row.childName) return;
+      const name = row.name || row.childName || "";
+      const g = Number(row.grade);
+      if (!g || isNaN(g)) { ungraded.push({...row, name}); return; }
+      if (!byGrade[g]) byGrade[g] = [];
+      byGrade[g].push({...row, name});
+    });
+
+    let html = `<div style="font-size:12px;color:#7effd4;font-weight:800;margin-bottom:12px;">
+      ✅ ${data.length} student${data.length!==1?"s":""} found · Tap ➕ to assign to class and add parent
+    </div>`;
+
+    // Show ungraded first
+    if (ungraded.length > 0) {
+      html += `<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:800;color:#f87171;margin-bottom:8px;">⚠️ ${ungraded.length} student${ungraded.length!==1?"s":""} with no grade assigned</div>`;
+      ungraded.forEach(s => {
+        html += renderMasterStudentRow(s, allGradeNums, 0);
+      });
+      html += `</div>`;
+    }
+
+    // Show by grade
+    allGradeNums.forEach(g => {
+      const students = byGrade[g] || [];
+      const teacher = customTeachersLocal[g] || TEACHERS[g] || "";
+      const col = getGradeColor(g);
+      html += `<div style="margin-bottom:12px;">
+        <div style="background:${col};border-radius:10px 10px 0 0;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:13px;font-weight:900;color:white;">Grade ${g} · ${students.length} student${students.length!==1?"s":""}</div>
+          ${teacher ? `<div style="font-size:11px;color:rgba(255,255,255,0.8);">👩‍🏫 ${teacher}</div>` : ""}
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border-radius:0 0 10px 10px;overflow:hidden;">`;
+      if (students.length === 0) {
+        html += `<div style="padding:12px 14px;font-size:12px;color:rgba(255,255,255,0.35);">No students in this grade yet</div>`;
+      } else {
+        students.forEach(s => { html += renderMasterStudentRow(s, allGradeNums, g); });
+      }
+      html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
+  } catch(err) {
+    container.innerHTML = `<div style="text-align:center;padding:20px;color:#f87171;font-size:13px;">❌ Failed to load: ${err.message}</div>`;
+  }
+}
+
+function renderMasterStudentRow(s, allGradeNums, currentGrade) {
+  const name = s.name || s.childName || "Unknown";
+  const parentName = s.parentName || "";
+  const phone = s.phone || "";
+  const gradeOptions = allGradeNums.map(g =>
+    `<option value="${g}" ${g === currentGrade ? "selected" : ""}>Grade ${g}</option>`
+  ).join("");
+
+  return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:0.5px solid rgba(255,255,255,0.08);flex-wrap:wrap;">
+    <div style="flex:1;min-width:120px;">
+      <div style="font-size:14px;font-weight:800;color:white;">${name}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);">Parent: ${parentName||"—"} ${phone ? "· +1"+phone : ""}</div>
+    </div>
+    <select onchange="this.dataset.grade=this.value"
+      data-grade="${currentGrade}" data-phone="${phone}" data-name="${name}" data-parent="${parentName}"
+      style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);
+      color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;outline:none;">
+      ${gradeOptions}
+    </select>
+    <button onclick="assignStudentToClass(this)"
+      data-phone="${phone}" data-name="${name.replace(/'/g,"&#39;")}" data-parent="${parentName.replace(/'/g,"&#39;")}"
+      data-grade="${currentGrade}"
+      style="padding:8px 14px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:8px;
+      font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;white-space:nowrap;">
+      ➕ Assign
+    </button>
+  </div>`;
+}
+
+async function assignStudentToClass(btn) {
+  // Get the select element sibling to get chosen grade
+  const row = btn.closest ? btn.closest("div[style]") : btn.parentElement;
+  const select = row ? row.querySelector("select") : null;
+  const chosenGrade = select ? Number(select.value) : Number(btn.dataset.grade);
+  const phone = btn.dataset.phone;
+  const childName = btn.dataset.name;
+  const parentName = btn.dataset.parent;
+
+  if (!chosenGrade) { showToast("⚠️ Please select a grade first"); return; }
+  if (!childName)   { showToast("⚠️ No student name found"); return; }
+
+  const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const teacher = customTeachersLocal[chosenGrade] || TEACHERS[chosenGrade] || "";
+
+  btn.textContent = "⏳...";
+  btn.disabled = true;
+
+  // ── 1. Save child info to Google Sheet ────────────────────────────
+  await fetch(SHEET_URL, {
+    method:"POST", mode:"no-cors",
+    headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({
+      type:"childInfo", phone: phone||childName,
+      parentName, childName, grade: chosenGrade,
+      teacher, unassigned:false, graduated:false
+    })
+  }).catch(()=>{});
+
+  // ── 2. Save to localStorage ───────────────────────────────────────
+  const ciKey = "childInfo__" + (phone||childName.replace(/\s/g,"_"));
+  localStorage.setItem(ciKey, JSON.stringify({
+    name: childName, grade: chosenGrade,
+    teacher, parentName, unassigned:false, graduated:false
+  }));
+
+  // ── 3. Add parent to roster if not already there ──────────────────
+  if (parentName && phone) {
+    const norm = String(phone).replace(/\D/g,"").slice(-10);
+    const encoded = btoa("+1" + norm);
+
+    // Generate PIN
+    const usedPins = new Set(roster.flatMap(w => w.parents.map(p => p.pin)));
+    let newPin = "";
+    while (!newPin || usedPins.has(newPin)) { newPin = String(Math.floor(1000 + Math.random() * 9000)); }
+
+    const newParent = { name: parentName, h: norm, e: encoded, pin: newPin };
+
+    // Add to grade-specific roster slot
+    const gradePrefix = "G" + chosenGrade + "-";
+    let gradeWeek = roster.find(w => w.date.startsWith(gradePrefix) && w.parents.length < 2);
+    if (gradeWeek) {
+      if (!gradeWeek.parents.find(p => p.h === norm)) gradeWeek.parents.push(newParent);
+    } else {
+      const slotNum = roster.filter(w => w.date.startsWith(gradePrefix)).length + 1;
+      const slotDate = gradePrefix + "Slot" + slotNum;
+      roster.push({ date: slotDate, parents: [newParent] });
+    }
+
+    // ── 4. Save parent to Google Sheet ────────────────────────────
+    await fetch(SHEET_URL, {
+      method:"POST", mode:"no-cors",
+      headers:{"Content-Type":"text/plain"},
+      body: JSON.stringify({
+        type:"newParent", name:parentName, phone:norm,
+        h:norm, e:encoded, pin:newPin, date:"assigned"
+      })
+    }).catch(()=>{});
+  }
+
+  btn.textContent = "✅ Done";
+  btn.style.background = "linear-gradient(135deg,#065f46,#10b981)";
+  showToast("✅ " + childName + " assigned to Grade " + chosenGrade + " · Parent added to roster");
+}
 
 async function loadArchivesFromSheet() {
   const container = document.getElementById("archivesTabContent");
