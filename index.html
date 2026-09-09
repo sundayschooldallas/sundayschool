@@ -2981,10 +2981,37 @@ function runAnnualPromotion() {
 function buildArchiveContent() { renderSuperAdminTab(); }
 
 // ── MASTER STUDENT LIST ───────────────────────────────────────────────────
-function clearAllClassAssignments() {
-  if (!confirm("🗑️ Clear ALL class assignments?\n\nThis removes all students from their classes and clears the volunteer roster.\n\nStudent data stays in Google Sheets — you can reassign anytime.\n\nAre you sure?")) return;
+async function clearAllClassAssignments() {
+  if (!confirm("🗑️ Clear ALL class assignments?\n\nThis sets all students back to grade 0 in Google Sheets and clears the volunteer roster.\n\nYou can reassign everyone anytime.\n\nAre you sure?")) return;
 
-  // Clear all childInfo__ from localStorage
+  const container = document.getElementById("masterStudentListContent");
+  if (container) container.innerHTML = `<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.5);font-size:13px;">⏳ Clearing all assignments in Google Sheets...</div>`;
+
+  // 1. Get all students from sheet
+  let allStudents = [];
+  try {
+    const res = await fetch(SHEET_URL + "?type=children&nocache=" + Date.now(), { mode:"cors" });
+    allStudents = await res.json();
+  } catch(e) {}
+
+  // 2. Reset every student to grade 0 in the sheet
+  const promises = allStudents.map(s => {
+    if (!s.phone && !s.name) return Promise.resolve();
+    return fetch(SHEET_URL, {
+      method:"POST", mode:"no-cors",
+      headers:{"Content-Type":"text/plain"},
+      body: JSON.stringify({
+        type:"childInfo",
+        phone: s.phone || s.name,
+        parentName: s.parentName || "",
+        childName: s.name || s.childName || "",
+        grade: 0, teacher:"", unassigned:true, graduated:false
+      })
+    }).catch(()=>{});
+  });
+  await Promise.all(promises);
+
+  // 3. Clear localStorage childInfo
   const keysToRemove = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
@@ -2992,14 +3019,17 @@ function clearAllClassAssignments() {
   }
   keysToRemove.forEach(k => localStorage.removeItem(k));
 
-  // Clear roster
+  // 4. Clear in-memory childrenSheetData grades
+  childrenSheetData.forEach(r => { r.grade = 0; r.teacher = ""; r.unassigned = true; });
+
+  // 5. Clear roster
   roster.length = 0;
 
-  // Clear Google Sheet roster
-  fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
+  // 6. Clear Google Sheet roster
+  await fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
     body: JSON.stringify({ type:"clearRoster" }) }).catch(()=>{});
 
-  showToast("✅ All assignments cleared. Ready to reassign.");
+  showToast("✅ All assignments cleared in Google Sheets. Ready to reassign.");
   loadMasterStudentList();
 }
 
