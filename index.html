@@ -3124,11 +3124,15 @@ function renderMasterStudentRow(s, allGradeNums, currentGrade) {
   const parentName = s.parentName || "";
   const phone = s.phone || "";
   const assigned = currentGrade > 0;
-  // Fallback to default grades if allGradeNums is empty
-  const gradeList = (allGradeNums && allGradeNums.length > 0) ? allGradeNums : [6,7,8,9];
+  // Always get grades fresh from TEACHERS constant + customTeachers
+  const _ct = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const _grades = [...new Set([
+    ...Object.keys(window.TEACHERS || {6:1,7:1,8:1,9:1}).map(Number),
+    ...Object.keys(_ct).map(Number)
+  ])].filter(g => g > 0).sort((a,b) => a-b);
   const gradeOptions = [
     `<option value="0">— Select Grade —</option>`,
-    ...gradeList.map(g =>
+    ..._grades.map(g =>
       `<option value="${g}" ${g === currentGrade ? "selected" : ""}>Grade ${g}</option>`)
   ].join("");
 
