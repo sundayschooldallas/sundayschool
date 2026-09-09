@@ -967,6 +967,46 @@ function seedMultiYearCalendars(grades, yearsAhead) {
 }
 let selectedGrade = null;
 
+// ── Generate real dated Sundays (with year) for N school years ahead ─────
+function generateSundaysWithYear(startYear, yearsAhead) {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const start = getPromotionSunday(startYear);
+  const end = new Date(startYear + yearsAhead, 7, 31);
+  const out = [];
+  const d = new Date(start);
+  while (d <= end) {
+    if (d.getDay() === 0) out.push(months[d.getMonth()] + " " + d.getDate() + " " + d.getFullYear());
+    d.setDate(d.getDate() + 7);
+  }
+  return out;
+}
+
+// ── Find the next real, unclaimed Sunday for a grade instead of a fake "SlotN" ──
+// 1) Prefer a real calendar date that already has a roster week with 0 parents.
+// 2) Otherwise, take the next real Sunday that has no roster week yet and create it.
+// 3) Last resort: any existing slot for this grade with room for a partner.
+function findNextOpenGradeDate(grade) {
+  const prefix = "G" + grade + "-";
+  const currentYear = new Date().getFullYear();
+  const candidates = generateSundaysWithYear(currentYear, 2);
+
+  const existing = {};
+  roster.forEach(w => { if (w.date.startsWith(prefix)) existing[w.date.slice(prefix.length)] = w; });
+
+  for (const d of candidates) {
+    const w = existing[d];
+    if (w && w.parents.length === 0) return w;
+  }
+  for (const d of candidates) {
+    if (!existing[d]) {
+      const w = { date: prefix + d, parents: [] };
+      roster.push(w);
+      return w;
+    }
+  }
+  return roster.find(w => w.date.startsWith(prefix) && w.parents.length < 2) || null;
+}
+
 let pendingChildren = []; // stores multiple children before saving
 
 function selectGrade(grade) {
@@ -3368,9 +3408,11 @@ async function assignStudentToClass(btn) {
     const alreadyInRoster = roster.some(w => w.parents.some(p => p.h === newParent.h));
     if (!alreadyInRoster) {
       let gradeWeek = roster.find(w => w.date.startsWith(gradePrefix) && w.parents.length < 2);
+      if (!gradeWeek) gradeWeek = findNextOpenGradeDate(chosenGrade);
       if (gradeWeek) {
         gradeWeek.parents.push(newParent);
       } else {
+        // Absolute last resort — no calendar seeded for this grade at all
         const slotNum = roster.filter(w => w.date.startsWith(gradePrefix)).length + 1;
         roster.push({ date: gradePrefix + "Slot" + slotNum, parents: [newParent] });
       }
@@ -4464,17 +4506,24 @@ function addNewParent() {
   if (dateChoice === "auto") {
     if (adminGrade) {
       // Grade admin — find a slot that has < 2 parents from THIS grade only
-      // or create a brand new grade-specific date
+      // or use the next real, unclaimed Sunday on this grade's calendar
       const gradePrefix = "G" + adminGrade + "-";
       let gradeWeek = roster.find(w => w.date.startsWith(gradePrefix) && w.parents.length < 2);
       if (gradeWeek) {
         gradeWeek.parents.push(newParent);
         assignedDate = gradeWeek.date;
       } else {
-        // Create new slot for this grade
-        const slotNum = roster.filter(w => w.date.startsWith(gradePrefix)).length + 1;
-        assignedDate = gradePrefix + "Slot" + slotNum;
-        roster.push({ date: assignedDate, parents: [newParent] });
+        // Find the next real, unclaimed calendar date for this grade
+        const openWeek = findNextOpenGradeDate(adminGrade);
+        if (openWeek) {
+          openWeek.parents.push(newParent);
+          assignedDate = openWeek.date;
+        } else {
+          // Absolute last resort — no calendar seeded for this grade at all
+          const slotNum = roster.filter(w => w.date.startsWith(gradePrefix)).length + 1;
+          assignedDate = gradePrefix + "Slot" + slotNum;
+          roster.push({ date: assignedDate, parents: [newParent] });
+        }
       }
     } else {
       // Regular admin — find first date with < 2 parents
