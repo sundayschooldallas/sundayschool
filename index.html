@@ -2724,6 +2724,28 @@ function deleteClass(grade) {
   renderClassesTab();
 }
 
+async function debugLoadSheet() {
+  const debugEl = document.getElementById("debugSheetData");
+  if (debugEl) debugEl.innerHTML = "⏳ Loading...";
+  try {
+    const res = await fetch(SHEET_URL + "?type=children&nocache=" + Date.now(), { mode:"cors" });
+    const data = await res.json();
+    console.log("RAW sheet data:", data);
+    if (debugEl) {
+      debugEl.innerHTML = data.slice(0,10).map(r =>
+        `phone:${r.phone} | name:${r.name} | grade:${r.grade} | parent:${r.parentName} | unassigned:${r.unassigned}`
+      ).join("<br>");
+    }
+    // Update childrenSheetData with fresh data
+    childrenSheetData = adminGrade
+      ? data.filter(r => Number(r.grade) === adminGrade)
+      : data;
+    renderStudentsTab();
+  } catch(e) {
+    if (debugEl) debugEl.innerHTML = "Error: " + e.message;
+  }
+}
+
 function renderStudentsTab() {
   const el = document.getElementById("tabStudentsContent");
   if (!el) return;
@@ -2751,8 +2773,29 @@ function renderStudentsTab() {
 
   all.sort((a,b) => (a.grade||0) - (b.grade||0) || a.childName.localeCompare(b.childName));
 
+  // Debug: show what we loaded
+  console.log("renderStudentsTab — adminGrade:", adminGrade, "childrenSheetData count:", childrenSheetData.length, "all:", all.length);
+  childrenSheetData.slice(0,5).forEach(r => console.log("  sheet row:", JSON.stringify(r)));
+
   if (all.length === 0) {
-    el.innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">No students registered yet.</div>`;
+    el.innerHTML = `
+      <div style="text-align:center;padding:20px;color:#7b7a90;font-size:14px;font-weight:700;">No students found for Grade ${adminGrade||"all"}.</div>
+      <div style="background:#f0f9ff;border-radius:12px;padding:14px;margin:10px 0;">
+        <div style="font-size:12px;font-weight:800;color:#0a5260;margin-bottom:8px;">🔍 Debug — Raw Sheet Data (first 5 rows):</div>
+        <div id="debugSheetData" style="font-size:11px;color:#333;font-family:monospace;"></div>
+        <button onclick="debugLoadSheet()" style="margin-top:10px;padding:8px 14px;background:#0a5260;color:white;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">
+          🔄 Reload & Debug
+        </button>
+      </div>`;
+    // Show raw data
+    const debugEl = document.getElementById("debugSheetData");
+    if (debugEl) {
+      debugEl.innerHTML = childrenSheetData.length === 0
+        ? "No data loaded from sheet yet."
+        : childrenSheetData.slice(0,8).map(r =>
+            `phone:${r.phone} | name:${r.name||r.childName} | grade:${r.grade} | parent:${r.parentName}`
+          ).join("<br>");
+    }
     return;
   }
 
