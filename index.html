@@ -3440,7 +3440,7 @@ function removeTeacherFromClass(grade, idx) {
   renderClassesTab();
 }
 
-function addNewGrade() {
+async function addNewGrade() {
   const gradeNum = parseInt(document.getElementById("newGradeNum").value);
   const teacherName = document.getElementById("newGradeTeacher").value.trim();
   const password = document.getElementById("newGradePassword").value.trim();
@@ -3465,14 +3465,24 @@ function addNewGrade() {
   // Also add to GRADE_ADMIN_PASSWORDS so login works immediately
   GRADE_ADMIN_PASSWORDS[gradeNum] = finalPw;
 
-  // Persist to Google Sheets so this class shows up on every device, not just this one
-  fetch(SHEET_URL, {
-    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify({
-      type: "saveClass", grade: gradeNum, teacher: teacherName,
-      adminPassword: finalPw, rollcallPassword: finalPw + "RC"
-    })
-  }).catch(() => {});
+  // Persist to Google Sheets so this class shows up on every device, not just this one.
+  // Readable (not no-cors) so we can capture the delete code the server generates
+  // immediately, instead of leaving it to a later refresh that could race with this call.
+  try {
+    const res = await fetch(SHEET_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        type: "saveClass", grade: gradeNum, teacher: teacherName,
+        adminPassword: finalPw, rollcallPassword: finalPw + "RC"
+      })
+    });
+    const result = await res.json();
+    if (result && result.deleteCode) {
+      const codes = JSON.parse(localStorage.getItem("classDeleteCodes") || "{}");
+      codes[gradeNum] = result.deleteCode;
+      localStorage.setItem("classDeleteCodes", JSON.stringify(codes));
+    }
+  } catch(e) { console.log("Could not save class to sheet:", e); }
 
   const result = document.getElementById("newGradeResult");
   if (result) {
