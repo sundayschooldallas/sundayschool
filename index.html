@@ -3165,22 +3165,31 @@ function getTeacherListHtml(grade, teacherStr, color) {
     const initial = t.charAt(0).toUpperCase() || "?";
     const phone = getTeacherPhone(grade, t);
     return `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f0fafc;border-radius:10px;margin-bottom:6px;">
-      <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;">${initial}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:800;color:#0a3d45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t}</div>
-        <div style="font-size:11px;color:#7b7a90;">Grade ${grade} Teacher</div>
-        <div style="font-size:11px;color:${phone ? "#0a5260" : "#bbb"};margin-top:1px;cursor:pointer;" onclick="editTeacherPhone(${grade}, ${i})">
-          📞 ${phone || "No phone on file — tap to add"}
+    <div style="background:#f0fafc;border-radius:12px;padding:10px 10px 8px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex-shrink:0;">${initial}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:800;color:#0a3d45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t}</div>
+          <div style="font-size:11px;color:#7b7a90;">Grade ${grade} Teacher</div>
         </div>
+        <button onclick="renameTeacherInClass(${grade}, ${i})"
+          style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#e0f5f7;color:#0a5260;border:1.5px solid #c0eaf0;border-radius:7px;padding:5px 9px;cursor:pointer;flex-shrink:0;">
+          ✏️
+        </button>
+        <button onclick="removeTeacherFromClass(${grade}, ${i})"
+          style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#fff0f0;color:#c0392b;border:1.5px solid #fbbcbc;border-radius:7px;padding:5px 9px;cursor:pointer;flex-shrink:0;">
+          ✕
+        </button>
       </div>
-      <button onclick="renameTeacherInClass(${grade}, ${i})"
-        style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#e0f5f7;color:#0a5260;border:1.5px solid #c0eaf0;border-radius:7px;padding:5px 9px;cursor:pointer;flex-shrink:0;">
-        ✏️
-      </button>
-      <button onclick="removeTeacherFromClass(${grade}, ${i})"
-        style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#fff0f0;color:#c0392b;border:1.5px solid #fbbcbc;border-radius:7px;padding:5px 9px;cursor:pointer;flex-shrink:0;">
-        ✕
+      <button onclick="editTeacherPhone(${grade}, ${i})"
+        style="width:100%;margin-top:8px;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;
+        border-radius:9px;display:flex;align-items:center;gap:8px;text-align:left;
+        ${phone
+          ? "background:#e0f5f7;border:1.5px solid #a8dde3;color:#0a5260;"
+          : "background:#fff8e1;border:1.5px dashed #f0c674;color:#8a6d1f;"}">
+        <span style="font-size:15px;">📞</span>
+        <span style="flex:1;">${phone || "No phone on file"}</span>
+        <span style="font-size:11px;font-weight:800;opacity:0.75;text-decoration:underline;">${phone ? "Edit" : "Tap to add"}</span>
       </button>
     </div>`;
   }).join("");
