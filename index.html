@@ -1520,6 +1520,9 @@ async function initTodayPairBanner() {
 
 let bannerOffset = 0; // 0 = current/next, 1 = 1 week back, 2 = 2 weeks back etc.
 
+// Tracks how many weeks forward each grade's row is currently showing (0 = next upcoming)
+let bannerGradeStep = {};
+
 function renderTodayPairBanner(offset) {
   const banner = document.getElementById("todayPairBanner");
   if (!banner) return;
@@ -1542,7 +1545,6 @@ function renderTodayPairBanner(offset) {
 
   const grades = getActiveGrades();
   const gradeBg = { 6:"#f5a623", 7:"#1db88a", 8:"#17b8d4", 9:"#e05c8a" };
-  const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
 
   const rows = grades.map(function(g) {
     const prefix = "G" + g + "-";
@@ -1552,28 +1554,32 @@ function renderTodayPairBanner(offset) {
       .filter(function(x){ return x.d; })
       .sort(function(a,b){ return a.d - b.d; });
 
-    const upcoming = gradeWeeks.find(function(x){ return x.d >= todayMidnight; });
-    const target = upcoming || gradeWeeks[gradeWeeks.length - 1];
+    const upcomingWeeks = gradeWeeks.filter(function(x){ return x.d >= todayMidnight; });
+    const step = bannerGradeStep[g] || 0;
+    const hasUpcoming = upcomingWeeks.length > 0;
+    const target = hasUpcoming ? upcomingWeeks[step % upcomingWeeks.length] : gradeWeeks[gradeWeeks.length - 1];
+    const isPast = !hasUpcoming && target;
+    const isNextWeek = hasUpcoming && step % upcomingWeeks.length === 1;
 
-    const rawT = customTeachersLocal[g] || TEACHERS[g] || "";
-    const teacher = rawT.split(/[,&]/)[0].trim();
     const dateLabel = target ? (months[target.d.getMonth()] + " " + target.d.getDate()) : null;
     const parents = (target && target.w.parents) ? target.w.parents : [];
     const names = parents.length > 0 ? parents.map(function(p){ return p.name; }).join(" & ") : "Not scheduled yet";
-    const isPast = target && !upcoming;
+    const canAdvance = upcomingWeeks.length > 1;
 
     return `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.07);margin-bottom:8px;">
+      <div ${canAdvance ? `onclick="bannerGradeStep['${g}']=((bannerGradeStep['${g}']||0)+1);renderTodayPairBanner();"` : ""}
+        style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.07);margin-bottom:8px;${canAdvance ? "cursor:pointer;" : ""}">
         <div style="width:6px;align-self:stretch;border-radius:4px;background:${gradeBg[g] || "#6366f1"};flex-shrink:0;"></div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.5px;">
-            Grade ${g}${teacher ? " · " + teacher : ""}${dateLabel ? " · " + dateLabel : ""}
+            Grade ${g}${dateLabel ? " · " + dateLabel : ""}${isNextWeek ? " · Next Week" : ""}
           </div>
           <div style="font-size:14px;font-weight:800;color:white;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
             ${names}
           </div>
         </div>
         ${isPast ? `<div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.4);flex-shrink:0;">PAST</div>` : ""}
+        ${canAdvance ? `<div style="font-size:16px;color:rgba(255,255,255,0.4);flex-shrink:0;">›</div>` : ""}
       </div>`;
   }).join("");
 
@@ -1582,8 +1588,9 @@ function renderTodayPairBanner(offset) {
     <div style="background:linear-gradient(135deg,#1e1b4b,#312e81,#0e7490);border-radius:20px;padding:16px;color:white;box-shadow:0 8px 32px rgba(13,11,31,0.4);border:1px solid rgba(255,255,255,0.1);">
       <div style="text-align:center;margin-bottom:12px;">
         <div style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#6366f1);color:white;font-size:11px;font-weight:900;padding:4px 14px;border-radius:20px;letter-spacing:0.5px;box-shadow:0 0 16px rgba(99,102,241,0.4);">
-          🔔 UPCOMING SUNDAY — BY CLASS
+          🔔 Parents On Duty by Class — Upcoming
         </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:6px;">Tap a class to see the week after →</div>
       </div>
       ${rows || `<div style="text-align:center;padding:14px;color:rgba(255,255,255,0.5);font-size:13px;font-weight:700;">No classes scheduled yet</div>`}
     </div>`;
