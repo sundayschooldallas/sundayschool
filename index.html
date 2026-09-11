@@ -705,6 +705,16 @@ function hideDutyBoard() {
   }
 }
 
+// Opens the full "Parent On Duty by Class" board with a specific grade already
+// selected — used when a class row in the front-page summary is tapped, so
+// even a class with nothing scheduled yet takes you somewhere useful.
+function openDutyBoardForGrade(grade) {
+  showDutyBoard("verify");
+  const sel = document.getElementById("dutyGradeSelect");
+  if (sel) sel.value = String(grade);
+  dutySelectGrade(String(grade));
+}
+
 function renderDutyBoard() {
   const now = getMockNow ? getMockNow() : new Date();
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1564,11 +1574,9 @@ function renderTodayPairBanner(offset) {
     const dateLabel = target ? (months[target.d.getMonth()] + " " + target.d.getDate()) : null;
     const parents = (target && target.w.parents) ? target.w.parents : [];
     const names = parents.length > 0 ? parents.map(function(p){ return p.name; }).join(" & ") : "Not scheduled yet";
-    const canAdvance = upcomingWeeks.length > 1;
-
     return `
-      <div ${canAdvance ? `onclick="bannerGradeStep['${g}']=((bannerGradeStep['${g}']||0)+1);renderTodayPairBanner();"` : ""}
-        style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.07);margin-bottom:8px;${canAdvance ? "cursor:pointer;" : ""}">
+      <div onclick="openDutyBoardForGrade(${g})"
+        style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.07);margin-bottom:8px;cursor:pointer;">
         <div style="width:6px;align-self:stretch;border-radius:4px;background:${gradeBg[g] || "#6366f1"};flex-shrink:0;"></div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.5px;">
@@ -1579,7 +1587,7 @@ function renderTodayPairBanner(offset) {
           </div>
         </div>
         ${isPast ? `<div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.4);flex-shrink:0;">PAST</div>` : ""}
-        ${canAdvance ? `<div style="font-size:16px;color:rgba(255,255,255,0.4);flex-shrink:0;">›</div>` : ""}
+        <div style="font-size:16px;color:rgba(255,255,255,0.4);flex-shrink:0;">›</div>
       </div>`;
   }).join("");
 
@@ -1590,7 +1598,7 @@ function renderTodayPairBanner(offset) {
         <div style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#6366f1);color:white;font-size:11px;font-weight:900;padding:4px 14px;border-radius:20px;letter-spacing:0.5px;box-shadow:0 0 16px rgba(99,102,241,0.4);">
           🔔 Parents On Duty by Class — Upcoming
         </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:6px;">Tap a class to see the week after →</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:6px;">Tap a class for its full schedule →</div>
       </div>
       ${rows || `<div style="text-align:center;padding:14px;color:rgba(255,255,255,0.5);font-size:13px;font-weight:700;">No classes scheduled yet</div>`}
     </div>`;
