@@ -3113,14 +3113,25 @@ function getTeacherListHtml(grade, teacherStr, color) {
   // teacherStr may be "Name1" or "Name1 & Name2" or "Name1, Name2"
   const teachers = teacherStr ? teacherStr.split(/[,&]/).map(t => t.trim()).filter(Boolean) : [];
   if (teachers.length === 0) return `<div style="font-size:12px;color:#bbb;padding:4px 0;">No teachers yet</div>`;
-  return teachers.map((t, i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f0fafc;border-radius:8px;margin-bottom:4px;">
-      <div style="flex:1;font-size:13px;font-weight:700;color:#0a3d45;">${t}</div>
+  return teachers.map((t, i) => {
+    const initial = t.charAt(0).toUpperCase() || "?";
+    return `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f0fafc;border-radius:10px;margin-bottom:6px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;">${initial}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:800;color:#0a3d45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t}</div>
+        <div style="font-size:11px;color:#7b7a90;">Grade ${grade} Teacher</div>
+      </div>
+      <button onclick="renameTeacherInClass(${grade}, ${i})"
+        style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#e0f5f7;color:#0a5260;border:1.5px solid #c0eaf0;border-radius:7px;padding:5px 9px;cursor:pointer;flex-shrink:0;">
+        ✏️
+      </button>
       <button onclick="removeTeacherFromClass(${grade}, ${i})"
-        style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#fff0f0;color:#c0392b;border:1.5px solid #fbbcbc;border-radius:7px;padding:4px 8px;cursor:pointer;">
+        style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#fff0f0;color:#c0392b;border:1.5px solid #fbbcbc;border-radius:7px;padding:5px 9px;cursor:pointer;flex-shrink:0;">
         ✕
       </button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 function getTeacherArray(grade) {
@@ -3135,6 +3146,33 @@ function saveTeacherArray(grade, arr) {
   customTeachers[grade] = joined;
   localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
   TEACHERS[grade] = joined;
+
+  // Keep the Sheet in sync too — this was local-only before, so a teacher
+  // rename/add/remove on one device never showed up on any other device.
+  // Passwords are re-sent unchanged so this update doesn't blank them out.
+  const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({
+      type: "saveClass", grade: grade, teacher: joined,
+      adminPassword: customPws["gradeadmin_" + grade] || GRADE_ADMIN_PASSWORDS[grade] || "",
+      rollcallPassword: customPws["rollcall_" + grade] || ""
+    })
+  }).catch(() => {});
+}
+
+function renameTeacherInClass(grade, idx) {
+  const arr = getTeacherArray(grade);
+  const current = arr[idx] || "";
+  const newName = prompt("Rename teacher:", current);
+  if (newName === null) return; // cancelled
+  const trimmed = newName.trim();
+  if (!trimmed) { showToast("❌ Name can't be empty."); return; }
+  arr[idx] = trimmed;
+  saveTeacherArray(grade, arr);
+  showToast("✅ Renamed to " + trimmed);
+  renderSuperAdminTab();
+  renderClassesTab();
 }
 
 function addTeacherToClass(grade) {
