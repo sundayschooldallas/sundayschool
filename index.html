@@ -141,6 +141,7 @@
     text-align: center; letter-spacing: 0.5px; transition: all 0.2s;
   }
   .phone-input-wrap input::placeholder { color: rgba(255,255,255,0.35); font-weight: 600; letter-spacing: 0; font-size: 14px; }
+  #phoneInput::placeholder, #pinInput::placeholder { color: #9ab8c0; font-weight: 600; }
   .phone-input-wrap input:focus { border-color: #17b8d4; background: rgba(23,184,212,0.10); box-shadow: 0 0 0 4px rgba(23,184,212,0.14); }
 
   /* Segmented 4-digit PIN input */
@@ -333,7 +334,7 @@
 
   <div class="phone-input-wrap" style="position:relative;">
     <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:17px;opacity:0.55;z-index:2;pointer-events:none;">📱</span>
-    <input type="tel" id="phoneInput" placeholder="+1 (000) 000-0000" style="padding-left:42px;" />
+    <input type="tel" id="phoneInput" placeholder="+1 (000) 000-0000" style="width:100%;padding:15px 18px 15px 42px;font-family:'Nunito',sans-serif;font-size:17px;font-weight:700;border:2px solid #c0eaf0;border-radius:12px;outline:none;color:#0a3d45;background:white;text-align:center;letter-spacing:0.5px;transition:border-color 0.2s;" />
     <div style="position:relative;margin-top:10px;">
       <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:16px;opacity:0.55;z-index:2;pointer-events:none;">🔒</span>
       <input type="password" id="pinInput" placeholder="Your PIN (4 digits)" style="width:100%;padding:15px 18px 15px 42px;font-family:'Nunito',sans-serif;font-size:17px;font-weight:700;border:2px solid #c0eaf0;border-radius:12px;outline:none;color:#0a3d45;background:white;text-align:center;letter-spacing:4px;transition:border-color 0.2s;"  maxlength="4" />
