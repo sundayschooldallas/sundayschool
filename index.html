@@ -1174,8 +1174,8 @@ async function showApp() {
   document.getElementById("childInfoScreen").style.display = "none";
   document.getElementById("childSelectScreen").style.display = "none";
 
-  // Make sure we have the latest registered-children list before deciding what to show
-  try { await loadChildrenFromSheet(); } catch(e) {}
+  // Make sure we have the latest registered-children list AND duty calendar before deciding what to show
+  try { await Promise.all([loadChildrenFromSheet(), loadEventsCalendarFromSheet()]); } catch(e) {}
 
   myChildren = getChildrenForPhone(myPhone);
 
@@ -1257,6 +1257,116 @@ function generateSundaysWithYear(startYear, yearsAhead) {
 // 1) Prefer a real calendar date that already has a roster week with 0 parents.
 // 2) Otherwise, take the next real Sunday that has no roster week yet and create it.
 // 3) Last resort: any existing slot for this grade with room for a partner.
+// ═══════════════════════════════════════════════════════════════════
+// SUPER ADMIN DUTY CALENDAR — a real, admin-created calendar of dated
+// events, each assignable to one or more grades. New parents get
+// auto-slotted into these dates (max 2 per date, pairing optional)
+// instead of a generic auto-seeded Sunday, once their child's class
+// is known.
+// ═══════════════════════════════════════════════════════════════════
+function getEventsCalendar() {
+  try { return JSON.parse(localStorage.getItem("eventsCalendar") || "[]"); } catch(e) { return []; }
+}
+function saveEventsCalendarLocal(events) {
+  localStorage.setItem("eventsCalendar", JSON.stringify(events));
+}
+async function loadEventsCalendarFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?type=events&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    const parsed = data.map(e => ({
+      id: e.id,
+      date: e.date,
+      label: e.label || "Sunday Duty",
+      grades: String(e.grades || "").split(",").map(g => parseInt(g)).filter(g => !isNaN(g))
+    }));
+    saveEventsCalendarLocal(parsed);
+  } catch(e) { console.log("Could not load events calendar:", e); }
+}
+function addCalendarEvent(dateStr, label, grades) {
+  const events = getEventsCalendar();
+  const id = "evt_" + Date.now() + "_" + Math.random().toString(36).slice(2,7);
+  const evt = { id, date: dateStr, label: label || "Sunday Duty", grades: grades };
+  events.push(evt);
+  saveEventsCalendarLocal(events);
+  fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ type:"saveEvent", id, date: dateStr, label: evt.label, grades: grades.join(",") })
+  }).catch(()=>{});
+  return evt;
+}
+function deleteCalendarEvent(id) {
+  const events = getEventsCalendar().filter(e => e.id !== id);
+  saveEventsCalendarLocal(events);
+  fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ type:"deleteEvent", id })
+  }).catch(()=>{});
+}
+function handleAddCalendarEvent() {
+  const dateInput = document.getElementById("newEventDate");
+  const labelInput = document.getElementById("newEventLabel");
+  const checks = document.querySelectorAll(".newEventGradeCheck:checked");
+
+  if (!dateInput.value) { showToast("⚠️ Pick a date first."); return; }
+  const grades = Array.from(checks).map(c => parseInt(c.value));
+  if (grades.length === 0) { showToast("⚠️ Select at least one class."); return; }
+
+  // Convert native "YYYY-MM-DD" input to the "Mon Day Year" format used everywhere else
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const parts = dateInput.value.split("-").map(Number); // [year, month, day]
+  const d = new Date(parts[0], parts[1]-1, parts[2]);
+  const dateStr = months[d.getMonth()] + " " + d.getDate() + " " + d.getFullYear();
+
+  addCalendarEvent(dateStr, labelInput.value.trim(), grades);
+  dateInput.value = "";
+  labelInput.value = "";
+  document.querySelectorAll(".newEventGradeCheck").forEach(c => c.checked = false);
+  showToast("✅ Event added to duty calendar");
+  renderEventsCalendarList();
+}
+function renderEventsCalendarList() {
+  const container = document.getElementById("eventsCalendarList");
+  if (!container) return;
+  const events = getEventsCalendar().slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+  const gradeColors = { 6:"#f5a623", 7:"#1db88a", 8:"#17b8d4", 9:"#e05c8a" };
+
+  if (events.length === 0) {
+    container.innerHTML = `<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">No events yet — add one above to start building the duty calendar.</div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Upcoming Events</div>
+    ${events.map(evt => `
+      <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:13px;font-weight:800;color:white;">📅 ${evt.date}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:1px;">${evt.label}</div>
+          </div>
+          <button onclick="if(confirm('Remove this event from the calendar?')){deleteCalendarEvent('${evt.id}');renderEventsCalendarList();}"
+            style="padding:6px 10px;background:rgba(255,0,0,0.15);border:1px solid rgba(255,0,0,0.3);border-radius:8px;color:#ff8a8a;font-size:11px;font-weight:800;cursor:pointer;">
+            🗑️
+          </button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+          ${evt.grades.map(g => {
+            const count = eventParentCount(evt, g);
+            return `<div style="font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px;background:${gradeColors[g] || "#6366f1"}22;color:${gradeColors[g] || "#6366f1"};border:1px solid ${gradeColors[g] || "#6366f1"}55;">
+              Grade ${g} · ${count}/2
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`).join("")}`;
+}
+// How many parents are currently allocated to a given calendar event, for this grade
+function eventParentCount(evt, grade) {
+  const key = "G" + grade + "-" + evt.date;
+  const week = roster.find(w => w.date === key);
+  return week ? week.parents.length : 0;
+}
+
 // Determine which grade a parent belongs to for admin filtering purposes.
 // Prefers actual registered child info; falls back to the grade encoded in
 // the roster week's date prefix (e.g. "G8-...") so a parent who has been
@@ -1272,11 +1382,31 @@ function parentBelongsToGrade(week, parentName, grade) {
 
 function findNextOpenGradeDate(grade) {
   const prefix = "G" + grade + "-";
+
+  // 1. Prefer Super Admin's custom events calendar, if any events are
+  //    assigned to this grade — earliest date first, max 2 parents each.
+  const events = getEventsCalendar()
+    .filter(e => Array.isArray(e.grades) && e.grades.includes(Number(grade)))
+    .slice()
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  for (const evt of events) {
+    const key = prefix + evt.date;
+    let week = roster.find(w => w.date === key);
+    if (!week) {
+      week = { date: key, parents: [], eventLabel: evt.label };
+      roster.push(week);
+    } else if (!week.eventLabel) {
+      week.eventLabel = evt.label;
+    }
+    if (week.parents.length < 2) return week;
+  }
+
+  // 2. Fallback — no events calendar set up for this grade yet, so keep
+  //    the original auto-seeded-Sunday behavior working as before.
   const now = new Date();
   const curCalYear = now.getFullYear();
-  // Which school year is currently active? (school year runs Sep → Aug)
   const activeSchoolYear = now >= getPromotionSunday(curCalYear) ? curCalYear : curCalYear - 1;
-  // Only ever look within the CURRENT active school year — never a year that hasn't begun
   const candidates = generateSundaysWithYear(activeSchoolYear, 0);
 
   const existing = {};
@@ -1443,6 +1573,30 @@ function saveChildInfo() {
     myChildren.push({ childName: c.name, name: c.name, grade: c.grade, teacher: c.teacher, phone: myPhone });
   });
   myChildInfo = { childName: savedBatch[0].name, name: savedBatch[0].name, grade: savedBatch[0].grade, teacher: savedBatch[0].teacher };
+
+  // ── Auto-allocate a duty date from the Super Admin's events calendar ──
+  // Only if this parent doesn't already have a duty slot for THIS grade —
+  // avoids double-booking a parent who already has one.
+  (function allocateDutyForRegisteredChild() {
+    const grade = savedBatch[0].grade;
+    const gradePrefix = "G" + grade + "-";
+    const myHash = normalize(myPhone);
+    const alreadyHasSlot = roster.some(w => w.date.startsWith(gradePrefix) && w.parents.some(p => normalize(p.h) === myHash));
+    if (alreadyHasSlot) return;
+
+    const week = findNextOpenGradeDate(grade);
+    if (!week) return;
+
+    const pin = (myParent && myParent.pin) ? myParent.pin : (customPins[myName] || "");
+    const encoded = (myParent && myParent.e) ? myParent.e : "";
+    week.parents.push({ name: myName, h: myHash, e: encoded, pin: pin });
+
+    // Persist this parent's updated duty date to the Sheet (upserts by phone hash)
+    fetch(SHEET_URL, {
+      method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ type: "newParent", name: myName, phone: myPhone, h: myHash, e: encoded, pin: pin, date: week.date.replace(gradePrefix, "") })
+    }).catch(() => {});
+  })();
 
   showMainApp();
   showToast("✅ Children saved — assigned to their teachers!");
@@ -2624,6 +2778,29 @@ function renderSuperAdminTab() {
       </button>
     </div>
 
+    <!-- ── SUPER ADMIN DUTY CALENDAR ────────────────────────────────── -->
+    <div style="background:rgba(99,102,241,0.08);border:1.5px solid rgba(99,102,241,0.3);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:900;color:white;margin-bottom:2px;">📅 Duty Calendar</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Create real event dates and assign them to classes. New parents are auto-allocated here (max 2 per date, per class) once their child is registered — no calendar set up yet for a class just falls back to auto Sundays.</div>
+
+      <input id="newEventDate" type="date" style="width:100%;padding:11px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid rgba(255,255,255,0.2);border-radius:10px;background:rgba(255,255,255,0.08);color:white;outline:none;margin-bottom:8px;" />
+      <input id="newEventLabel" type="text" placeholder="Event name (optional — e.g. Fall Picnic)" style="width:100%;padding:11px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid rgba(255,255,255,0.2);border-radius:10px;background:rgba(255,255,255,0.08);color:white;outline:none;margin-bottom:8px;" />
+      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:6px;">Assign to:</div>
+      <div id="newEventGradeChecks" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        ${allGrades.map(g => `
+          <label style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+            <input type="checkbox" class="newEventGradeCheck" value="${g}" style="cursor:pointer;" /> Grade ${g}
+          </label>`).join("")}
+      </div>
+      <button onclick="handleAddCalendarEvent()"
+        style="width:100%;padding:11px;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:10px;
+        font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:white;cursor:pointer;margin-bottom:14px;">
+        ➕ Add Event to Calendar
+      </button>
+
+      <div id="eventsCalendarList"></div>
+    </div>
+
     <!-- ── ARCHIVES ─────────────────────────────────────────────────── -->
     <div style="background:rgba(34,197,94,0.1);border:2px solid rgba(34,197,94,0.35);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -2867,6 +3044,8 @@ function renderSuperAdminTab() {
     </div>`;
   el.appendChild(archDiv);
   checkPromotionBanner();
+  renderEventsCalendarList();
+  loadEventsCalendarFromSheet().then(renderEventsCalendarList).catch(()=>{});
 }
 
 function getTeacherListHtml(grade, teacherStr, color) {
