@@ -890,7 +890,24 @@ function dutySelectGrade(val) {
 // Returns all active grades in order — works for any number of classes
 function getActiveGrades() {
   const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  return Object.keys({...TEACHERS, ...customTeachers}).map(Number).sort();
+  const deletedGrades = JSON.parse(localStorage.getItem("deletedGrades") || "[]");
+  return Object.keys({...TEACHERS, ...customTeachers})
+    .map(Number)
+    .filter(g => !deletedGrades.includes(g))
+    .sort();
+}
+
+// Load the tombstone list of permanently-deleted grades. This is what stops
+// an original grade (6-9, hardcoded in the app itself) from silently
+// reappearing on a fresh page load after being deleted.
+async function loadDeletedGradesFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?type=deletedGrades&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    localStorage.setItem("deletedGrades", JSON.stringify(data));
+  } catch(e) { console.log("Could not load deleted grades:", e); }
 }
 
 // Pull custom classes (created via Super Admin) from the Sheet and merge them
@@ -906,6 +923,7 @@ async function loadClassesFromSheet() {
 
     const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
     const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+    const deleteCodes = JSON.parse(localStorage.getItem("classDeleteCodes") || "{}");
 
     data.forEach(cls => {
       const g = Number(cls.grade);
@@ -916,10 +934,12 @@ async function loadClassesFromSheet() {
         GRADE_ADMIN_PASSWORDS[g] = cls.adminPassword;
       }
       if (cls.rollcallPassword) customPws["rollcall_" + g] = cls.rollcallPassword;
+      if (cls.deleteCode) deleteCodes[g] = cls.deleteCode;
     });
 
     localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
     localStorage.setItem("customAdminPws", JSON.stringify(customPws));
+    localStorage.setItem("classDeleteCodes", JSON.stringify(deleteCodes));
   } catch(e) { console.log("Could not load classes from sheet:", e); }
 }
 
@@ -1274,7 +1294,7 @@ async function showApp() {
   document.getElementById("childSelectScreen").style.display = "none";
 
   // Make sure we have the latest classes, registered-children list, and duty calendar before deciding what to show
-  try { await Promise.all([loadClassesFromSheet(), loadChildrenFromSheet(), loadEventsCalendarFromSheet()]); } catch(e) {}
+  try { await Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadChildrenFromSheet(), loadEventsCalendarFromSheet()]); } catch(e) {}
 
   myChildren = getChildrenForPhone(myPhone);
 
@@ -1774,7 +1794,7 @@ async function initTodayPairBanner() {
   try { renderTodayPairBanner(0); } catch(e) {}
   // Then load fresh classes + parent assignments + statuses from sheet in background and re-render
   try {
-    await Promise.all([loadClassesFromSheet(), loadNewParentsFromSheet(), loadStatusesFromSheet()]);
+    await Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadNewParentsFromSheet(), loadStatusesFromSheet()]);
     renderTodayPairBanner(bannerOffset);
   } catch(e) {}
   // Refresh every 60 seconds
@@ -2241,7 +2261,7 @@ function showAdminLogin() {
   document.getElementById("adminDash").style.display = "none";
   document.getElementById("adminLogin").style.display = "flex";
   // Load any classes created on other devices so their passwords work here too
-  loadClassesFromSheet().catch(() => {});
+  Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet()]).catch(() => {});
 }
 function showVerify() {
   const ids = ["adminLogin","adminDash","advocateDash","mainApp","childInfoScreen","rollCallDash"];
@@ -2274,7 +2294,7 @@ async function verifyAdmin() {
     document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:30px;font-weight:700;'><span class='modern-spinner'></span>Loading data...</p>";
     try {
       await withTimeout(
-        Promise.all([loadClassesFromSheet(), loadTeacherPhonesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
+        Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadTeacherPhonesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
         15000,
         "Data load"
       );
@@ -2807,9 +2827,10 @@ function renderSuperAdminTab() {
   if (!el) return;
 
   const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+  const deletedGradesLocal = JSON.parse(localStorage.getItem("deletedGrades") || "[]");
   const teachers = {};
-  Object.keys(TEACHERS).forEach(g => { teachers[g] = customTeachers[g] || TEACHERS[g]; });
-  Object.keys(customTeachers).forEach(g => { teachers[g] = customTeachers[g]; });
+  Object.keys(TEACHERS).forEach(g => { if (!deletedGradesLocal.includes(Number(g))) teachers[g] = customTeachers[g] || TEACHERS[g]; });
+  Object.keys(customTeachers).forEach(g => { if (!deletedGradesLocal.includes(Number(g))) teachers[g] = customTeachers[g]; });
 
   const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
   const adminPw   = customPws.admin || "Jesusislord";
@@ -2844,6 +2865,20 @@ function renderSuperAdminTab() {
   const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
   const gradeColors = { 6:"#f5a623", 7:"#1db88a", 8:"#5c4ac7", 9:"#e05c8a" };
   const allGrades = Object.keys(teachers).map(Number).sort((a,b)=>a-b);
+  const classDeleteCodesLocal = JSON.parse(localStorage.getItem("classDeleteCodes") || "{}");
+  // Any active grade with no delete code yet gets one generated server-side now
+  allGrades.forEach(g => {
+    if (!classDeleteCodesLocal[g]) {
+      fetch(SHEET_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          type: "saveClass", grade: g, teacher: teachers[g] || "",
+          adminPassword: customPws["gradeadmin_" + g] || GRADE_ADMIN_PASSWORDS[g] || "",
+          rollcallPassword: customPws["rollcall_" + g] || ""
+        })
+      }).then(() => setTimeout(() => loadClassesFromSheet().then(renderSuperAdminTab), 1200)).catch(() => {});
+    }
+  });
 
   el.innerHTML = `
     <div style="background:linear-gradient(135deg,#021a1e,#0a5260);border-radius:16px;padding:16px;margin-bottom:16px;color:white;">
@@ -2869,6 +2904,19 @@ function renderSuperAdminTab() {
         font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
         Clear Student Registrations
       </button>
+    </div>
+
+    <!-- ── DELETE CODE VAULT ────────────────────────────────────────── -->
+    <div style="background:rgba(255,215,0,0.06);border:1.5px solid rgba(255,215,0,0.3);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:900;color:#FFD700;margin-bottom:2px;">🔐 Delete Code Vault</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:12px;">Every class has its own delete code. To fully delete a class, you'll need to look up its code here first — this is intentional friction so a class full of real students and parents can't be deleted by accident or on a whim.</div>
+      <div id="deleteCodeVault">
+        ${allGrades.map(g => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.06);border-radius:8px;margin-bottom:6px;">
+            <div style="font-size:12px;font-weight:800;color:white;">Grade ${g}</div>
+            <div style="font-size:13px;font-weight:900;color:#FFD700;letter-spacing:1px;font-family:monospace;">${classDeleteCodesLocal[g] || "—"}</div>
+          </div>`).join("")}
+      </div>
     </div>
 
     <!-- ── ANNUAL PROMOTION ──────────────────────────────────────────── -->
@@ -3494,29 +3542,97 @@ function deleteCustomUser(idx) {
   renderSuperAdminTab();
 }
 
-function deleteClass(grade) {
-  if (!confirm("Delete Grade " + grade + " class? This will remove the teacher assignment, calendar, and all roster slots for this grade. Students already registered will NOT be deleted.")) return;
-  // Remove teacher
-  const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  delete customTeachers[grade];
-  localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
-  delete TEACHERS[grade];
-  // Remove calendar
-  const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
-  delete gradeCalendars[grade];
-  localStorage.setItem("gradeCalendars", JSON.stringify(gradeCalendars));
-  // Remove roster slots for this grade
-  const prefix = "G" + grade + "-";
-  for (let i = roster.length - 1; i >= 0; i--) {
-    if (roster[i].date.startsWith(prefix)) roster.splice(i, 1);
+async function deleteClass(grade) {
+  // Count affected students first — this number drives the whole warning
+  let studentCount = 0;
+  try {
+    const res = await fetch(SHEET_URL + "?type=children&nocache=" + Date.now(), { mode: "cors" });
+    const data = await res.json();
+    if (Array.isArray(data)) studentCount = data.filter(r => Number(r.grade) === Number(grade) && !r.graduated).length;
+  } catch(e) { /* if this fails we still proceed, just without a precise count */ }
+
+  const codes = JSON.parse(localStorage.getItem("classDeleteCodes") || "{}");
+  const knownCode = codes[grade];
+  if (!knownCode) {
+    showToast("⚠️ No delete code found yet for Grade " + grade + " — open the Super Admin tab again and wait a moment for it to generate.");
+    return;
   }
-  showToast("🗑️ Grade " + grade + " class deleted.");
-  fetch(SHEET_URL, {
-    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify({ type: "deleteClass", grade: grade })
-  }).catch(() => {});
-  renderSuperAdminTab();
-  renderClassesTab();
+
+  const warningMsg =
+    "⚠️ DELETE GRADE " + grade + " — READ CAREFULLY\n\n" +
+    "This class currently has " + studentCount + " registered student" + (studentCount === 1 ? "" : "s") + ".\n\n" +
+    "Deleting it will PERMANENTLY remove:\n" +
+    "• The teacher assignment and class password\n" +
+    "• The class calendar and every roster/duty slot\n" +
+    "• ALL " + studentCount + " registered student" + (studentCount === 1 ? "" : "s") + " in this class\n" +
+    "• This grade from any calendar events it's assigned to\n\n" +
+    (studentCount > 0
+      ? "Because real students and parents are affected, deleting this class is NOT advised — consider it only if you're certain.\n\n"
+      : "") +
+    "This cannot be undone. Continue?";
+  if (!confirm(warningMsg)) return;
+
+  const enteredCode = prompt("Enter the delete code for Grade " + grade + " (find it in 🔐 Delete Code Vault above):");
+  if (enteredCode === null) return;
+  if (enteredCode.trim().toUpperCase() !== String(knownCode).toUpperCase()) {
+    showToast("❌ Delete code didn't match. Nothing was deleted.");
+    return;
+  }
+
+  const confirmerName = prompt("Your name — this will be permanently recorded as who authorized this deletion:");
+  if (confirmerName === null || !confirmerName.trim()) {
+    showToast("❌ A name is required to authorize deletion. Nothing was deleted.");
+    return;
+  }
+  const confirmerTrimmed = confirmerName.trim();
+
+  if (!confirm("FINAL CONFIRMATION\n\nDelete Grade " + grade + " and all " + studentCount + " student(s) in it?\nAuthorized by: " + confirmerTrimmed + "\n\nThis is your last chance to cancel.")) return;
+
+  showToast("⏳ Deleting Grade " + grade + "...");
+
+  try {
+    // Not no-cors here — we need to actually read whether the code matched server-side
+    const res = await fetch(SHEET_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ type: "deleteClass", grade: grade, deleteCode: enteredCode.trim(), confirmerName: confirmerTrimmed })
+    });
+    const result = await res.json();
+
+    if (!result.ok) {
+      showToast("❌ " + (result.error || "Deletion failed on the server. Nothing was deleted."));
+      return;
+    }
+
+    // Only now — after confirmed server-side success — clean up local state
+    const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+    delete customTeachers[grade];
+    localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
+    delete TEACHERS[grade];
+
+    const gradeCalendars = JSON.parse(localStorage.getItem("gradeCalendars") || "{}");
+    delete gradeCalendars[grade];
+    localStorage.setItem("gradeCalendars", JSON.stringify(gradeCalendars));
+
+    const prefix = "G" + grade + "-";
+    for (let i = roster.length - 1; i >= 0; i--) {
+      if (roster[i].date.startsWith(prefix)) roster.splice(i, 1);
+    }
+
+    childrenSheetData = childrenSheetData.filter(r => Number(r.grade) !== Number(grade));
+
+    const deletedGrades = JSON.parse(localStorage.getItem("deletedGrades") || "[]");
+    if (!deletedGrades.includes(Number(grade))) deletedGrades.push(Number(grade));
+    localStorage.setItem("deletedGrades", JSON.stringify(deletedGrades));
+
+    delete codes[grade];
+    localStorage.setItem("classDeleteCodes", JSON.stringify(codes));
+
+    showToast("🗑️ Grade " + grade + " and " + result.studentsDeleted + " student(s) deleted. Authorized by " + confirmerTrimmed + ".");
+    renderSuperAdminTab();
+    renderClassesTab();
+  } catch(e) {
+    showToast("❌ Deletion failed — network or server error. Nothing was deleted. (" + e.message + ")");
+  }
 }
 
 async function debugLoadSheet() {
