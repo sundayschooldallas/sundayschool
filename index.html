@@ -725,12 +725,10 @@ function renderDutyBoard() {
   const targetSunday = new Date(now);
   targetSunday.setDate(now.getDate() + daysToSunday);
   const targetStr = months[targetSunday.getMonth()] + " " + targetSunday.getDate();
-  const targetKey  = targetStr + " " + targetSunday.getFullYear();
 
   const nextSunday = new Date(targetSunday);
   nextSunday.setDate(targetSunday.getDate() + 7);
   const nextStr = months[nextSunday.getMonth()] + " " + nextSunday.getDate();
-  const nextKey  = nextStr + " " + nextSunday.getFullYear();
 
   const dateEl = document.getElementById("dutyBoardDate");
   if (dateEl) dateEl.textContent = days[targetSunday.getDay()] + ", " + months[targetSunday.getMonth()] + " " + targetSunday.getDate() + ", " + targetSunday.getFullYear();
@@ -777,10 +775,25 @@ function renderDutyBoard() {
   container.id = "dutyPanelsContainer";
   container.appendChild(placeholder);
 
+  function parseGradeDate(dateStr) {
+    var stripped = String(dateStr).replace(/^G\d+-/, "").trim();
+    var parts = stripped.split(/\s+/);
+    var mi = months.indexOf(parts[0]);
+    if (mi === -1) return null;
+    var day = parseInt(parts[1]);
+    if (isNaN(day)) return null;
+    var year = parts[2] ? parseInt(parts[2]) : now.getFullYear();
+    return new Date(year, mi, day);
+  }
+  function sameDay(d, ref) {
+    return d && d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+  }
+
   allGrades.forEach(function(g) {
     var gradePrefix = "G" + g + "-";
-    var thisWeek = roster.find(function(w){ return w.date === gradePrefix + targetKey; });
-    var nextWeek = roster.find(function(w){ return w.date === gradePrefix + nextKey; });
+    var gradeWeeksAll = roster.filter(function(w){ return w.date.startsWith(gradePrefix); });
+    var thisWeek = gradeWeeksAll.find(function(w){ return sameDay(parseGradeDate(w.date), targetSunday); });
+    var nextWeek = gradeWeeksAll.find(function(w){ return sameDay(parseGradeDate(w.date), nextSunday); });
 
     var panel = document.createElement("div");
     panel.id = "dutyPanel_" + g;
@@ -1251,7 +1264,7 @@ let selectedGrade = null;
 function generateSundaysWithYear(startYear, yearsAhead) {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const start = getPromotionSunday(startYear);
-  const end = new Date(startYear + yearsAhead, 7, 31);
+  const end = new Date(startYear + yearsAhead + 1, 7, 31);
   const out = [];
   const d = new Date(start);
   while (d <= end) {
