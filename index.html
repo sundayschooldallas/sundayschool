@@ -9,23 +9,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --purple: #0d7a8a;
-    --purple-light: #e0f5f7;
-    --purple-dark: #0a5260;
-    --amber: #4caf50;
-    --amber-light: #e8f5e9;
-    --green: #2e7d32;
-    --green-light: #e8f5e9;
-    --red: #e03e3e;
-    --red-light: #fdeaea;
+    --purple: #6366f1;
+    --purple-light: #eef2ff;
+    --purple-dark: #4338ca;
+    --amber: #f59e0b;
+    --amber-light: #fffbeb;
+    --green: #10b981;
+    --green-light: #ecfdf5;
+    --red: #f43f5e;
+    --red-light: #fff1f2;
     --gray: #f4f3f8;
-    --text: #0a3d45;
+    --text: #1e1b4b;
     --muted: #7b7a90;
     --radius: 16px;
     --shadow: 0 4px 20px rgba(13,122,138,0.10);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Nunito', sans-serif; background: #f0eefb; color: var(--text); min-height: 100vh; padding-bottom: 48px; }
+  body { font-family: 'Nunito', sans-serif; background: linear-gradient(160deg, #f5f3ff 0%, #eef2ff 40%, #ecfeff 100%); background-attachment: fixed; color: var(--text); min-height: 100vh; padding-bottom: 48px; }
 
   /* ── RESPONSIVE ── */
   @media (min-width: 600px) {
@@ -66,14 +66,14 @@
     min-height: 100vh; display: flex; flex-direction: column;
     align-items: center; justify-content: center; padding: 30px 24px; text-align: center;
     position: relative; overflow: hidden;
-    background: linear-gradient(160deg, #021a1e 0%, #0a3d45 40%, #0d2e1a 100%);
+    background: linear-gradient(160deg, #1e1b4b 0%, #312e81 45%, #0e7490 100%);
   }
   /* Animated glowing orbs */
   .verify-screen::before {
     content: '';
     position: absolute; top: -120px; right: -80px;
     width: 380px; height: 380px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(13,122,138,0.35) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(99,102,241,0.45) 0%, transparent 70%);
     animation: floatOrb1 8s ease-in-out infinite;
     pointer-events: none;
   }
@@ -81,7 +81,7 @@
     content: '';
     position: absolute; bottom: -100px; left: -60px;
     width: 320px; height: 320px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(46,125,50,0.3) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(6,182,212,0.4) 0%, transparent 70%);
     animation: floatOrb2 10s ease-in-out infinite;
     pointer-events: none;
   }
@@ -142,7 +142,7 @@
   }
   .phone-input-wrap input::placeholder { color: rgba(255,255,255,0.35); font-weight: 600; letter-spacing: 0; font-size: 14px; }
   #phoneInput::placeholder, #pinInput::placeholder { color: #9ab8c0; font-weight: 600; }
-  .phone-input-wrap input:focus { border-color: #17b8d4; background: rgba(23,184,212,0.10); box-shadow: 0 0 0 4px rgba(23,184,212,0.14); }
+  .phone-input-wrap input:focus { border-color: #06b6d4; background: rgba(6,182,212,0.10); box-shadow: 0 0 0 4px rgba(6,182,212,0.14); }
 
   /* Segmented 4-digit PIN input */
   .pin-boxes { display: flex; gap: 10px; width: 100%; max-width: 340px; margin-top: 12px; justify-content: center; }
@@ -151,21 +151,21 @@
     font-family: 'Nunito', sans-serif; font-size: 22px; font-weight: 800;
     color: #eefaf9; background: rgba(255,255,255,0.06);
     border: 1.5px solid rgba(255,255,255,0.18); border-radius: 14px;
-    outline: none; transition: all 0.18s; caret-color: #17b8d4;
+    outline: none; transition: all 0.18s; caret-color: #06b6d4;
   }
-  .pin-boxes input:focus { border-color: #17b8d4; background: rgba(23,184,212,0.12); box-shadow: 0 0 0 4px rgba(23,184,212,0.16); transform: translateY(-1px); }
+  .pin-boxes input:focus { border-color: #06b6d4; background: rgba(6,182,212,0.12); box-shadow: 0 0 0 4px rgba(6,182,212,0.16); transform: translateY(-1px); }
   .pin-boxes input.filled { border-color: rgba(95,224,205,0.55); }
 
   .verify-btn {
     width: 100%; margin-top: 20px; padding: 16px;
-    background: linear-gradient(135deg, #17b8d4, #5c4ac7);
+    background: linear-gradient(135deg, #06b6d4, #6366f1);
     color: white; border: none; border-radius: 16px;
     font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 800; cursor: pointer;
-    box-shadow: 0 10px 26px rgba(23,184,212,0.3);
+    box-shadow: 0 10px 26px rgba(99,102,241,0.35);
     transition: all 0.2s; position: relative; z-index: 1;
     letter-spacing: 0.2px;
   }
-  .verify-btn:hover { filter: brightness(1.06); box-shadow: 0 12px 30px rgba(23,184,212,0.4); }
+  .verify-btn:hover { filter: brightness(1.06); box-shadow: 0 12px 30px rgba(99,102,241,0.45); }
   .verify-btn:active { transform: scale(0.98); opacity: 0.9; }
   .verify-error { margin-top: 14px; font-size: 13px; color: #ff9d9d; font-weight: 700; display: none; position: relative; z-index: 1; }
 
@@ -318,6 +318,57 @@
     display: flex; align-items: center; gap: 8px;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+
+  /* ── AURORA THEME OVERRIDE ──
+     Retheme recurring inline-style patterns app-wide via attribute
+     matching, so the whole app picks up the new palette without
+     editing every individual render function. Grade-identity colors
+     (6/7/8/9 color coding) are deliberately left untouched. */
+
+  /* Admin / Advocate dashboard canvas → soft aurora gradient instead of flat teal */
+  #adminDash, #advocateDash {
+    background: linear-gradient(160deg, #f5f3ff 0%, #eef2ff 45%, #ecfeff 100%) !important;
+  }
+  /* Dark header bars (admin dash, advocate dash) → deep indigo/violet, matching login */
+  div[style*="linear-gradient(135deg,#021a1e,#0a3d45,#0d3b2e)"] {
+    background: linear-gradient(135deg,#1e1b4b,#312e81,#0e7490) !important;
+  }
+  div[style*="linear-gradient(135deg,#0d3b2e,#0f6e56,#1db88a)"] {
+    background: linear-gradient(135deg,#0f172a,#0e7490,#06b6d4) !important;
+  }
+  div[style*="linear-gradient(135deg,#021a1e,#0a5260)"] {
+    background: linear-gradient(135deg,#1e1b4b,#0e7490) !important;
+  }
+  /* Primary action gradient (teal) → indigo/cyan, used by main CTA buttons and badges */
+  [style*="linear-gradient(135deg,#0a5260,#0d7a8a)"] {
+    background: linear-gradient(135deg,#6366f1,#06b6d4) !important;
+  }
+  [style*="linear-gradient(135deg,#5c4ac7,#3b2f8f)"] {
+    background: linear-gradient(135deg,#6366f1,#06b6d4) !important;
+  }
+  /* Light accent chips/backgrounds (tab buttons, banners) → soft indigo tint */
+  [style*="background:#e0f5f7"] {
+    background: linear-gradient(135deg,#eef2ff,#e0e7ff) !important;
+  }
+  [style*="background:#e8e4fb"] {
+    background: linear-gradient(135deg,#ede9fe,#dbeafe) !important;
+  }
+  /* White cards → soft glassmorphism, restricted to div cards (not inputs) */
+  div[style*="background:white;border-radius:12px"],
+  div[style*="background:white;border-radius:14px"] {
+    background: rgba(255,255,255,0.82) !important;
+    backdrop-filter: blur(18px) !important;
+    -webkit-backdrop-filter: blur(18px) !important;
+    border: 1px solid rgba(255,255,255,0.7) !important;
+    box-shadow: 0 10px 30px rgba(99,102,241,0.12), 0 2px 8px rgba(0,0,0,0.04) !important;
+  }
+  /* Card shadows tinted to match new palette instead of flat teal */
+  div[style*="box-shadow:0 2px 10px rgba(13,122,138,0.08)"] {
+    box-shadow: 0 8px 24px rgba(99,102,241,0.12) !important;
+  }
+  div[style*="box-shadow:0 2px 10px rgba(13,122,138"] {
+    box-shadow: 0 8px 24px rgba(99,102,241,0.10) !important;
+  }
 
   /* ── MODERN INTERACTION LAYER ── */
   @keyframes modernPopIn {
