@@ -2931,7 +2931,7 @@ function renderSuperAdminTab() {
   const allActiveGradeKeys = [...new Set([
     ...Object.keys(GRADE_ADMIN_PASSWORDS).map(Number),
     ...Object.keys(customPws).filter(k => k.startsWith("gradeadmin_")).map(k => Number(k.replace("gradeadmin_","")))
-  ])].filter(g => g > 0).sort((a,b) => a-b);
+  ])].filter(g => g > 0 && !deletedGradesLocal.includes(g)).sort((a,b) => a-b);
 
   const builtinAccounts = [
     { label:"👑 Super Admin",         key:"superadmin", pw:"Jesusislord4SuperAdmin",  deletable:false },
@@ -3817,6 +3817,15 @@ async function deleteClass(grade) {
 
     delete codes[grade];
     localStorage.setItem("classDeleteCodes", JSON.stringify(codes));
+
+    // Clean up the leftover passwords too — these were never touched before,
+    // so a deleted class's Roll Call / Grade Admin entries kept lingering
+    // forever in the Custom Admin Users list.
+    delete GRADE_ADMIN_PASSWORDS[grade];
+    const customPwsCleanup = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+    delete customPwsCleanup["gradeadmin_" + grade];
+    delete customPwsCleanup["rollcall_" + grade];
+    localStorage.setItem("customAdminPws", JSON.stringify(customPwsCleanup));
 
     showToast("🗑️ Grade " + grade + " and " + result.studentsDeleted + " student(s) deleted. Authorized by " + confirmerTrimmed + ".");
     renderSuperAdminTab();
