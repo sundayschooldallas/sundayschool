@@ -1148,12 +1148,9 @@ async function showApp() {
   if (myChildren.length === 0) {
     // No child registered yet under this phone — show the registration screen
     showChildInfoScreen();
-  } else if (myChildren.length === 1) {
-    // Exactly one match — no ambiguity, go straight in
-    myChildInfo = myChildren[0];
-    showMainApp();
   } else {
-    // More than one child on this phone — let the parent choose which one
+    // One or more children found on this phone — always let the parent confirm
+    // which one, or register a new one, rather than silently picking for them
     myChildInfo = null;
     renderChildSelectScreen();
     document.getElementById("childSelectScreen").style.display = "block";
@@ -1436,7 +1433,7 @@ function showMainApp() {
 
   const badge = document.getElementById("myChildBadge");
   if (badge) {
-    if (myChildInfo && myChildren.length > 1) {
+    if (myChildInfo && myChildren.length >= 1) {
       badge.innerHTML = `<div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.85);">
         Viewing <strong>${myChildInfo.childName || myChildInfo.name}</strong> (Grade ${myChildInfo.grade})
         &nbsp;·&nbsp;<span onclick="backToChildSelect()" style="text-decoration:underline;cursor:pointer;">Switch child</span>
@@ -2584,6 +2581,26 @@ function renderSuperAdminTab() {
     <div style="background:linear-gradient(135deg,#021a1e,#0a5260);border-radius:16px;padding:16px;margin-bottom:16px;color:white;">
       <div style="font-size:16px;font-weight:800;">👑 Super Admin Controls</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">Only you can see and change these settings</div>
+    </div>
+
+    <!-- ── DANGER ZONE ──────────────────────────────────────────────── -->
+    <div style="background:rgba(255,0,0,0.06);border:1.5px solid rgba(255,0,0,0.25);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:900;color:#ff8a8a;margin-bottom:2px;">⚠️ Danger Zone</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:12px;">These are two SEPARATE data stores. Clearing one does not clear the other — that's why cleared parents can still see an old child.</div>
+      <div style="font-size:12px;font-weight:800;color:white;">🗑️ Parent duty roster & PINs</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Who's on volunteer duty which week, and their login PINs.</div>
+      <button onclick="clearAllRosterData()"
+        style="width:100%;padding:10px;background:linear-gradient(135deg,#991b1b,#ef4444);border:none;border-radius:8px;
+        font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;margin-bottom:14px;">
+        Clear Parent Duty Roster & PINs
+      </button>
+      <div style="font-size:12px;font-weight:800;color:white;">🎓 Student registrations</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px;">Every registered child, their grade, and their teacher — the data that decides which child a parent sees when they log in.</div>
+      <button onclick="clearAllStudentRegistrations()"
+        style="width:100%;padding:10px;background:linear-gradient(135deg,#991b1b,#ef4444);border:none;border-radius:8px;
+        font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+        Clear Student Registrations
+      </button>
     </div>
 
     <!-- ── ANNUAL PROMOTION ──────────────────────────────────────────── -->
@@ -4094,6 +4111,33 @@ function updateStudentName(inputId, oldName, parentName, phone) {
 
   showToast("✅ " + oldName + " renamed to " + newName);
   loadChildrenFromSheet().then(() => renderStudentsTab()).catch(() => renderStudentsTab());
+}
+
+function clearAllStudentRegistrations() {
+  if (adminRole !== "superadmin") { showToast("🔒 Super Admin only."); return; }
+  if (!confirm("⚠️ Clear ALL student registrations?\n\nThis removes every registered child (name, grade, teacher) from the app and Google Sheets. Parent duty PINs are NOT affected — use 'Clear Parent Duty Roster & PINs' separately for that.\n\nThis cannot be undone. Are you sure?")) return;
+  if (!confirm("Really sure? This deletes every family's registered children. Type OK to confirm.")) return;
+
+  // Clear local cache of children
+  childrenSheetData = [];
+
+  // Clear every childInfo__ localStorage key (per-device cache of "already registered" state)
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith("childInfo__")) keysToRemove.push(k);
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // Clear the children tab in Google Sheets
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "clearChildren" })
+  }).catch(() => {});
+
+  showToast("✅ Student registrations cleared. Parents will be asked to register their child fresh.");
+  try { renderSuperAdminTab(); } catch(e) {}
 }
 
 function clearAllRosterData() {
