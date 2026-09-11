@@ -923,6 +923,54 @@ async function loadClassesFromSheet() {
   } catch(e) { console.log("Could not load classes from sheet:", e); }
 }
 
+// ── TEACHER PHONE NUMBERS ──────────────────────────────────────────────
+// Stored separately, keyed by "grade_teacherName" — this is what makes it
+// scale to any number of teachers/classes and apply to every EXISTING
+// teacher immediately, with zero migration: nothing about how names or
+// classes are stored has to change. A teacher simply has no phone entry
+// until one is added.
+function teacherPhoneKey(grade, name) {
+  return grade + "_" + String(name).trim().toLowerCase();
+}
+function getTeacherPhones() {
+  try { return JSON.parse(localStorage.getItem("teacherPhones") || "{}"); } catch(e) { return {}; }
+}
+function saveTeacherPhonesLocal(map) {
+  localStorage.setItem("teacherPhones", JSON.stringify(map));
+}
+function getTeacherPhone(grade, name) {
+  return getTeacherPhones()[teacherPhoneKey(grade, name)] || "";
+}
+function setTeacherPhone(grade, name, phone) {
+  const map = getTeacherPhones();
+  map[teacherPhoneKey(grade, name)] = phone;
+  saveTeacherPhonesLocal(map);
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "saveTeacherPhone", grade: grade, name: name, phone: phone })
+  }).catch(() => {});
+}
+function deleteTeacherPhoneEntry(grade, name) {
+  const map = getTeacherPhones();
+  delete map[teacherPhoneKey(grade, name)];
+  saveTeacherPhonesLocal(map);
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "deleteTeacherPhone", grade: grade, name: name })
+  }).catch(() => {});
+}
+async function loadTeacherPhonesFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?type=teacherPhones&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    const map = getTeacherPhones();
+    data.forEach(t => { if (t.grade && t.name) map[teacherPhoneKey(t.grade, t.name)] = t.phone || ""; });
+    saveTeacherPhonesLocal(map);
+  } catch(e) { console.log("Could not load teacher phones from sheet:", e); }
+}
+
 // Returns the next grade above the given one (for swap button)
 function getAdjacentGrade(grade) {
   const grades = getActiveGrades();
@@ -2226,7 +2274,7 @@ async function verifyAdmin() {
     document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:30px;font-weight:700;'><span class='modern-spinner'></span>Loading data...</p>";
     try {
       await withTimeout(
-        Promise.all([loadClassesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
+        Promise.all([loadClassesFromSheet(), loadTeacherPhonesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
         15000,
         "Data load"
       );
@@ -3115,12 +3163,16 @@ function getTeacherListHtml(grade, teacherStr, color) {
   if (teachers.length === 0) return `<div style="font-size:12px;color:#bbb;padding:4px 0;">No teachers yet</div>`;
   return teachers.map((t, i) => {
     const initial = t.charAt(0).toUpperCase() || "?";
+    const phone = getTeacherPhone(grade, t);
     return `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f0fafc;border-radius:10px;margin-bottom:6px;">
       <div style="width:32px;height:32px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;">${initial}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:800;color:#0a3d45;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t}</div>
         <div style="font-size:11px;color:#7b7a90;">Grade ${grade} Teacher</div>
+        <div style="font-size:11px;color:${phone ? "#0a5260" : "#bbb"};margin-top:1px;cursor:pointer;" onclick="editTeacherPhone(${grade}, ${i})">
+          📞 ${phone || "No phone on file — tap to add"}
+        </div>
       </div>
       <button onclick="renameTeacherInClass(${grade}, ${i})"
         style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#e0f5f7;color:#0a5260;border:1.5px solid #c0eaf0;border-radius:7px;padding:5px 9px;cursor:pointer;flex-shrink:0;">
@@ -3156,7 +3208,7 @@ function saveTeacherArray(grade, arr) {
     body: JSON.stringify({
       type: "saveClass", grade: grade, teacher: joined,
       adminPassword: customPws["gradeadmin_" + grade] || GRADE_ADMIN_PASSWORDS[grade] || "",
-      rollcallPassword: customPws["rollcall_" + grade] || ""
+      rollcallPassword: customPws["rollcall_" + grade] || ("JesusislordAdmin" + grade + "RC")
     })
   }).catch(() => {});
 }
@@ -3170,7 +3222,27 @@ function renameTeacherInClass(grade, idx) {
   if (!trimmed) { showToast("❌ Name can't be empty."); return; }
   arr[idx] = trimmed;
   saveTeacherArray(grade, arr);
+  // Carry their phone number over to the new name, then drop the old entry
+  if (trimmed.toLowerCase() !== current.toLowerCase()) {
+    const phone = getTeacherPhone(grade, current);
+    if (phone) setTeacherPhone(grade, trimmed, phone);
+    deleteTeacherPhoneEntry(grade, current);
+  }
   showToast("✅ Renamed to " + trimmed);
+  renderSuperAdminTab();
+  renderClassesTab();
+}
+
+function editTeacherPhone(grade, idx) {
+  const arr = getTeacherArray(grade);
+  const name = arr[idx] || "";
+  if (!name) return;
+  const current = getTeacherPhone(grade, name);
+  const newPhone = prompt("Phone number for " + name + ":", current);
+  if (newPhone === null) return; // cancelled
+  const trimmed = newPhone.trim();
+  setTeacherPhone(grade, name, trimmed);
+  showToast(trimmed ? "✅ Phone number saved for " + name : "✅ Phone number cleared for " + name);
   renderSuperAdminTab();
   renderClassesTab();
 }
@@ -3193,6 +3265,7 @@ function removeTeacherFromClass(grade, idx) {
   if (arr.length <= 1) { showToast("⚠️ A class must have at least one teacher. Use Delete Class to remove it entirely."); return; }
   const removed = arr.splice(idx, 1)[0];
   saveTeacherArray(grade, arr);
+  deleteTeacherPhoneEntry(grade, removed);
   showToast("🗑️ " + removed + " removed from Grade " + grade);
   renderSuperAdminTab();
   renderClassesTab();
