@@ -934,21 +934,25 @@ const statuses = JSON.parse(localStorage.getItem("rosterStatuses") || "{}");
 function getKey(date, name) { return `${date}__${name}`; }
 function normalizeRosterDate(dateStr) {
   if (!dateStr) return "";
-  // Strip grade prefix like "G6-", "G9-" etc.
+  // Preserve any grade prefix like "G6-", "G9-" — normalize only the date portion.
+  // (Previously this stripped the prefix entirely, which broke matching between
+  // the roster's grade-scoped keys and dates read back from the Sheet.)
+  const prefixMatch = String(dateStr).trim().match(/^(G\d+-)/);
+  const prefix = prefixMatch ? prefixMatch[1] : "";
   let s = String(dateStr).trim().replace(/^G\d+-/, "");
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   // Already "May 3" or "May 3 2026" format
   const m0 = s.match(/^([A-Za-z]+)\s+(\d+)(\s+\d{4})?$/);
-  if (m0) return m0[1].charAt(0).toUpperCase() + m0[1].slice(1,3).toLowerCase() + " " + parseInt(m0[2]) + (m0[3] ? m0[3] : "");
+  if (m0) return prefix + m0[1].charAt(0).toUpperCase() + m0[1].slice(1,3).toLowerCase() + " " + parseInt(m0[2]) + (m0[3] ? m0[3] : "");
   // "5/3/2026" MM/DD/YYYY
   const m2 = s.match(/^(\d+)\/(\d+)\/(\d{4})$/);
-  if (m2) return months[parseInt(m2[1])-1] + " " + parseInt(m2[2]) + " " + m2[3];
+  if (m2) return prefix + months[parseInt(m2[1])-1] + " " + parseInt(m2[2]) + " " + m2[3];
   // "03/05/2026" DD/MM/YYYY
   const m3 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m3) return months[parseInt(m3[2])-1] + " " + parseInt(m3[1]) + " " + m3[3];
+  if (m3) return prefix + months[parseInt(m3[2])-1] + " " + parseInt(m3[1]) + " " + m3[3];
   // Try JS Date
-  try { const d = new Date(s); if (!isNaN(d)) return months[d.getMonth()] + " " + d.getDate() + " " + d.getFullYear(); } catch(e) {}
-  return s;
+  try { const d = new Date(s); if (!isNaN(d)) return prefix + months[d.getMonth()] + " " + d.getDate() + " " + d.getFullYear(); } catch(e) {}
+  return prefix + s;
 }
 
 // Apply to all roster dates on load
@@ -1594,7 +1598,7 @@ function saveChildInfo() {
     // Persist this parent's updated duty date to the Sheet (upserts by phone hash)
     fetch(SHEET_URL, {
       method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ type: "newParent", name: myName, phone: myPhone, h: myHash, e: encoded, pin: pin, date: week.date.replace(gradePrefix, "") })
+      body: JSON.stringify({ type: "newParent", name: myName, phone: myPhone, h: myHash, e: encoded, pin: pin, date: week.date })
     }).catch(() => {});
   })();
 
