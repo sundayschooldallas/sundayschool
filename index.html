@@ -4429,7 +4429,7 @@ function renderPinTab() {
           </div>
 
           <div style="margin-top:10px;border-top:0.5px solid #f0eefb;padding-top:10px;">
-            ${adminRole === "superadmin" ? `<button onclick="fullRemoveParent('${p.name}','${p.h}','${week.date}')"
+            ${adminRole === "superadmin" ? `<button onclick="removeParentWithWarning('${p.name}','${p.h}','${week.date}')"
               style="width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:#fdeaea;color:#a32d2d;border:1.5px solid #f7bfbf;border-radius:10px;cursor:pointer;">
               🗑️ Fully Remove ${p.name} from System
             </button>` : `<div style="font-size:11px;color:#bbb;text-align:center;">🔒 Full removal — Super Admin only</div>`}
@@ -4439,6 +4439,24 @@ function renderPinTab() {
   });
 
   document.getElementById("tabPinContent").innerHTML = html;
+}
+
+// Wraps fullRemoveParent with a clear, specific warning about which children
+// (and which grades) will be removed along with this parent — called from the
+// Parents tab list.
+function removeParentWithWarning(name, ph, date) {
+  const kids = (childrenSheetData || []).filter(r => r && r.phone && normalize(r.phone) === normalize(ph) && !r.graduated);
+  if (kids.length > 0) {
+    const kidsList = kids.map(k => (k.name || "Unnamed") + " in Grade " + (k.grade || "?")).join(", ");
+    const proceed = confirm(
+      "⚠️ " + name + " has " + kids.length + " child" + (kids.length > 1 ? "ren" : "") + " registered: " + kidsList + ".\n\n" +
+      "Deleting this parent profile will ALSO delete " + (kids.length > 1 ? "these children" : "this child") + ". " +
+      "They will need to be registered again — either by the parent, or by the admin for their grade.\n\n" +
+      "Continue with deleting " + name + " and " + (kids.length > 1 ? "their children" : "their child") + "?"
+    );
+    if (!proceed) return;
+  }
+  fullRemoveParent(name, ph, date);
 }
 
 function fullRemoveParent(name, ph, date) {
@@ -4476,15 +4494,18 @@ function fullRemoveParent(name, ph, date) {
 
   // 4. Remove from newParentsFromSheet cache
   newParentsFromSheet = newParentsFromSheet.filter(p => p.h !== ph);
-  childrenSheetData = childrenSheetData.filter(r => r.phone !== ph);
+  childrenSheetData = childrenSheetData.filter(r => normalize(r.phone) !== normalize(ph));
 
-  // 5. Wipe from Google Sheets (child info + tracker)
+  // 5. Actually delete this parent's children rows from Google Sheets
+  // (previously this only blanked one row, which no longer matches how
+  // the backend identifies children now that it keys on phone + name)
   fetch(SHEET_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"},
-    body: JSON.stringify({ type:"childInfo", phone: ph, parentName: name, childName:"", grade:0, teacher:"", unassigned:false })
+    body: JSON.stringify({ type:"deleteChildrenByPhone", phone: ph })
   }).catch(()=>{});
 
-  showToast("🗑️ " + name + " fully removed from system.");
+  showToast("🗑️ " + name + " and their children fully removed from system.");
   renderPinTab();
+  try { renderParentsTab(); } catch(e) {}
 }
 
 function updateName(oldName, inputId) {
@@ -4825,7 +4846,7 @@ function renderParentsTab() {
     <!-- Current Roster for this class only -->
     ${relevantRoster.length > 0 ? `
     <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">
-      ${adminGrade ? "Your Class Parents" : "Current Roster"}
+      ${adminGrade ? "Your Class Schedule" : "Current Roster"}
     </div>
     ${relevantRoster.map(w => `
       <div style="background:white;border-radius:12px;padding:11px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(13,122,138,0.06);display:flex;align-items:center;justify-content:space-between;">
@@ -4840,6 +4861,55 @@ function renderParentsTab() {
     <div style="text-align:center;padding:20px;color:#bbb;font-size:13px;font-weight:700;">
       No parents added yet for this class. Use ➕ Add Parent above to get started.
     </div>`}
+
+    <!-- Manage Existing Parents — individual list with edit/delete -->
+    ${(function(){
+      const seen = new Set();
+      const flatParents = [];
+      relevantRoster.forEach(w => {
+        w.parents.forEach(p => {
+          if (seen.has(p.h)) return;
+          seen.add(p.h);
+          flatParents.push({ p, date: w.date });
+        });
+      });
+      if (flatParents.length === 0) return "";
+      return `
+      <div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px;">
+        Manage Existing Parents
+      </div>
+      ${flatParents.map(({p, date}) => {
+        const kids = (childrenSheetData || []).filter(r => r && r.phone && normalize(r.phone) === normalize(p.h) && !r.graduated);
+        const kidsLabel = kids.length > 0
+          ? kids.map(k => (k.name || "Unnamed") + " (Grade " + (k.grade || "?") + ")").join(", ")
+          : "No children registered yet";
+        const safeId = p.name.replace(/\s|\./g,'_');
+        return `
+        <div style="background:white;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 10px rgba(13,122,138,0.08);">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:14px;font-weight:800;color:#0a3d45;">${p.name}</div>
+              <div style="font-size:12px;color:#7b7a90;margin-top:2px;">📅 ${date.replace(/^G\d+-/,"")} &nbsp;·&nbsp; PIN ${p.pin}</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:12px;color:#0d7a8a;background:#e0f5f7;border-radius:10px;padding:6px 10px;">
+            👶 ${kidsLabel}
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button onclick="showAdminTab('pin')"
+              style="flex:1;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:#e0f5f7;color:#0a5260;border:none;border-radius:10px;cursor:pointer;">
+              ✏️ Edit Name / Phone / PIN
+            </button>
+            ${adminRole === "superadmin"
+              ? `<button onclick="removeParentWithWarning('${p.name}','${p.h}','${date}')"
+                  style="flex:1;padding:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;background:#fdeaea;color:#a32d2d;border:1.5px solid #f7bfbf;border-radius:10px;cursor:pointer;">
+                  🗑️ Delete Parent
+                </button>`
+              : `<div style="flex:1;text-align:center;font-size:11px;color:#bbb;padding-top:8px;">🔒 Delete — Super Admin only</div>`}
+          </div>
+        </div>`;
+      }).join("")}`;
+    })()}
   `;
 
   document.getElementById("tabParentsContent").innerHTML = html;
