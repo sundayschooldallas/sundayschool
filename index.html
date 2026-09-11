@@ -1360,7 +1360,8 @@ function saveChildInfo() {
     // Also check childrenSheetData
     if (!isDuplicate && childrenSheetData) {
       for (const row of childrenSheetData) {
-        if (row.name && row.name.trim().toLowerCase() === nameLower) { isDuplicate = true; break; }
+        const rowName = row.childName || row.name;
+        if (rowName && rowName.trim().toLowerCase() === nameLower) { isDuplicate = true; break; }
       }
     }
     if (isDuplicate) {
@@ -1382,14 +1383,15 @@ function saveChildInfo() {
     allChildren: pendingChildren
   }));
 
-  // Sync each child to Google Sheets
+  // Sync each child to Google Sheets — real phone for every child now that the
+  // backend matches rows by phone + child name (so siblings don't overwrite each other)
   pendingChildren.forEach((c, i) => {
     fetch(SHEET_URL, {
       method: "POST", mode: "no-cors",
       headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({
         type: "childInfo",
-        phone: i === 0 ? myPhone : myPhone + "_child" + i,
+        phone: myPhone,
         parentName: myName,
         childName: c.name,
         grade: c.grade,
@@ -4723,7 +4725,7 @@ function getChildInfoByParent(parentName) {
       if (adminGrade && g !== adminGrade) return null;
       if (adminGrade && g !== adminGrade) return null;
     }
-    return { name: fromSheet.childName, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned };
+    return { name: fromSheet.name, grade: fromSheet.grade, teacher: fromSheet.teacher, unassigned: fromSheet.unassigned };
   }
 
   // Fallback to localStorage
