@@ -3542,6 +3542,59 @@ function deleteCustomUser(idx) {
   renderSuperAdminTab();
 }
 
+// ── MODERN MODAL SYSTEM ──────────────────────────────────────────────
+// Replaces native confirm()/prompt() with a themed dialog matching the
+// rest of the app, while keeping the same async call pattern.
+function customModal({ title, message, type, placeholder, danger, okLabel }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(10,8,30,0.72);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;animation:modernScreenIn 0.2s ease;";
+
+    const card = document.createElement("div");
+    card.style.cssText = "background:linear-gradient(165deg,#1e1b4b 0%,#312e81 60%,#0e7490 100%);border:1px solid rgba(255,255,255,0.15);border-radius:22px;padding:24px;max-width:420px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.55);color:white;font-family:'Nunito',sans-serif;max-height:85vh;overflow-y:auto;";
+
+    const inputHtml = type === "prompt"
+      ? `<input id="modalInput" type="text" placeholder="${placeholder || ""}" style="width:100%;padding:13px 14px;margin-top:16px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1);color:white;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;" />`
+      : "";
+
+    card.innerHTML = `
+      ${title ? `<div style="font-size:17px;font-weight:900;margin-bottom:10px;${danger ? "color:#ff9b9b;" : "color:white;"}">${title}</div>` : ""}
+      <div style="font-size:13.5px;line-height:1.65;color:rgba(255,255,255,0.88);white-space:pre-line;">${message}</div>
+      ${inputHtml}
+      <div style="display:flex;gap:10px;margin-top:22px;">
+        <button id="modalCancel" style="flex:1;padding:13px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:white;font-family:'Nunito',sans-serif;font-weight:800;font-size:13.5px;cursor:pointer;">Cancel</button>
+        <button id="modalOk" style="flex:1;padding:13px;border-radius:12px;border:none;background:${danger ? "linear-gradient(135deg,#991b1b,#ef4444)" : "linear-gradient(135deg,#6366f1,#06b6d4)"};color:white;font-family:'Nunito',sans-serif;font-weight:800;font-size:13.5px;cursor:pointer;box-shadow:0 6px 18px ${danger ? "rgba(239,68,68,0.35)" : "rgba(99,102,241,0.35)"};">${okLabel || "OK"}</button>
+      </div>`;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const input = card.querySelector("#modalInput");
+    if (input) setTimeout(() => input.focus(), 60);
+
+    function close(result) {
+      overlay.remove();
+      resolve(result);
+    }
+
+    card.querySelector("#modalCancel").onclick = () => close(type === "prompt" ? null : false);
+    card.querySelector("#modalOk").onclick = () => close(type === "prompt" ? (input ? input.value : "") : true);
+    if (input) {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") close(input.value);
+        if (e.key === "Escape") close(null);
+      });
+    }
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(type === "prompt" ? null : false); });
+  });
+}
+function modalConfirm(message, opts = {}) {
+  return customModal({ message, type: "confirm", title: opts.title, danger: opts.danger, okLabel: opts.okLabel });
+}
+function modalPrompt(message, placeholder = "", opts = {}) {
+  return customModal({ message, type: "prompt", placeholder, title: opts.title, danger: opts.danger, okLabel: opts.okLabel });
+}
+
 async function deleteClass(grade) {
   // Count affected students first — this number drives the whole warning
   let studentCount = 0;
@@ -3559,7 +3612,6 @@ async function deleteClass(grade) {
   }
 
   const warningMsg =
-    "⚠️ DELETE GRADE " + grade + " — READ CAREFULLY\n\n" +
     "This class currently has " + studentCount + " registered student" + (studentCount === 1 ? "" : "s") + ".\n\n" +
     "Deleting it will PERMANENTLY remove:\n" +
     "• The teacher assignment and class password\n" +
@@ -3569,24 +3621,29 @@ async function deleteClass(grade) {
     (studentCount > 0
       ? "Because real students and parents are affected, deleting this class is NOT advised — consider it only if you're certain.\n\n"
       : "") +
-    "This cannot be undone. Continue?";
-  if (!confirm(warningMsg)) return;
+    "This cannot be undone.";
+  const proceed1 = await modalConfirm(warningMsg, { title: "⚠️ Delete Grade " + grade + " — Read Carefully", danger: true, okLabel: "Continue" });
+  if (!proceed1) return;
 
-  const enteredCode = prompt("Enter the delete code for Grade " + grade + " (find it in 🔐 Delete Code Vault above):");
+  const enteredCode = await modalPrompt("Find it in 🔐 Delete Code Vault, in Super Admin.", "Delete code for Grade " + grade, { title: "Enter Delete Code", danger: true, okLabel: "Verify" });
   if (enteredCode === null) return;
   if (enteredCode.trim().toUpperCase() !== String(knownCode).toUpperCase()) {
     showToast("❌ Delete code didn't match. Nothing was deleted.");
     return;
   }
 
-  const confirmerName = prompt("Your name — this will be permanently recorded as who authorized this deletion:");
+  const confirmerName = await modalPrompt("This will be permanently recorded as who authorized this deletion.", "Your name", { title: "Authorize This Deletion", danger: true, okLabel: "Continue" });
   if (confirmerName === null || !confirmerName.trim()) {
     showToast("❌ A name is required to authorize deletion. Nothing was deleted.");
     return;
   }
   const confirmerTrimmed = confirmerName.trim();
 
-  if (!confirm("FINAL CONFIRMATION\n\nDelete Grade " + grade + " and all " + studentCount + " student(s) in it?\nAuthorized by: " + confirmerTrimmed + "\n\nThis is your last chance to cancel.")) return;
+  const proceed2 = await modalConfirm(
+    "Delete Grade " + grade + " and all " + studentCount + " student(s) in it?\n\nAuthorized by: " + confirmerTrimmed + "\n\nThis is your last chance to cancel.",
+    { title: "🚨 Final Confirmation", danger: true, okLabel: "Delete Permanently" }
+  );
+  if (!proceed2) return;
 
   showToast("⏳ Deleting Grade " + grade + "...");
 
