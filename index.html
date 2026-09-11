@@ -910,6 +910,64 @@ async function loadDeletedGradesFromSheet() {
   } catch(e) { console.log("Could not load deleted grades:", e); }
 }
 
+// Fetches and renders who/what role/device logged in, and when.
+async function loadAndRenderLoginLog() {
+  const el = document.getElementById("loginActivityLog");
+  if (!el) return;
+  el.innerHTML = `<div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">Loading...</div>`;
+  try {
+    const res = await fetch(SHEET_URL + "?type=loginLog&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      el.innerHTML = `<div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">No logins recorded yet.</div>`;
+      return;
+    }
+    const roleLabels = { superadmin: "👑 Super Admin", admin: "🛡️ Admin", gradeadmin: "🏫 Grade Admin", advocate: "💚 Advocate", rollcall: "📋 Roll Call" };
+    // Most recent first, capped to the last 50 so this doesn't grow unbounded on screen
+    const sorted = data.slice().reverse().slice(0, 50);
+    el.innerHTML = sorted.map(entry => {
+      const label = roleLabels[entry.role] || entry.role;
+      const gradeLabel = entry.grade ? " · Grade " + entry.grade : "";
+      return `
+      <div style="background:rgba(255,255,255,0.06);border-left:3px solid #6366f1;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:800;color:white;">${label}${gradeLabel}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">📱 ${entry.device}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px;">${entry.timestamp}</div>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    el.innerHTML = `<div style="text-align:center;padding:14px;color:rgba(255,140,140,0.8);font-size:12px;font-weight:700;">Couldn't load the log — check your connection and try again.</div>`;
+  }
+}
+
+// grade, who authorized it, how many students were affected, and when.
+async function loadAndRenderDeletionLog() {
+  const el = document.getElementById("deletionAuditLog");
+  if (!el) return;
+  try {
+    const res = await fetch(SHEET_URL + "?type=deletionLog&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      el.innerHTML = `<div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">No classes have been deleted yet.</div>`;
+      return;
+    }
+    // Most recent first
+    const sorted = data.slice().reverse();
+    el.innerHTML = sorted.map(entry => `
+      <div style="background:rgba(255,255,255,0.06);border-left:3px solid #ef4444;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:800;color:white;">Grade ${entry.grade} deleted</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px;">
+          👤 Authorized by <strong>${entry.confirmedBy}</strong> &nbsp;·&nbsp; 🎓 ${entry.studentsDeleted} student${entry.studentsDeleted === 1 ? "" : "s"} affected
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px;">${entry.timestamp}</div>
+      </div>`).join("");
+  } catch(e) {
+    el.innerHTML = `<div style="text-align:center;padding:14px;color:rgba(255,140,140,0.8);font-size:12px;font-weight:700;">Couldn't load the log — check your connection and try reopening this tab.</div>`;
+  }
+}
+
 // Pull custom classes (created via Super Admin) from the Sheet and merge them
 // into local state, so a class created on one device shows up everywhere —
 // front page, duty board, admin logins, everything — not just on the device
@@ -2274,6 +2332,35 @@ function showVerify() {
   myPhone = ""; myName = ""; myWeek = null; myParent = null; myPartner = null;
 }
 
+// ── LOGIN ACTIVITY LOGGING ────────────────────────────────────────────
+// Turns a raw User-Agent string into something readable, e.g. "Chrome on
+// Windows" or "Safari on iPhone", instead of a wall of technical text.
+function describeDevice() {
+  const ua = navigator.userAgent || "";
+  let browser = "Unknown browser";
+  if (/Edg\//.test(ua)) browser = "Edge";
+  else if (/Chrome\//.test(ua) && !/OPR\//.test(ua)) browser = "Chrome";
+  else if (/Firefox\//.test(ua)) browser = "Firefox";
+  else if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) browser = "Safari";
+  else if (/OPR\//.test(ua)) browser = "Opera";
+
+  let os = "Unknown device";
+  if (/iPhone/.test(ua)) os = "iPhone";
+  else if (/iPad/.test(ua)) os = "iPad";
+  else if (/Android/.test(ua)) os = "Android";
+  else if (/Windows/.test(ua)) os = "Windows";
+  else if (/Macintosh/.test(ua)) os = "Mac";
+  else if (/Linux/.test(ua)) os = "Linux";
+
+  return browser + " on " + os;
+}
+function logLoginEvent(role, grade) {
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "logLogin", role: role, grade: grade || "", device: describeDevice() })
+  }).catch(() => {});
+}
+
 async function verifyAdmin() {
   const pw = document.getElementById("adminPwInput").value;
   const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
@@ -2289,6 +2376,7 @@ async function verifyAdmin() {
   async function loginAdmin(role, grade) {
     adminRole = role;
     adminGrade = grade;
+    logLoginEvent(role, grade);
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("adminDash").style.display = "block";
     document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:30px;font-weight:700;'><span class='modern-spinner'></span>Loading data...</p>";
@@ -2335,6 +2423,7 @@ async function verifyAdmin() {
     if (gradeMatch !== null) {
       await loginAdmin("gradeadmin", gradeMatch);
     } else if (pw === ADVOCATE_PASSWORD) {
+      logLoginEvent("advocate", null);
       document.getElementById("adminLogin").style.display = "none";
       document.getElementById("advocateDash").style.display = "block";
       document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;"><span class="modern-spinner"></span>Loading data from server...</div>`;
@@ -2919,6 +3008,27 @@ function renderSuperAdminTab() {
       </div>
     </div>
 
+    <!-- ── LOGIN ACTIVITY LOG ───────────────────────────────────────── -->
+    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+        <div style="font-size:14px;font-weight:900;color:white;">🔓 Login Activity Log</div>
+        <button onclick="loadAndRenderLoginLog()" style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:7px;padding:5px 10px;cursor:pointer;">↻ Refresh</button>
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Every successful login — role, class, device, and when. Note: since passwords are shared per role/class rather than per person, this shows <em>which role and device</em> logged in, not necessarily which specific person was using it.</div>
+      <div id="loginActivityLog">
+        <div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">Loading...</div>
+      </div>
+    </div>
+
+    <!-- ── DELETION AUDIT LOG ───────────────────────────────────────── -->
+    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:900;color:white;margin-bottom:2px;">📜 Deletion Audit Log</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Every class deletion is permanently recorded here — grade, who authorized it, how many students were affected, and when.</div>
+      <div id="deletionAuditLog">
+        <div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">Loading...</div>
+      </div>
+    </div>
+
     <!-- ── ANNUAL PROMOTION ──────────────────────────────────────────── -->
     <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
       <div style="font-size:14px;font-weight:900;color:white;margin-bottom:6px;">🎓 Annual Promotion + Archive</div>
@@ -3203,6 +3313,8 @@ function renderSuperAdminTab() {
   checkPromotionBanner();
   renderEventsCalendarList();
   loadEventsCalendarFromSheet().then(renderEventsCalendarList).catch(()=>{});
+  loadAndRenderDeletionLog();
+  loadAndRenderLoginLog();
 }
 
 function getTeacherListHtml(grade, teacherStr, color) {
@@ -6308,6 +6420,7 @@ function saveRollCallEntry(date, childName, status) {
 
 function showRollCallDash(grade) {
   if (grade !== undefined) rollCallGrade = grade;
+  logLoginEvent("rollcall", grade);
   document.getElementById("rollCallDash").style.display = "block";
   function _setRCTitle() {
     const el = document.getElementById("rcSubtitle");
