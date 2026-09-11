@@ -3465,6 +3465,18 @@ async function addNewGrade() {
   // Also add to GRADE_ADMIN_PASSWORDS so login works immediately
   GRADE_ADMIN_PASSWORDS[gradeNum] = finalPw;
 
+  // If this grade number was deleted before, clear that old tombstone —
+  // otherwise the new class would be silently hidden everywhere even
+  // though it's a brand-new class now.
+  const deletedGrades = JSON.parse(localStorage.getItem("deletedGrades") || "[]");
+  if (deletedGrades.includes(gradeNum)) {
+    localStorage.setItem("deletedGrades", JSON.stringify(deletedGrades.filter(g => g !== gradeNum)));
+    fetch(SHEET_URL, {
+      method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ type: "untombstoneGrade", grade: gradeNum })
+    }).catch(() => {});
+  }
+
   // Persist to Google Sheets so this class shows up on every device, not just this one.
   // Readable (not no-cors) so we can capture the delete code the server generates
   // immediately, instead of leaving it to a later refresh that could race with this call.
