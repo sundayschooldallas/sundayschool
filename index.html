@@ -2534,6 +2534,11 @@ function showAdminTab(tab) {
     loadChildrenFromSheet().then(() => renderStudentsTab()).catch(() => renderStudentsTab());
   }
   if (tab === "superadmin") renderSuperAdminTab();
+  if (tab === "parents") {
+    Promise.all([loadNewParentsFromSheet(), loadChildrenFromSheet()])
+      .then(() => renderParentsTab())
+      .catch(() => renderParentsTab());
+  }
 }
 
 function renderSuperAdminTab() {
