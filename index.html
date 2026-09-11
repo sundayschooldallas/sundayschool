@@ -1031,6 +1031,19 @@ function generateSundaysWithYear(startYear, yearsAhead) {
 // 1) Prefer a real calendar date that already has a roster week with 0 parents.
 // 2) Otherwise, take the next real Sunday that has no roster week yet and create it.
 // 3) Last resort: any existing slot for this grade with room for a partner.
+// Determine which grade a parent belongs to for admin filtering purposes.
+// Prefers actual registered child info; falls back to the grade encoded in
+// the roster week's date prefix (e.g. "G8-...") so a parent who has been
+// added but whose child isn't registered yet still shows up for the right
+// grade admin instead of silently disappearing.
+function parentBelongsToGrade(week, parentName, grade) {
+  const ci = getChildInfoByParent(parentName);
+  if (ci && ci.grade) return Number(ci.grade) === Number(grade);
+  const m = String(week.date).match(/^G(\d+)-/);
+  if (m) return Number(m[1]) === Number(grade);
+  return false;
+}
+
 function findNextOpenGradeDate(grade) {
   const prefix = "G" + grade + "-";
   const now = new Date();
@@ -3906,11 +3919,7 @@ function renderAttendanceTab(isSunday, isPastCheck) {
       week.parents.forEach(p => {
         // Filter by grade if grade admin
         if (adminGrade) {
-          const ci = getChildInfoByParent(p.name);
-          if (!ci || !ci.grade) return;
-          const g = Number(ci.grade);
-          if (adminGrade && g !== adminGrade) return;
-          if (adminGrade && g !== adminGrade) return;
+          if (!parentBelongsToGrade(week, p.name, adminGrade)) return;
         }
         if (getStatus(week.date, p.name) !== "confirmed") noShows.push({ ...p, date: week.date });
       });
@@ -3984,11 +3993,7 @@ function renderSwapTab() {
   roster.forEach(week => {
     week.parents.forEach(p => {
       if (adminGrade) {
-        const ci = getChildInfoByParent(p.name);
-        if (!ci || !ci.grade) return;
-        const g = Number(ci.grade);
-        if (adminGrade && g !== adminGrade) return;
-        if (adminGrade && g !== adminGrade) return;
+        if (!parentBelongsToGrade(week, p.name, adminGrade)) return;
       }
       parentOptions += `<option value="${week.date}|${p.name}">${p.name} — currently ${week.date}</option>`;
     });
@@ -4105,13 +4110,10 @@ function renderPinTab() {
 
   roster.forEach(week => {
     week.parents.forEach(p => {
-      // Filter by grade if grade admin
+      // Filter by grade if grade admin (falls back to the week's grade prefix
+      // if the child hasn't been registered yet, so newly-added parents still show)
       if (adminGrade) {
-        const ci = getChildInfoByParent(p.name);
-        if (!ci || !ci.grade) return;
-        const g = Number(ci.grade);
-        if (adminGrade && g !== adminGrade) return;
-        if (adminGrade && g !== adminGrade) return;
+        if (!parentBelongsToGrade(week, p.name, adminGrade)) return;
       }
       const currentPin = customPins[p.name] || p.pin;
       const safeId = p.name.replace(/\s|\./g,'_');
