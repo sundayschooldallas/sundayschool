@@ -456,6 +456,11 @@ document.addEventListener('click', function(e) {
     </div>
     <button class="verify-btn" onclick="verifyPhone()">Find my assignment →</button>
     <div class="verify-error" id="verifyError">❌ Phone number or PIN is incorrect.</div>
+    <button onclick="showDutyBoard('verify')" type="button"
+      style="width:100%;margin-top:12px;padding:13px;background:rgba(255,215,0,0.12);border:1.5px solid rgba(255,215,0,0.4);
+      border-radius:14px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:#a17f00;cursor:pointer;">
+      📋 View Who Is On Duty This Sunday
+    </button>
   </div>
 </div>
 </div>
@@ -547,6 +552,23 @@ document.addEventListener('click', function(e) {
 </div>
 
 <!-- CHILD INFO SCREEN -->
+<!-- PUBLIC DUTY BOARD — its own independent screen, no login needed, reachable from the front page -->
+<div id="publicDutyBoard" style="display:none;background:linear-gradient(160deg,#1e1b4b 0%,#312e81 45%,#0e7490 100%);min-height:100vh;padding-bottom:20px;">
+  <div style="max-width:480px;margin:0 auto;padding:16px 14px;">
+  <div style="background:rgba(255,255,255,0.08);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:20px;margin-bottom:16px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.25);">
+    <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📋 Parent Duty Board</div>
+    <div style="font-size:19px;font-weight:900;color:white;">Who is on duty this Sunday?</div>
+    <div id="dutyBoardDate" style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:4px;"></div>
+  </div>
+  <div id="dutyBoardContent"></div>
+  <button onclick="hideDutyBoard()"
+    style="width:100%;margin-top:10px;padding:14px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
+    border-radius:14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;color:white;cursor:pointer;">
+    ← Back to Login
+  </button>
+  </div>
+</div>
+
 <div id="childInfoScreen" style="display:none;min-height:100vh;background:#e0f5f7;padding-bottom:40px;">
   <div style="background:linear-gradient(135deg,#0a5260,#0d7a8a);padding:28px 20px 24px;text-align:center;color:white;">
     <div style="font-size:28px;margin-bottom:8px;">👨‍👧</div>
@@ -554,24 +576,8 @@ document.addEventListener('click', function(e) {
     <div style="font-size:13px;opacity:0.8;">This only takes a moment — fill in once</div>
   </div>
 
-      <!-- PUBLIC DUTY BOARD — no login needed -->
-  <div id="publicDutyBoard" style="display:none;background:linear-gradient(160deg,#1e1b4b 0%,#312e81 45%,#0e7490 100%);min-height:100vh;padding-bottom:20px;">
-    <div style="max-width:480px;margin:0 auto;padding:16px 14px;">
-    <div style="background:rgba(255,255,255,0.08);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:20px;margin-bottom:16px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.25);">
-      <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📋 Parent Duty Board</div>
-      <div style="font-size:19px;font-weight:900;color:white;">Who is on duty this Sunday?</div>
-      <div id="dutyBoardDate" style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:4px;"></div>
-    </div>
-    <div id="dutyBoardContent"></div>
-    <button onclick="hideDutyBoard()"
-      style="width:100%;margin-top:10px;padding:14px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
-      border-radius:14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;color:white;cursor:pointer;">
-      ← Back to Login
-    </button>
-    </div>
-  </div>
-  <div style="max-width:480px;margin:0 auto;padding:0 14px 10px;">
-    <button onclick="showDutyBoard()"
+  <div id="dutyBoardTriggerWrap" style="max-width:480px;margin:0 auto;padding:0 14px 10px;">
+    <button onclick="showDutyBoard('childInfo')"
       style="width:100%;padding:14px;background:rgba(255,215,0,0.15);border:1.5px solid rgba(255,215,0,0.4);
       border-radius:14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;color:#FFD700;cursor:pointer;">
       📋 View Who is On Duty This Sunday
@@ -674,9 +680,14 @@ const avatarColors = [
   { bg: "#f0fce8", color: "#2a6b10" },
 ];
 
-function showDutyBoard() {
+let dutyBoardOrigin = "verify"; // "verify" (front page) or "childInfo" (post-login registration screen)
+
+function showDutyBoard(origin) {
+  dutyBoardOrigin = origin === "childInfo" ? "childInfo" : "verify";
   document.getElementById("publicDutyBoard").style.display = "block";
   document.getElementById("mainLoginArea").style.display = "none";
+  const triggerWrap = document.getElementById("dutyBoardTriggerWrap");
+  if (triggerWrap) triggerWrap.style.display = "none";
   const verifyScreen = document.getElementById("verifyScreen");
   if (verifyScreen) verifyScreen.style.display = "none";
   renderDutyBoard();
@@ -684,7 +695,14 @@ function showDutyBoard() {
 
 function hideDutyBoard() {
   document.getElementById("publicDutyBoard").style.display = "none";
-  document.getElementById("mainLoginArea").style.display = "block";
+  const triggerWrap = document.getElementById("dutyBoardTriggerWrap");
+  if (dutyBoardOrigin === "childInfo") {
+    document.getElementById("mainLoginArea").style.display = "block";
+    if (triggerWrap) triggerWrap.style.display = "block";
+  } else {
+    const verifyScreen = document.getElementById("verifyScreen");
+    if (verifyScreen) verifyScreen.style.display = "flex";
+  }
 }
 
 function renderDutyBoard() {
