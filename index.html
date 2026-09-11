@@ -725,16 +725,16 @@ function renderDutyBoard() {
   const targetSunday = new Date(now);
   targetSunday.setDate(now.getDate() + daysToSunday);
   const targetStr = months[targetSunday.getMonth()] + " " + targetSunday.getDate();
+  const targetKey  = targetStr + " " + targetSunday.getFullYear();
 
   const nextSunday = new Date(targetSunday);
   nextSunday.setDate(targetSunday.getDate() + 7);
   const nextStr = months[nextSunday.getMonth()] + " " + nextSunday.getDate();
+  const nextKey  = nextStr + " " + nextSunday.getFullYear();
 
   const dateEl = document.getElementById("dutyBoardDate");
   if (dateEl) dateEl.textContent = days[targetSunday.getDay()] + ", " + months[targetSunday.getMonth()] + " " + targetSunday.getDate() + ", " + targetSunday.getFullYear();
 
-  const thisWeek = roster.find(function(w){ return w.date === targetStr; });
-  const nextWeek = roster.find(function(w){ return w.date === nextStr; });
   const box = document.getElementById("dutyBoardContent");
   if (!box) return;
 
@@ -778,6 +778,10 @@ function renderDutyBoard() {
   container.appendChild(placeholder);
 
   allGrades.forEach(function(g) {
+    var gradePrefix = "G" + g + "-";
+    var thisWeek = roster.find(function(w){ return w.date === gradePrefix + targetKey; });
+    var nextWeek = roster.find(function(w){ return w.date === gradePrefix + nextKey; });
+
     var panel = document.createElement("div");
     panel.id = "dutyPanel_" + g;
     panel.style.display = "none";
