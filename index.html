@@ -310,15 +310,79 @@
   .mbtn-cancel { background: var(--gray); color: var(--muted); }
 
   .toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    background: var(--text); color: white; padding: 12px 22px; border-radius: 30px;
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px) scale(0.9);
+    background: linear-gradient(135deg, #0a3d45, #0a5260); color: white; padding: 14px 24px 14px 20px; border-radius: 30px;
     font-size: 13px; font-weight: 700; opacity: 0; pointer-events: none;
-    transition: opacity 0.3s; z-index: 200; white-space: nowrap;
+    transition: opacity 0.35s cubic-bezier(0.34,1.56,0.64,1), transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 200; white-space: nowrap; box-shadow: 0 10px 30px rgba(10,61,69,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset;
+    display: flex; align-items: center; gap: 8px;
   }
-  .toast.show { opacity: 1; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+
+  /* ── MODERN INTERACTION LAYER ── */
+  @keyframes modernPopIn {
+    0% { opacity: 0; transform: translateY(14px) scale(0.97); }
+    60% { opacity: 1; transform: translateY(-2px) scale(1.005); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes modernScreenIn {
+    0% { opacity: 0; transform: translateY(16px) scale(0.985); filter: blur(2px); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  }
+  @keyframes rippleAnim {
+    from { transform: scale(0); opacity: 0.55; }
+    to { transform: scale(2.6); opacity: 0; }
+  }
+  @keyframes spinModern {
+    to { transform: rotate(360deg); }
+  }
+  /* Screen-level containers replay this fade/slide every time JS toggles display */
+  #verifyScreen, #mainApp, #adminLogin, #adminDash, #advocateDash, #childInfoScreen, #adminDash > div {
+    animation: modernScreenIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  /* Auto-animate card-like blocks across every tab (matched by their common shadow signature) — no per-file edits needed */
+  div[style*="box-shadow:0 2px 10px rgba(13,122,138"],
+  div[style*="box-shadow: 0 2px 10px rgba(13,122,138"],
+  div[style*="box-shadow:0 2px 8px rgba(0,0,0,0.06)"] {
+    animation: modernPopIn 0.42s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  /* Buttons everywhere get a tasteful lift + press, plus a ripple layer */
+  button {
+    position: relative; overflow: hidden;
+    transition: transform 0.16s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease, filter 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:hover { transform: translateY(-1px); filter: brightness(1.04); }
+  button:active { transform: scale(0.95); filter: brightness(0.97); }
+  .modern-ripple {
+    position: absolute; border-radius: 50%; background: rgba(255,255,255,0.55);
+    pointer-events: none; transform: scale(0); animation: rippleAnim 0.55s ease-out forwards;
+  }
+  .modern-spinner {
+    display: inline-block; width: 18px; height: 18px; border-radius: 50%;
+    border: 2.5px solid rgba(13,122,138,0.2); border-top-color: #0d7a8a;
+    animation: spinModern 0.7s linear infinite; vertical-align: middle; margin-right: 8px;
+  }
 </style>
 </head>
+
 <body>
+<script>
+// ── MODERN UI LAYER: ripple on every button, no per-render-function changes needed ──
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const rect = btn.getBoundingClientRect();
+  const ripple = document.createElement('span');
+  const size = Math.max(rect.width, rect.height) * 1.2;
+  ripple.className = 'modern-ripple';
+  ripple.style.width = ripple.style.height = size + 'px';
+  ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+  ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+  btn.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 600);
+});
+</script>
 
 <div class="verify-screen" id="verifyScreen">
   <div class="stars"></div>
@@ -1782,7 +1846,7 @@ async function verifyAdmin() {
     adminGrade = grade;
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("adminDash").style.display = "block";
-    document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
+    document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:30px;font-weight:700;'><span class='modern-spinner'></span>Loading data...</p>";
     try {
       await withTimeout(
         Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
@@ -1828,7 +1892,7 @@ async function verifyAdmin() {
     } else if (pw === ADVOCATE_PASSWORD) {
       document.getElementById("adminLogin").style.display = "none";
       document.getElementById("advocateDash").style.display = "block";
-      document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;">⏳ Loading data from server...</div>`;
+      document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;"><span class="modern-spinner"></span>Loading data from server...</div>`;
       await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
       await renderAdvocateDash();
     } else if (pw === ROLL_CALL_PASSWORD_G6 || pw === customPws["rollcall_6"]) {
