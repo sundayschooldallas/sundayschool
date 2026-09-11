@@ -987,8 +987,12 @@ function generateSundaysWithYear(startYear, yearsAhead) {
 // 3) Last resort: any existing slot for this grade with room for a partner.
 function findNextOpenGradeDate(grade) {
   const prefix = "G" + grade + "-";
-  const currentYear = new Date().getFullYear();
-  const candidates = generateSundaysWithYear(currentYear, 2);
+  const now = new Date();
+  const curCalYear = now.getFullYear();
+  // Which school year is currently active? (school year runs Sep → Aug)
+  const activeSchoolYear = now >= getPromotionSunday(curCalYear) ? curCalYear : curCalYear - 1;
+  // Only ever look within the CURRENT active school year — never a year that hasn't begun
+  const candidates = generateSundaysWithYear(activeSchoolYear, 0);
 
   const existing = {};
   roster.forEach(w => { if (w.date.startsWith(prefix)) existing[w.date.slice(prefix.length)] = w; });
@@ -1005,6 +1009,20 @@ function findNextOpenGradeDate(grade) {
     }
   }
   return roster.find(w => w.date.startsWith(prefix) && w.parents.length < 2) || null;
+}
+
+// True if a "G{grade}-Mon D YYYY" date belongs to a school year that hasn't started yet
+function isFutureUnstartedSchoolYearDate(dateStr) {
+  const m = String(dateStr).match(/^G\d+-([A-Za-z]+)\s+(\d+)\s+(\d{4})$/);
+  if (!m) return false; // not a year-tagged grade date — leave it alone
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const monthIdx = months.indexOf(m[1]);
+  const year = parseInt(m[3]);
+  const dateSchoolYear = monthIdx >= 8 ? year : year - 1; // Sep–Dec belongs to that calendar year's school year
+  const now = new Date();
+  const curCalYear = now.getFullYear();
+  const activeSchoolYear = now >= getPromotionSunday(curCalYear) ? curCalYear : curCalYear - 1;
+  return dateSchoolYear > activeSchoolYear;
 }
 
 let pendingChildren = []; // stores multiple children before saving
@@ -1692,14 +1710,41 @@ async function verifyAdmin() {
   const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
   const effectiveAdminPw = customPws.admin || ADMIN_PASSWORD;
 
+  function withTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error((label || "Request") + " timed out after " + (ms/1000) + "s")), ms))
+    ]);
+  }
+
   async function loginAdmin(role, grade) {
     adminRole = role;
     adminGrade = grade;
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("adminDash").style.display = "block";
     document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:20px;'>Loading data...</p>";
-    await Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]);
-    renderAdminDash();
+    try {
+      await withTimeout(
+        Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
+        15000,
+        "Data load"
+      );
+    } catch(e) {
+      console.error("Admin data load failed:", e);
+      document.getElementById("adminContent").innerHTML =
+        "<p style='text-align:center;color:#a32d2d;padding:20px;font-weight:700;'>⚠️ Some data failed to load (" +
+        (e && e.message ? e.message : "unknown error") +
+        "). Showing what we have — try refreshing.</p>";
+    }
+    try {
+      renderAdminDash();
+    } catch(e) {
+      console.error("renderAdminDash failed:", e);
+      document.getElementById("adminContent").innerHTML =
+        "<p style='text-align:center;color:#a32d2d;padding:20px;font-weight:700;'>⚠️ Dashboard failed to render: " +
+        (e && e.message ? e.message : "unknown error") +
+        "<br><span style='font-size:12px;color:#7b7a90;font-weight:400;'>Check the browser console for details, or refresh and try again.</span></p>";
+    }
   }
 
   if (pw === SUPER_ADMIN_PASSWORD) {
@@ -3846,6 +3891,8 @@ function renderAttendanceTab(isSunday, isPastCheck) {
 
   html += `<div style="font-size:12px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Full Roster Status</div>`;
   roster.forEach(week => {
+    if (isFutureUnstartedSchoolYearDate(week.date)) return; // don't populate attendance for a year that hasn't begun
+
     // Filter parents by grade if grade admin
     const parents = adminGrade ? week.parents.filter(p => {
       const ci = getChildInfoByParent(p.name);
