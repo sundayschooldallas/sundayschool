@@ -735,12 +735,14 @@ function renderDutyBoard() {
   // Build dropdown
   var sel = document.createElement("select");
   sel.id = "dutyGradeSelect";
-  sel.style.cssText = "width:100%;padding:14px 16px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:1.5px solid rgba(255,255,255,0.3);border-radius:14px;background:rgba(255,255,255,0.14);backdrop-filter:blur(8px);color:white;outline:none;cursor:pointer;margin-bottom:14px;display:block;box-shadow:0 4px 16px rgba(0,0,0,0.15);";
+  sel.style.cssText = "width:100%;padding:14px 16px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:1.5px solid rgba(255,255,255,0.3);border-radius:14px;background-color:#241f5c;color:white;outline:none;cursor:pointer;margin-bottom:14px;display:block;box-shadow:0 4px 16px rgba(0,0,0,0.15);";
   sel.onchange = function(){ dutySelectGrade(this.value); };
 
   var defaultOpt = document.createElement("option");
   defaultOpt.value = "";
   defaultOpt.textContent = "— Select a class —";
+  defaultOpt.style.backgroundColor = "#241f5c";
+  defaultOpt.style.color = "#ffffff";
   sel.appendChild(defaultOpt);
 
   allGrades.forEach(function(g) {
@@ -749,6 +751,8 @@ function renderDutyBoard() {
     var opt = document.createElement("option");
     opt.value = g;
     opt.textContent = "Grade " + g + (teacher ? " · " + teacher : "");
+    opt.style.backgroundColor = "#241f5c";
+    opt.style.color = "#ffffff";
     sel.appendChild(opt);
   });
 
