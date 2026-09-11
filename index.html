@@ -755,7 +755,7 @@ function renderDutyBoard() {
 
   allGrades.forEach(function(g) {
     var rawT = customTeachersLocal[g] || TEACHERS[g] || "";
-    var teacher = rawT.split(/[,&]/)[0].trim();
+    var teacher = rawT.split(/[,&]/).map(function(x){ return x.trim(); }).filter(Boolean).join(" & ");
     var opt = document.createElement("option");
     opt.value = g;
     opt.textContent = "Grade " + g + (teacher ? " · " + teacher : "");
@@ -807,7 +807,7 @@ function renderDutyBoard() {
     var header = document.createElement("div");
     header.style.cssText = "background:" + bg + ";border-radius:14px 14px 0 0;padding:14px 16px;margin-bottom:0;";
     header.innerHTML = "<div style='font-size:16px;font-weight:900;color:white;'>Grade " + g + "</div>" +
-      (teacherName ? "<div style='font-size:12px;color:rgba(255,255,255,0.85);'>&#128105;&#8205;&#127979; " + teacherName + "</div>" : "");
+      (teacherName ? "<div style='font-size:12px;color:rgba(255,255,255,0.85);'>&#128105;&#8205;&#127979; Class Teacher" + (teacherName.includes(" & ") ? "s" : "") + ": " + teacherName + "</div>" : "");
 
     // This Sunday body
     var body = document.createElement("div");
@@ -815,7 +815,7 @@ function renderDutyBoard() {
 
     var label = document.createElement("div");
     label.style.cssText = "font-size:11px;font-weight:800;color:#7b7a90;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;";
-    label.textContent = "📋 This Sunday — " + targetStr;
+    label.textContent = "📋 Parent Scheduled Today — " + targetStr;
     body.appendChild(label);
 
     var thisParents = (thisWeek && thisWeek.parents) ? thisWeek.parents : [];
