@@ -1521,113 +1521,72 @@ async function initTodayPairBanner() {
 let bannerOffset = 0; // 0 = current/next, 1 = 1 week back, 2 = 2 weeks back etc.
 
 function renderTodayPairBanner(offset) {
-  if (offset !== undefined) bannerOffset = offset;
-  const now = getMockNow();
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const todayStr = `${months[now.getMonth()]} ${now.getDate()}`;
-  const isSunday = now.getDay() === 0;
-  const isPast12 = now.getHours() >= 12;
-
   const banner = document.getElementById("todayPairBanner");
   if (!banner) return;
 
-  // Build sorted list of all roster weeks
-  const sortedWeeks = roster.slice().sort((a, b) => {
-    const parse = d => { const [m,day] = d.split(" "); return new Date(2026, months.indexOf(m), parseInt(day)); };
-    return parse(a.date) - parse(b.date);
-  });
+  const now = getMockNow();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Find current display index
-  let currentIndex;
-  if (isSunday && !isPast12) {
-    currentIndex = sortedWeeks.findIndex(w => w.date === todayStr);
-    if (currentIndex === -1) currentIndex = sortedWeeks.findIndex(w => {
-      const [m,d] = w.date.split(" ");
-      return new Date(2026, months.indexOf(m), parseInt(d)) >= now;
-    });
-  } else {
-    currentIndex = sortedWeeks.findIndex(w => {
-      const [m,d] = w.date.split(" ");
-      return new Date(2026, months.indexOf(m), parseInt(d)) > now;
-    });
-    if (currentIndex === -1) currentIndex = sortedWeeks.length - 1;
+  // Handles both plain "Mon Day[ Year]" and grade-prefixed "G6-Mon Day Year" roster dates
+  function parseRosterDate(dateStr) {
+    const stripped = String(dateStr).replace(/^G\d+-/, "");
+    const parts = stripped.trim().split(" ");
+    const mi = months.indexOf(parts[0]);
+    if (mi === -1) return null;
+    const day = parseInt(parts[1]);
+    if (isNaN(day)) return null;
+    const year = parts[2] ? parseInt(parts[2]) : now.getFullYear();
+    return new Date(year, mi, day);
   }
 
-  const displayIndex = currentIndex - bannerOffset;
-  if (displayIndex < 0 || !sortedWeeks[displayIndex]) { 
-    banner.innerHTML = ""; 
-    return; 
-  }
+  const grades = getActiveGrades();
+  const gradeBg = { 6:"#f5a623", 7:"#1db88a", 8:"#17b8d4", 9:"#e05c8a" };
+  const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
 
-  const displayWeek = sortedWeeks[displayIndex];
-  banner.style.display = "block";
+  const rows = grades.map(function(g) {
+    const prefix = "G" + g + "-";
+    const gradeWeeks = roster
+      .filter(function(w){ return w.date.startsWith(prefix); })
+      .map(function(w){ return { w: w, d: parseRosterDate(w.date) }; })
+      .filter(function(x){ return x.d; })
+      .sort(function(a,b){ return a.d - b.d; });
 
-  const isCurrentWeek = displayIndex === currentIndex;
-  const isPastWeek = displayIndex < currentIndex;
+    const upcoming = gradeWeeks.find(function(x){ return x.d >= todayMidnight; });
+    const target = upcoming || gradeWeeks[gradeWeeks.length - 1];
 
-  const parentColors = [
-    { bg: "linear-gradient(135deg,#e05c8a,#993556)", light: "rgba(224,92,138,0.25)", border: "rgba(224,92,138,0.5)" },
-    { bg: "linear-gradient(135deg,#4caf50,#2e7d32)", light: "rgba(23,184,212,0.25)", border: "rgba(23,184,212,0.5)" },
-  ];
+    const rawT = customTeachersLocal[g] || TEACHERS[g] || "";
+    const teacher = rawT.split(/[,&]/)[0].trim();
+    const dateLabel = target ? (months[target.d.getMonth()] + " " + target.d.getDate()) : null;
+    const parents = (target && target.w.parents) ? target.w.parents : [];
+    const names = parents.length > 0 ? parents.map(function(p){ return p.name; }).join(" & ") : "Not scheduled yet";
+    const isPast = target && !upcoming;
 
-  const label = isCurrentWeek && isSunday && !isPast12
-    ? `<span style="font-family:'Noto Serif Ethiopic',serif;font-size:13px;font-weight:800;color:#FFD700;text-shadow:0 0 12px rgba(255,215,0,0.5);">ሎሚ ዝተሓጋገዙ ወለዲ</span>`
-    : isPastWeek
-    ? `<span style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.7);">📅 ${displayWeek.date}</span>`
-    : `<div style="text-align:center;">
-        <div style="display:inline-block;background:linear-gradient(135deg,#FFD700,#ff9500);color:#021a1e;font-size:11px;font-weight:900;padding:4px 14px;border-radius:20px;letter-spacing:0.5px;box-shadow:0 0 16px rgba(255,215,0,0.5);margin-bottom:4px;">🔔 UPCOMING SUNDAY</div>
-        <div style="font-size:15px;font-weight:900;color:white;text-shadow:0 0 10px rgba(255,255,255,0.4);">📅 ${displayWeek.date}</div>
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.07);margin-bottom:8px;">
+        <div style="width:6px;align-self:stretch;border-radius:4px;background:${gradeBg[g] || "#6366f1"};flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.5px;">
+            Grade ${g}${teacher ? " · " + teacher : ""}${dateLabel ? " · " + dateLabel : ""}
+          </div>
+          <div style="font-size:14px;font-weight:800;color:white;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${names}
+          </div>
+        </div>
+        ${isPast ? `<div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.4);flex-shrink:0;">PAST</div>` : ""}
       </div>`;
+  }).join("");
 
-  const canGoBack = displayIndex > 0;
-  const canGoForward = bannerOffset > 0;
-
-  const backBtn = canGoBack
-    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer;" onclick="renderTodayPairBanner(${bannerOffset + 1})">
-        <div style="color:#22a06b;font-size:22px;font-weight:900;line-height:1;">←</div>
-        <span style="font-family:'Noto Serif Ethiopic',serif;font-size:10px;font-weight:800;color:#ffffff;text-align:center;line-height:1.4;max-width:72px;">ዝሓለፈ ሰሙን ዝነበሩ ስድራ</span>
-      </div>`
-    : `<div style="width:32px;"></div>`;
-
-  const forwardBtn = canGoForward
-    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer;" onclick="renderTodayPairBanner(${bannerOffset - 1})">
-        <div style="color:#22a06b;font-size:22px;font-weight:900;line-height:1;">→</div>
-      </div>`
-    : `<div style="width:32px;"></div>`;
-
+  banner.style.display = "block";
   banner.innerHTML = `
-    <div style="background:linear-gradient(135deg,#021a1e,#0a3d45,#0d3b2e);border-radius:20px;padding:16px;color:white;box-shadow:0 8px 32px rgba(13,11,31,0.4);border:1px solid rgba(255,255,255,0.1);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
-        ${backBtn}
-        <div style="flex:1;text-align:center;">${label}</div>
-        ${forwardBtn}
+    <div style="background:linear-gradient(135deg,#1e1b4b,#312e81,#0e7490);border-radius:20px;padding:16px;color:white;box-shadow:0 8px 32px rgba(13,11,31,0.4);border:1px solid rgba(255,255,255,0.1);">
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#6366f1);color:white;font-size:11px;font-weight:900;padding:4px 14px;border-radius:20px;letter-spacing:0.5px;box-shadow:0 0 16px rgba(99,102,241,0.4);">
+          🔔 UPCOMING SUNDAY — BY CLASS
+        </div>
       </div>
-      ${isPastWeek ? `<div style="text-align:center;font-size:10px;font-weight:800;color:rgba(255,255,255,0.45);margin-bottom:10px;text-transform:uppercase;letter-spacing:1.5px;">Past Sunday</div>` : ""}
-      <div style="display:flex;gap:10px;">
-        ${displayWeek.parents.map((p, i) => {
-          const s = getStatus(displayWeek.date, p.name);
-          const confirmed = s === "confirmed";
-          const c = parentColors[i % parentColors.length];
-          return `
-          <div style="flex:1;background:${confirmed ? "rgba(34,160,107,0.2)" : c.light};border:1.5px solid ${confirmed ? "rgba(34,160,107,0.5)" : c.border};border-radius:16px;padding:14px;text-align:center;">
-            <div style="width:48px;height:48px;border-radius:50%;background:${c.bg};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:white;margin:0 auto 10px;box-shadow:0 4px 14px rgba(0,0,0,0.3);">
-              ${p.name.charAt(0)}
-            </div>
-            <div style="font-size:15px;font-weight:800;color:white;margin-bottom:6px;">${p.name}</div>
-            <div style="display:inline-block;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;
-              background:${confirmed ? "#22a06b" : isPastWeek ? "rgba(200,50,50,0.3)" : "rgba(0,87,183,0.08)"};
-              color:#ffffff;
-              border:${confirmed ? "none" : isPastWeek ? "2px solid rgba(255,100,100,0.6)" : "2px solid rgba(100,180,255,0.9)"};
-              text-shadow:${confirmed ? "none" : "0 0 10px rgba(100,180,255,0.5)"};">
-              ${confirmed ? "✅" : isPastWeek ? "❌ Did not serve" : "Not In Class Yet"}
-            </div>
-          </div>`;
-        }).join("")}
-      </div>
-      ${displayWeek.perf ? `<div style="text-align:center;margin-top:12px;font-size:12px;font-weight:800;color:rgba(255,215,0,0.9);background:rgba(255,215,0,0.1);border-radius:10px;padding:6px;">⭐ Performance Sunday</div>` : ""}
+      ${rows || `<div style="text-align:center;padding:14px;color:rgba(255,255,255,0.5);font-size:13px;font-weight:700;">No classes scheduled yet</div>`}
     </div>`;
-
-  // Auto-refresh handled by initTodayPairBanner
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
