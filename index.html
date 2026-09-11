@@ -737,7 +737,7 @@ function renderDutyBoard() {
   if (!box) return;
 
   const customTeachersLocal = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  const allGrades = Object.keys(TEACHERS).map(Number).sort();
+  const allGrades = getActiveGrades();
   const gradeBg   = { 6:"#854f0b", 7:"#0f6e56", 8:"#0a5260", 9:"#993556" };
 
   // Build dropdown
@@ -871,7 +871,7 @@ function renderDutyBoard() {
 }
 
 function dutySelectGrade(val) {
-  const allGrades = Object.keys(TEACHERS).map(Number);
+  const allGrades = getActiveGrades();
   allGrades.forEach(function(g) {
     var p = document.getElementById("dutyPanel_" + g);
     if (p) p.style.display = "none";
@@ -891,6 +891,36 @@ function dutySelectGrade(val) {
 function getActiveGrades() {
   const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
   return Object.keys({...TEACHERS, ...customTeachers}).map(Number).sort();
+}
+
+// Pull custom classes (created via Super Admin) from the Sheet and merge them
+// into local state, so a class created on one device shows up everywhere —
+// front page, duty board, admin logins, everything — not just on the device
+// that created it.
+async function loadClassesFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?type=classes&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+
+    const customTeachers = JSON.parse(localStorage.getItem("customTeachers") || "{}");
+    const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
+
+    data.forEach(cls => {
+      const g = Number(cls.grade);
+      if (!g) return;
+      if (cls.teacher) { customTeachers[g] = cls.teacher; TEACHERS[g] = cls.teacher; }
+      if (cls.adminPassword) {
+        customPws["gradeadmin_" + g] = cls.adminPassword;
+        GRADE_ADMIN_PASSWORDS[g] = cls.adminPassword;
+      }
+      if (cls.rollcallPassword) customPws["rollcall_" + g] = cls.rollcallPassword;
+    });
+
+    localStorage.setItem("customTeachers", JSON.stringify(customTeachers));
+    localStorage.setItem("customAdminPws", JSON.stringify(customPws));
+  } catch(e) { console.log("Could not load classes from sheet:", e); }
 }
 
 // Returns the next grade above the given one (for swap button)
@@ -1195,8 +1225,8 @@ async function showApp() {
   document.getElementById("childInfoScreen").style.display = "none";
   document.getElementById("childSelectScreen").style.display = "none";
 
-  // Make sure we have the latest registered-children list AND duty calendar before deciding what to show
-  try { await Promise.all([loadChildrenFromSheet(), loadEventsCalendarFromSheet()]); } catch(e) {}
+  // Make sure we have the latest classes, registered-children list, and duty calendar before deciding what to show
+  try { await Promise.all([loadClassesFromSheet(), loadChildrenFromSheet(), loadEventsCalendarFromSheet()]); } catch(e) {}
 
   myChildren = getChildrenForPhone(myPhone);
 
@@ -1694,9 +1724,9 @@ function signOut() {
 async function initTodayPairBanner() {
   // Render immediately with cached data (no wait)
   try { renderTodayPairBanner(0); } catch(e) {}
-  // Then load fresh parent assignments + statuses from sheet in background and re-render
+  // Then load fresh classes + parent assignments + statuses from sheet in background and re-render
   try {
-    await Promise.all([loadNewParentsFromSheet(), loadStatusesFromSheet()]);
+    await Promise.all([loadClassesFromSheet(), loadNewParentsFromSheet(), loadStatusesFromSheet()]);
     renderTodayPairBanner(bannerOffset);
   } catch(e) {}
   // Refresh every 60 seconds
@@ -2162,6 +2192,8 @@ function showAdminLogin() {
   document.getElementById("mainApp").style.display = "none";
   document.getElementById("adminDash").style.display = "none";
   document.getElementById("adminLogin").style.display = "flex";
+  // Load any classes created on other devices so their passwords work here too
+  loadClassesFromSheet().catch(() => {});
 }
 function showVerify() {
   const ids = ["adminLogin","adminDash","advocateDash","mainApp","childInfoScreen","rollCallDash"];
@@ -2194,7 +2226,7 @@ async function verifyAdmin() {
     document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:30px;font-weight:700;'><span class='modern-spinner'></span>Loading data...</p>";
     try {
       await withTimeout(
-        Promise.all([loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
+        Promise.all([loadClassesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
         15000,
         "Data load"
       );
@@ -3153,6 +3185,15 @@ function addNewGrade() {
   // Also add to GRADE_ADMIN_PASSWORDS so login works immediately
   GRADE_ADMIN_PASSWORDS[gradeNum] = finalPw;
 
+  // Persist to Google Sheets so this class shows up on every device, not just this one
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({
+      type: "saveClass", grade: gradeNum, teacher: teacherName,
+      adminPassword: finalPw, rollcallPassword: finalPw + "RC"
+    })
+  }).catch(() => {});
+
   const result = document.getElementById("newGradeResult");
   if (result) {
     result.style.display = "block";
@@ -3350,6 +3391,10 @@ function deleteClass(grade) {
     if (roster[i].date.startsWith(prefix)) roster.splice(i, 1);
   }
   showToast("🗑️ Grade " + grade + " class deleted.");
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "deleteClass", grade: grade })
+  }).catch(() => {});
   renderSuperAdminTab();
   renderClassesTab();
 }
@@ -3570,7 +3615,7 @@ function runAnnualPromotion() {
   const isPromotionDay = today.toDateString() === promotionSunday.toDateString();
   const yearLabel = getArchiveYear();
 
-  const allGrades = Object.keys(TEACHERS).map(Number).sort();
+  const allGrades = getActiveGrades();
   const maxGrade  = Math.max(...allGrades);
 
   const confirm1 = confirm(
