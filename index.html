@@ -894,7 +894,7 @@ function getActiveGrades() {
   return Object.keys({...TEACHERS, ...customTeachers})
     .map(Number)
     .filter(g => !deletedGrades.includes(g))
-    .sort();
+    .sort((a, b) => a - b);
 }
 
 // Load the tombstone list of permanently-deleted grades. This is what stops
@@ -5775,7 +5775,7 @@ function renderClassesTab() {
   };
   const defaultGradeColor = "linear-gradient(135deg,#5c4ac7,#8b5cf6)";
   const customTeachersNow = JSON.parse(localStorage.getItem("customTeachers") || "{}");
-  const allActiveGrades = Object.keys({...TEACHERS, ...customTeachersNow}).map(Number).sort();
+  const allActiveGrades = Object.keys({...TEACHERS, ...customTeachersNow}).map(Number).sort((a,b)=>a-b);
   const gradeConfig = {};
   allActiveGrades.forEach(g => {
     gradeConfig[g] = {
@@ -5822,7 +5822,7 @@ function renderClassesTab() {
 
   let html = `<div style="background:#e8e4fb;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#0a5260;font-weight:700;">🎓 Your class has full edit rights. Other classes are read-only and collapsible.</div>`;
 
-  Object.keys(gradeConfig).map(Number).sort().forEach(g => {
+  Object.keys(gradeConfig).map(Number).sort((a,b)=>a-b).forEach(g => {
     const cfg = gradeConfig[g];
     const students = allGrades[g];
     const mine = isMyGrade(g);
@@ -6571,7 +6571,7 @@ function renderRollCallScreen() {
   };
 
   // Collect all unique grades in this roll call session, sorted
-  const activeGrades = Object.keys(byGrade).map(Number).sort();
+  const activeGrades = Object.keys(byGrade).map(Number).sort((a,b)=>a-b);
 
   container.innerHTML = `
     ${timerHtml}
