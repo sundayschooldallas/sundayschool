@@ -555,18 +555,20 @@ document.addEventListener('click', function(e) {
   </div>
 
       <!-- PUBLIC DUTY BOARD — no login needed -->
-  <div id="publicDutyBoard" style="display:none;max-width:480px;margin:0 auto;padding:16px 14px;">
-    <div style="background:linear-gradient(135deg,#0a5260,#0d7a8a);border-radius:18px;padding:16px;margin-bottom:16px;text-align:center;">
+  <div id="publicDutyBoard" style="display:none;background:linear-gradient(160deg,#1e1b4b 0%,#312e81 45%,#0e7490 100%);min-height:100vh;padding-bottom:20px;">
+    <div style="max-width:480px;margin:0 auto;padding:16px 14px;">
+    <div style="background:rgba(255,255,255,0.08);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:20px;margin-bottom:16px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.25);">
       <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📋 Parent Duty Board</div>
-      <div style="font-size:18px;font-weight:900;color:white;">Who is on duty this Sunday?</div>
-      <div id="dutyBoardDate" style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;"></div>
+      <div style="font-size:19px;font-weight:900;color:white;">Who is on duty this Sunday?</div>
+      <div id="dutyBoardDate" style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:4px;"></div>
     </div>
     <div id="dutyBoardContent"></div>
     <button onclick="hideDutyBoard()"
-      style="width:100%;margin-top:10px;padding:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+      style="width:100%;margin-top:10px;padding:14px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
       border-radius:14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;color:white;cursor:pointer;">
       ← Back to Login
     </button>
+    </div>
   </div>
   <div style="max-width:480px;margin:0 auto;padding:0 14px 10px;">
     <button onclick="showDutyBoard()"
@@ -715,7 +717,7 @@ function renderDutyBoard() {
   // Build dropdown
   var sel = document.createElement("select");
   sel.id = "dutyGradeSelect";
-  sel.style.cssText = "width:100%;padding:14px 16px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:2px solid rgba(255,255,255,0.25);border-radius:14px;background:rgba(255,255,255,0.12);color:white;outline:none;cursor:pointer;margin-bottom:14px;display:block;";
+  sel.style.cssText = "width:100%;padding:14px 16px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;border:1.5px solid rgba(255,255,255,0.3);border-radius:14px;background:rgba(255,255,255,0.14);backdrop-filter:blur(8px);color:white;outline:none;cursor:pointer;margin-bottom:14px;display:block;box-shadow:0 4px 16px rgba(0,0,0,0.15);";
   sel.onchange = function(){ dutySelectGrade(this.value); };
 
   var defaultOpt = document.createElement("option");
@@ -786,7 +788,7 @@ function renderDutyBoard() {
 
     // Next Sunday preview
     var nextBox = document.createElement("div");
-    nextBox.style.cssText = "background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:12px 14px;margin-top:4px;margin-bottom:16px;";
+    nextBox.style.cssText = "background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px 14px;margin-top:4px;margin-bottom:16px;";
     var nextLabel = document.createElement("div");
     nextLabel.style.cssText = "font-size:12px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:6px;";
     nextLabel.textContent = "🔔 Next Sunday — " + nextStr;
