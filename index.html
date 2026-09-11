@@ -106,32 +106,68 @@
       radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.4) 0%, transparent 100%),
       radial-gradient(2px 2px at 60% 40%, rgba(255,255,255,0.2) 0%, transparent 100%);
   }
+
+  /* ── MODERN LOGIN CARD ── */
+  .login-card {
+    width: 100%; max-width: 380px; position: relative; z-index: 1;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 28px;
+    padding: 36px 28px 32px;
+    backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+    display: flex; flex-direction: column; align-items: center;
+    animation: cardIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  .login-logo {
+    width: 76px; height: 76px; border-radius: 50%; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.9);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.25), 0 12px 30px rgba(13,122,138,0.35);
+    margin-bottom: 18px;
+  }
+  .login-logo img { width: 100%; height: 100%; object-fit: cover; }
   .verify-icon { margin-bottom: 8px; position: relative; z-index: 1; }
-  .verify-screen h2 { font-size: 22px; font-weight: 800; color: #0a3d45; margin-bottom: 8px; position: relative; z-index: 1; text-shadow: none; }
-  .verify-screen p { font-size: 14px; color: #2e7d32; margin-bottom: 28px; line-height: 1.6; max-width: 290px; position: relative; z-index: 1; font-family: 'Noto Serif Ethiopic', serif; font-weight: 700; }
+  .verify-screen h2 { font-size: 21px; font-weight: 800; color: #eefaf9; margin-bottom: 4px; position: relative; z-index: 1; text-shadow: none; letter-spacing: -0.2px; }
+  .verify-screen p { font-size: 15px; color: #8fd7c4; margin-bottom: 26px; line-height: 1.5; max-width: 290px; position: relative; z-index: 1; font-family: 'Noto Serif Ethiopic', serif; font-weight: 700; }
+  .field-label { align-self: flex-start; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; color: rgba(255,255,255,0.55); margin: 0 0 6px 4px; }
   .phone-input-wrap { width: 100%; max-width: 340px; position: relative; z-index: 1; }
   .phone-input-wrap input {
     width: 100%; padding: 15px 18px;
-    font-family: 'Nunito', sans-serif; font-size: 17px; font-weight: 700;
-    border: 1.5px solid #c0eaf0; border-radius: 16px;
-    outline: none; color: #0a3d45; background: white;
-    text-align: center; letter-spacing: 1px; transition: all 0.2s;
-    backdrop-filter: blur(10px);
+    font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,0.18); border-radius: 16px;
+    outline: none; color: #eefaf9; background: rgba(255,255,255,0.06);
+    text-align: center; letter-spacing: 0.5px; transition: all 0.2s;
   }
-  .phone-input-wrap input::placeholder { color: #7aadbb; }
-  .phone-input-wrap input:focus { border-color: #17b8d4; background: #f0fafc; box-shadow: 0 0 16px rgba(23,184,212,0.2); }
-  .phone-input-wrap input:focus { border-color: var(--purple); }
-  .phone-input-wrap input::placeholder { color: #7aadbb; font-weight: 600; letter-spacing: 0; font-size: 14px; }
+  .phone-input-wrap input::placeholder { color: rgba(255,255,255,0.35); font-weight: 600; letter-spacing: 0; font-size: 14px; }
+  .phone-input-wrap input:focus { border-color: #17b8d4; background: rgba(23,184,212,0.10); box-shadow: 0 0 0 4px rgba(23,184,212,0.14); }
+
+  /* Segmented 4-digit PIN input */
+  .pin-boxes { display: flex; gap: 10px; width: 100%; max-width: 340px; margin-top: 12px; justify-content: center; }
+  .pin-boxes input {
+    width: 56px; height: 58px; text-align: center;
+    font-family: 'Nunito', sans-serif; font-size: 22px; font-weight: 800;
+    color: #eefaf9; background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.18); border-radius: 14px;
+    outline: none; transition: all 0.18s; caret-color: #17b8d4;
+  }
+  .pin-boxes input:focus { border-color: #17b8d4; background: rgba(23,184,212,0.12); box-shadow: 0 0 0 4px rgba(23,184,212,0.16); transform: translateY(-1px); }
+  .pin-boxes input.filled { border-color: rgba(95,224,205,0.55); }
+
   .verify-btn {
-    width: 100%; margin-top: 12px; padding: 15px;
-    background: linear-gradient(135deg, #5c4ac7, #3b2f8f);
+    width: 100%; margin-top: 20px; padding: 16px;
+    background: linear-gradient(135deg, #17b8d4, #5c4ac7);
     color: white; border: none; border-radius: 16px;
     font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 800; cursor: pointer;
-    box-shadow: 0 8px 24px rgba(13,122,138,0.4);
+    box-shadow: 0 10px 26px rgba(23,184,212,0.3);
     transition: all 0.2s; position: relative; z-index: 1;
+    letter-spacing: 0.2px;
   }
+  .verify-btn:hover { filter: brightness(1.06); box-shadow: 0 12px 30px rgba(23,184,212,0.4); }
   .verify-btn:active { transform: scale(0.98); opacity: 0.9; }
-  .verify-error { margin-top: 12px; font-size: 13px; color: #ff8a8a; font-weight: 700; display: none; position: relative; z-index: 1; }
+  .verify-error { margin-top: 14px; font-size: 13px; color: #ff9d9d; font-weight: 700; display: none; position: relative; z-index: 1; }
+
 
   .main-app { display: none; }
   header {
@@ -295,9 +331,13 @@
   <!-- TODAY'S PAIR — shown immediately -->
   <div id="todayPairBanner" style="width:100%;max-width:380px;margin:16px 0;"></div>
 
-  <div class="phone-input-wrap">
-    <input type="tel" id="phoneInput" placeholder="+1 (000) 000-0000" />
-    <input type="password" id="pinInput" placeholder="Your PIN (4 digits)" style="width:100%;padding:15px 18px;font-family:'Nunito',sans-serif;font-size:17px;font-weight:700;border:2px solid #c0eaf0;border-radius:12px;outline:none;color:#0a3d45;background:white;text-align:center;letter-spacing:4px;margin-top:10px;transition:border-color 0.2s;"  maxlength="4" />
+  <div class="phone-input-wrap" style="position:relative;">
+    <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:17px;opacity:0.55;z-index:2;pointer-events:none;">📱</span>
+    <input type="tel" id="phoneInput" placeholder="+1 (000) 000-0000" style="padding-left:42px;" />
+    <div style="position:relative;margin-top:10px;">
+      <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:16px;opacity:0.55;z-index:2;pointer-events:none;">🔒</span>
+      <input type="password" id="pinInput" placeholder="Your PIN (4 digits)" style="width:100%;padding:15px 18px 15px 42px;font-family:'Nunito',sans-serif;font-size:17px;font-weight:700;border:2px solid #c0eaf0;border-radius:12px;outline:none;color:#0a3d45;background:white;text-align:center;letter-spacing:4px;transition:border-color 0.2s;"  maxlength="4" />
+    </div>
     <button class="verify-btn" onclick="verifyPhone()">Find my assignment →</button>
     <div class="verify-error" id="verifyError">❌ Phone number or PIN is incorrect.</div>
   </div>
@@ -305,15 +345,18 @@
 </div>
 
 <!-- ADMIN LOGIN -->
-<div id="adminLogin" style="display:none;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;padding:30px 24px;text-align:center;background:#e0f5f7;">
-  <div style="font-size:40px;margin-bottom:12px;">🔐</div>
-  <h2 style="font-size:20px;font-weight:800;color:#0a5260;margin-bottom:8px;">Secure Access</h2>
-  <p style="font-size:13px;color:#7b7a90;margin-bottom:20px;">Enter your password</p>
-  <div style="width:100%;max-width:300px;">
-    <input type="password" id="adminPwInput" placeholder="Password" style="width:100%;padding:14px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;border:2px solid #c0eaf0;border-radius:12px;outline:none;text-align:center;background:white;" />
-    <button onclick="verifyAdmin()" style="width:100%;margin-top:10px;padding:14px;background:#0a5260;color:white;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;">Enter →</button>
-    <div id="adminError" style="display:none;margin-top:10px;font-size:13px;color:#e03e3e;font-weight:700;">❌ Incorrect password</div>
-    <div style="margin-top:14px;"><span onclick="showVerify()" style="font-size:12px;color:#bbb;cursor:pointer;text-decoration:underline;">← Back</span></div>
+<div id="adminLogin" class="verify-screen" style="display:none;">
+  <div class="stars"></div>
+  <div style="background:rgba(255,255,255,0.92);border-radius:28px;padding:32px 28px 34px;width:100%;max-width:360px;box-shadow:0 8px 40px rgba(13,122,138,0.25),0 2px 8px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;animation:fadeUp 0.4s ease both;">
+    <div style="background:linear-gradient(135deg,#0a5260,#0d7a8a);width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:16px;box-shadow:0 8px 20px rgba(13,122,138,0.35);">🔐</div>
+    <h2 style="font-size:20px;font-weight:800;color:#0a3d45;margin-bottom:4px;">Secure Access</h2>
+    <p style="font-size:13px;color:#7b8a90;margin-bottom:22px;">Enter your password to continue</p>
+    <div style="width:100%;position:relative;">
+      <input type="password" id="adminPwInput" placeholder="Password" style="width:100%;padding:15px 18px;font-family:'Nunito',sans-serif;font-size:16px;font-weight:700;border:1.5px solid #c0eaf0;border-radius:16px;outline:none;text-align:center;letter-spacing:1px;color:#0a3d45;background:#f8fdfe;transition:all 0.2s;" onkeydown="if(event.key==='Enter')verifyAdmin()" />
+    </div>
+    <button onclick="verifyAdmin()" style="width:100%;margin-top:14px;padding:15px;background:linear-gradient(135deg,#5c4ac7,#3b2f8f);color:white;border:none;border-radius:16px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(13,122,138,0.3);transition:all 0.2s;">Enter →</button>
+    <div id="adminError" style="display:none;margin-top:12px;font-size:13px;color:#e03e3e;font-weight:700;">❌ Incorrect password</div>
+    <div style="margin-top:16px;"><span onclick="showVerify()" style="font-size:12px;color:#9a99ac;cursor:pointer;text-decoration:underline;">← Back</span></div>
   </div>
 </div>
 
