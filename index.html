@@ -538,6 +538,7 @@ document.addEventListener('click', function(e) {
     <h1>Sunday School Volunteer Roster</h1>
     <p>7th & 8th Grade — May to July 2026</p>
     <div class="you-badge" id="youBadge"></div>
+    <div id="myChildBadge"></div>
     <span class="signout" onclick="signOut()">Not you? Sign out</span>
   </header>
   <div class="container">
@@ -629,6 +630,25 @@ document.addEventListener('click', function(e) {
       <div style="text-align:center;margin-top:14px;">
         <span onclick="skipChildInfo()" style="font-size:12px;color:#bbb;cursor:pointer;text-decoration:underline;">Skip for now</span>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHILD SELECT SCREEN — shown when a phone number has more than one registered child -->
+<div id="childSelectScreen" style="display:none;min-height:100vh;background:#e0f5f7;padding-bottom:40px;">
+  <div style="background:linear-gradient(135deg,#0a5260,#0d7a8a);padding:28px 20px 24px;text-align:center;color:white;">
+    <div style="font-size:28px;margin-bottom:8px;">👨‍👩‍👧‍👦</div>
+    <div style="font-size:20px;font-weight:800;margin-bottom:4px;">Who are you signing in for?</div>
+    <div style="font-size:13px;opacity:0.8;">We found more than one child on this phone number</div>
+  </div>
+  <div style="max-width:480px;margin:0 auto;padding:20px 16px;">
+    <div id="childSelectList"></div>
+    <button onclick="startRegisterAnotherChild()"
+      style="width:100%;margin-top:6px;padding:15px;background:white;color:#0a5260;border:2px solid #c0eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;">
+      ➕ Register a New Child Instead
+    </button>
+    <div style="text-align:center;margin-top:14px;">
+      <span onclick="signOut()" style="font-size:12px;color:#bbb;cursor:pointer;text-decoration:underline;">← Back to login</span>
     </div>
   </div>
 </div>
@@ -989,6 +1009,8 @@ async function loadStatusesFromSheet() {
 
 let myPhone = localStorage.getItem("myPhone") || "";
 let myName = "", myWeek = null, myParent = null, myPartner = null;
+let myChildren = []; // all children registered under the current phone number
+let myChildInfo = null; // the specific child the parent is currently viewing
 
 // Load admin overrides — apply phones first, then pins, then names
 const customPins = JSON.parse(localStorage.getItem("customPins") || "{}");
@@ -1056,31 +1078,88 @@ async function verifyPhone() {
   showApp();
 }
 
-function showApp() {
+// Find every child registered under a given phone number (excludes graduated children).
+// Handles the existing "_child2", "_child3"... suffix pattern used when a parent
+// registers more than one child in the same sitting, so all of them still match.
+function getChildrenForPhone(phone) {
+  const norm = normalize(phone);
+  if (!norm) return [];
+  return (childrenSheetData || []).filter(r => {
+    if (!r || !r.phone || r.graduated) return false;
+    const basePhone = String(r.phone).split("_child")[0];
+    return normalize(basePhone) === norm;
+  });
+}
+
+function resetChildInfoForm() {
+  document.getElementById("childNameInput").value = "";
+  selectedGrade = null;
+  pendingChildren = [];
+  [6,7,8,9].forEach(g => {
+    const btn = document.getElementById("grade" + g + "btn");
+    if (btn) { btn.style.background = "white"; btn.style.color = "#7b7a90"; btn.style.borderColor = "#ddd8f8"; }
+  });
+  const banner = document.getElementById("teacherBanner");
+  if (banner) banner.style.display = "none";
+  const saved = document.getElementById("savedChildrenList");
+  if (saved) saved.innerHTML = "";
+}
+
+function showChildInfoScreen() {
+  document.getElementById("childSelectScreen").style.display = "none";
+  document.getElementById("mainApp").style.display = "none";
+  document.getElementById("childInfoScreen").style.display = "block";
+  resetChildInfoForm();
+}
+
+function startRegisterAnotherChild() {
+  showChildInfoScreen();
+}
+
+function renderChildSelectScreen() {
+  const list = document.getElementById("childSelectList");
+  if (!list) return;
+  list.innerHTML = myChildren.map((c, i) => `
+    <button onclick="selectMyChild(${i})" style="width:100%;text-align:left;margin-bottom:12px;padding:16px;background:white;border:2px solid #c0eaf0;border-radius:14px;font-family:'Nunito',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:#0a3d45;">${c.childName || c.name || "Unnamed child"}</div>
+        <div style="font-size:12px;color:#7b7a90;margin-top:2px;">Grade ${c.grade}${c.teacher ? " · " + c.teacher : ""}</div>
+      </div>
+      <div style="font-size:18px;color:#0d7a8a;">→</div>
+    </button>`).join("");
+}
+
+function selectMyChild(i) {
+  myChildInfo = myChildren[i] || null;
+  showMainApp();
+}
+
+async function showApp() {
   document.getElementById("verifyScreen").style.display = "none";
   document.getElementById("mainApp").style.display = "none";
   document.getElementById("childInfoScreen").style.display = "none";
+  document.getElementById("childSelectScreen").style.display = "none";
 
-  // Check if child info already filled for this parent
-  const childKey = "childInfo__" + myPhone;
-  const existing = localStorage.getItem(childKey);
+  // Make sure we have the latest registered-children list before deciding what to show
+  try { await loadChildrenFromSheet(); } catch(e) {}
 
-  if (!existing) {
-    // First time — show child info screen
-    document.getElementById("childInfoScreen").style.display = "block";
-    document.getElementById("childNameInput").value = "";
-    selectedGrade = null;
-    document.getElementById("grade7btn").style.background = "white";
-    document.getElementById("grade7btn").style.color = "#7b7a90";
-    document.getElementById("grade7btn").style.borderColor = "#ddd8f8";
-    document.getElementById("grade8btn").style.background = "white";
-    document.getElementById("grade8btn").style.color = "#7b7a90";
-    document.getElementById("grade8btn").style.borderColor = "#ddd8f8";
-  } else {
-    // Already filled — go straight to main app
+  myChildren = getChildrenForPhone(myPhone);
+
+  if (myChildren.length === 0) {
+    // No child registered yet under this phone — show the registration screen
+    showChildInfoScreen();
+  } else if (myChildren.length === 1) {
+    // Exactly one match — no ambiguity, go straight in
+    myChildInfo = myChildren[0];
     showMainApp();
+  } else {
+    // More than one child on this phone — let the parent choose which one
+    myChildInfo = null;
+    renderChildSelectScreen();
+    document.getElementById("childSelectScreen").style.display = "block";
   }
 }
+
 
 const TEACHERS = { 6: "Yemane Tsegay & Amots Michael", 7: "Bereket Isayas", 8: "Amanuel Habte", 9: "Ruth" };
 
@@ -1323,7 +1402,15 @@ function saveChildInfo() {
     }).catch(() => {});
   });
 
+  const savedBatch = pendingChildren.slice();
   pendingChildren = [];
+
+  // Reflect the newly saved child(ren) immediately — don't wait on the sheet round-trip
+  savedBatch.forEach(c => {
+    myChildren.push({ childName: c.name, name: c.name, grade: c.grade, teacher: c.teacher, phone: myPhone });
+  });
+  myChildInfo = { childName: savedBatch[0].name, name: savedBatch[0].name, grade: savedBatch[0].grade, teacher: savedBatch[0].teacher };
+
   showMainApp();
   showToast("✅ Children saved — assigned to their teachers!");
 }
@@ -1343,8 +1430,26 @@ function getChildInfo() {
 
 function showMainApp() {
   document.getElementById("childInfoScreen").style.display = "none";
+  document.getElementById("childSelectScreen").style.display = "none";
   document.getElementById("mainApp").style.display = "block";
   document.getElementById("youBadge").textContent = "👤 " + myName;
+
+  const badge = document.getElementById("myChildBadge");
+  if (badge) {
+    if (myChildInfo && myChildren.length > 1) {
+      badge.innerHTML = `<div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.85);">
+        Viewing <strong>${myChildInfo.childName || myChildInfo.name}</strong> (Grade ${myChildInfo.grade})
+        &nbsp;·&nbsp;<span onclick="backToChildSelect()" style="text-decoration:underline;cursor:pointer;">Switch child</span>
+      </div>`;
+    } else if (myChildInfo) {
+      badge.innerHTML = `<div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.85);">
+        ${myChildInfo.childName || myChildInfo.name} · Grade ${myChildInfo.grade}
+      </div>`;
+    } else {
+      badge.innerHTML = "";
+    }
+  }
+
   try { renderMyCard(); } catch(e) { console.log("renderMyCard error:", e); }
   // Load sheet data in background then refresh
   Promise.all([
@@ -1352,6 +1457,12 @@ function showMainApp() {
     loadTrackerFromSheet(myName),
     loadNewParentsFromSheet()
   ]).then(() => { try { renderMyCard(); } catch(e){} }).catch(() => {});
+}
+
+function backToChildSelect() {
+  document.getElementById("mainApp").style.display = "none";
+  renderChildSelectScreen();
+  document.getElementById("childSelectScreen").style.display = "block";
 }
 
 function resetChildInfo() {
@@ -1363,7 +1474,10 @@ function resetChildInfo() {
 function signOut() {
   localStorage.removeItem("myPhone");
   myPhone = ""; myName = ""; myWeek = null; myParent = null; myPartner = null;
+  myChildren = []; myChildInfo = null;
   document.getElementById("mainApp").style.display = "none";
+  document.getElementById("childSelectScreen").style.display = "none";
+  document.getElementById("childInfoScreen").style.display = "none";
   document.getElementById("verifyScreen").style.display = "flex";
   document.getElementById("phoneInput").value = "";
   document.getElementById("verifyError").style.display = "none";
@@ -1731,8 +1845,8 @@ function renderMyCard() {
         <div style="font-size:26px;font-weight:800;color:white;margin-bottom:4px;">${myParent.name}</div>
         <div style="font-size:13px;color:rgba(255,255,255,0.85);margin-bottom:10px;">${dp(myParent.e)}</div>
         ${(function(){ try {
-          const ci = getChildInfo();
-          if (ci && ci.name) return '<div style="display:inline-block;background:rgba(255,255,255,0.2);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;color:white;margin-bottom:6px;">👦 ' + ci.name + ' &nbsp;·&nbsp; Grade ' + ci.grade + ' &nbsp;<span style="opacity:0.7;cursor:pointer;" onclick="resetChildInfo()">✏️</span></div><div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:10px;margin-left:4px;">👨‍🏫 ' + (ci.teacher || TEACHERS[ci.grade] || "") + '</div>';
+          const ci = myChildInfo || getChildInfo();
+          if (ci && (ci.childName || ci.name)) return '<div style="display:inline-block;background:rgba(255,255,255,0.2);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;color:white;margin-bottom:6px;">👦 ' + (ci.childName || ci.name) + ' &nbsp;·&nbsp; Grade ' + ci.grade + ' &nbsp;<span style="opacity:0.7;cursor:pointer;" onclick="resetChildInfo()">✏️</span></div><div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:10px;margin-left:4px;">👨‍🏫 ' + (ci.teacher || TEACHERS[ci.grade] || "") + '</div>';
           return '<div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:10px;cursor:pointer;" onclick="resetChildInfo()">+ Add child info</div>';
         } catch(e){ return ""; } })()}
 
@@ -5388,8 +5502,8 @@ function renderParentTracker() {
   const dates = getAllTrackerDates(myName);
   if (dates.length === 0) return "";
 
-  const ci = getChildInfo();
-  const childName = ci && ci.name ? ci.name : null;
+  const ci = myChildInfo || getChildInfo();
+  const childName = ci && (ci.childName || ci.name) ? (ci.childName || ci.name) : null;
   const childGrade = ci && ci.grade ? "Grade " + ci.grade : "";
 
   let html = `<div style="margin:16px 20px 0;background:white;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.07);padding:20px;">
