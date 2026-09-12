@@ -3016,14 +3016,19 @@ function renderSuperAdminTab() {
 
     <!-- ── DELETE CODE VAULT ────────────────────────────────────────── -->
     <div style="background:rgba(255,215,0,0.06);border:1.5px solid rgba(255,215,0,0.3);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
-      <div style="font-size:14px;font-weight:900;color:#FFD700;margin-bottom:2px;">🔐 Delete Code Vault</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:12px;">Every class has its own delete code. To fully delete a class, you'll need to look up its code here first — this is intentional friction so a class full of real students and parents can't be deleted by accident or on a whim.</div>
-      <div id="deleteCodeVault">
-        ${allGrades.map(g => `
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.06);border-radius:8px;margin-bottom:6px;">
-            <div style="font-size:12px;font-weight:800;color:white;">Grade ${g}</div>
-            <div style="font-size:13px;font-weight:900;color:#FFD700;letter-spacing:1px;font-family:monospace;">${classDeleteCodesLocal[g] || "—"}</div>
-          </div>`).join("")}
+      <div onclick="toggleCollapsibleSection('deleteVaultBody','deleteVaultChevron')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+        <div style="font-size:14px;font-weight:900;color:#FFD700;">🔐 Delete Code Vault</div>
+        <span id="deleteVaultChevron" style="font-size:14px;color:#FFD700;transition:transform 0.2s;">▶</span>
+      </div>
+      <div id="deleteVaultBody" style="display:none;margin-top:10px;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:12px;">Every class has its own delete code. To fully delete a class, you'll need to look up its code here first — this is intentional friction so a class full of real students and parents can't be deleted by accident or on a whim.</div>
+        <div id="deleteCodeVault">
+          ${allGrades.map(g => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.06);border-radius:8px;margin-bottom:6px;">
+              <div style="font-size:12px;font-weight:800;color:white;">Grade ${g}</div>
+              <div style="font-size:13px;font-weight:900;color:#FFD700;letter-spacing:1px;font-family:monospace;">${classDeleteCodesLocal[g] || "—"}</div>
+            </div>`).join("")}
+        </div>
       </div>
     </div>
 
