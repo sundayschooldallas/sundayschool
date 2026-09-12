@@ -4729,6 +4729,29 @@ async function loadArchivesFromSheet() {
   }
 }
 
+async function restoreChildrenFromArchive(yearLabel) {
+  if (!confirm("Restore every student from the " + yearLabel + " archive back into the live Children sheet?\n\nExisting matching students (same phone + name) will be updated, not duplicated. This will NOT delete anything currently in the live sheet.")) return;
+
+  showToast("⏳ Restoring students from " + yearLabel + "...");
+  try {
+    const res = await fetch(SHEET_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ type: "restoreChildrenFromArchive", yearLabel: yearLabel })
+    });
+    const result = await res.json();
+    if (!result.ok) {
+      showToast("❌ " + (result.error || "Restore failed."));
+      return;
+    }
+    showToast("✅ Restored " + result.restored + " student(s) from " + yearLabel + " to live data.");
+    await loadChildrenFromSheet();
+    try { renderClassesTab(); } catch(e) {}
+    try { renderStudentsTab(); } catch(e) {}
+  } catch(e) {
+    showToast("❌ Restore failed — network or server error. (" + e.message + ")");
+  }
+}
+
 async function viewArchiveReport(yearLabel, safeId) {
   const panel = document.getElementById(safeId);
   if (!panel) return;
@@ -4832,6 +4855,17 @@ function renderArchiveDetail(snap) {
   const H = "font-size:13px;font-weight:900;color:#7effd4;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.15);padding-bottom:6px;margin-top:14px;";
   const R = "font-size:12px;color:#cde;padding:4px 0 4px 12px;border-left:2px solid rgba(255,255,255,0.2);";
   let html = "";
+
+  // ── Restore — recovery path if the live Children sheet got cleared ──
+  html += `<div style="background:rgba(239,68,68,0.1);border:1.5px solid rgba(239,68,68,0.3);border-radius:12px;padding:12px;margin-bottom:10px;">
+    <div style="font-size:12px;font-weight:800;color:#ff9b9b;margin-bottom:6px;">♻️ Restore this year's students to live data</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:10px;">If the live Children sheet was accidentally cleared, this copies every student from this archive snapshot back into it. Existing matching students are updated, not duplicated.</div>
+    <button onclick="restoreChildrenFromArchive('${snap.yearLabel}')"
+      style="width:100%;padding:10px;background:linear-gradient(135deg,#991b1b,#ef4444);border:none;border-radius:9px;
+      font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+      ♻️ Restore ${(snap.students||[]).length} Student${(snap.students||[]).length!==1?"s":""} to Live Data
+    </button>
+  </div>`;
 
   // ── Students ────────────────────────────────────────────────────────
   const students = snap.students || [];
