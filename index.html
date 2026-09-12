@@ -501,6 +501,7 @@ document.addEventListener('click', function(e) {
         <div>
           <div style="font-size:17px;font-weight:800;">Advocate Portal</div>
           <div style="font-size:11px;opacity:0.7;margin-top:1px;">Parent Behavior Support</div>
+          <div id="advocateNameDisplay" style="font-size:12px;opacity:0.9;margin-top:4px;font-weight:700;"></div>
         </div>
       </div>
       <button onclick="showVerify()" style="font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:white;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:7px 14px;cursor:pointer;position:relative;z-index:10;">Sign out</button>
@@ -947,7 +948,7 @@ async function loadAndRenderLoginLog() {
     const sorted = data.slice().reverse().slice(0, 50);
     el.innerHTML = sorted.map(entry => {
       const label = roleLabels[entry.role] || entry.role;
-      const gradeLabel = entry.grade ? " · Grade " + entry.grade : "";
+      const gradeLabel = entry.role === "advocate" ? (entry.grade ? " · " + entry.grade : "") : (entry.grade ? " · Grade " + entry.grade : "");
       return `
       <div style="background:rgba(255,255,255,0.06);border-left:3px solid #6366f1;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="font-size:13px;font-weight:800;color:white;">${label}${gradeLabel}</div>
@@ -2513,9 +2514,13 @@ async function verifyAdmin() {
     if (gradeMatch !== null) {
       await loginAdmin("gradeadmin", gradeMatch);
     } else if (pw === (customPws["advocate"] || ADVOCATE_PASSWORD) || getCustomAdvocates().some(a => a.password === pw)) {
-      logLoginEvent("advocate", null);
+      const matchedAdvocate = getCustomAdvocates().find(a => a.password === pw);
+      const advocateName = matchedAdvocate ? matchedAdvocate.name : "Built-in Advocate";
+      logLoginEvent("advocate", advocateName);
       document.getElementById("adminLogin").style.display = "none";
       document.getElementById("advocateDash").style.display = "block";
+      const nameDisplay = document.getElementById("advocateNameDisplay");
+      if (nameDisplay) nameDisplay.textContent = "👤 Logged in as: " + advocateName;
       document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;"><span class="modern-spinner"></span>Loading data from server...</div>`;
       await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
       await renderAdvocateDash();
