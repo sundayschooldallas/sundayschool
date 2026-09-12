@@ -920,6 +920,16 @@ async function loadDeletedGradesFromSheet() {
 }
 
 // Fetches and renders who/what role/device logged in, and when.
+// Generic expand/collapse toggle for collapsible panels (Login Log, Deletion Log, etc.)
+function toggleCollapsibleSection(bodyId, chevronId) {
+  const body = document.getElementById(bodyId);
+  const chevron = document.getElementById(chevronId);
+  if (!body) return;
+  const isOpen = body.style.display !== "none";
+  body.style.display = isOpen ? "none" : "block";
+  if (chevron) chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(90deg)";
+}
+
 async function loadAndRenderLoginLog() {
   const el = document.getElementById("loginActivityLog");
   if (!el) return;
@@ -3019,22 +3029,32 @@ function renderSuperAdminTab() {
 
     <!-- ── LOGIN ACTIVITY LOG ───────────────────────────────────────── -->
     <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+      <div onclick="toggleCollapsibleSection('loginLogBody','loginLogChevron')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
         <div style="font-size:14px;font-weight:900;color:white;">🔓 Login Activity Log</div>
-        <button onclick="loadAndRenderLoginLog()" style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:7px;padding:5px 10px;cursor:pointer;">↻ Refresh</button>
+        <span id="loginLogChevron" style="font-size:14px;color:rgba(255,255,255,0.6);transition:transform 0.2s;">▶</span>
       </div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Every successful login — role, class, device, and when. Note: since passwords are shared per role/class rather than per person, this shows <em>which role and device</em> logged in, not necessarily which specific person was using it.</div>
-      <div id="loginActivityLog">
-        <div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">Loading...</div>
+      <div id="loginLogBody" style="display:none;margin-top:10px;">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:2px;">
+          <button onclick="event.stopPropagation();loadAndRenderLoginLog()" style="font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:7px;padding:5px 10px;cursor:pointer;">↻ Refresh</button>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Every successful login — role, class, device, and when. Note: since passwords are shared per role/class rather than per person, this shows <em>which role and device</em> logged in, not necessarily which specific person was using it.</div>
+        <div id="loginActivityLog">
+          <div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">Loading...</div>
+        </div>
       </div>
     </div>
 
     <!-- ── DELETION AUDIT LOG ───────────────────────────────────────── -->
     <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
-      <div style="font-size:14px;font-weight:900;color:white;margin-bottom:2px;">📜 Deletion Audit Log</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Every class deletion is permanently recorded here — grade, who authorized it, how many students were affected, and when.</div>
-      <div id="deletionAuditLog">
-        <div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">Loading...</div>
+      <div onclick="toggleCollapsibleSection('deletionLogBody','deletionLogChevron')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+        <div style="font-size:14px;font-weight:900;color:white;">📜 Deletion Audit Log</div>
+        <span id="deletionLogChevron" style="font-size:14px;color:rgba(255,255,255,0.6);transition:transform 0.2s;">▶</span>
+      </div>
+      <div id="deletionLogBody" style="display:none;margin-top:10px;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Every class deletion is permanently recorded here — grade, who authorized it, how many students were affected, and when.</div>
+        <div id="deletionAuditLog">
+          <div style="text-align:center;padding:14px;color:rgba(255,255,255,0.4);font-size:12px;font-weight:700;">Loading...</div>
+        </div>
       </div>
     </div>
 
