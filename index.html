@@ -1068,6 +1068,77 @@ async function loadTeacherPhonesFromSheet() {
   } catch(e) { console.log("Could not load teacher phones from sheet:", e); }
 }
 
+// ── CUSTOM ADVOCATES ──────────────────────────────────────────────────
+// Kept as their own dedicated system (not mixed into the general
+// "custom admin users" list) given how sensitive advocate access is —
+// advocates can see tracker/behavior notes across every family.
+function getCustomAdvocates() {
+  try { return JSON.parse(localStorage.getItem("customAdvocates") || "[]"); } catch(e) { return []; }
+}
+function saveCustomAdvocatesLocal(list) {
+  localStorage.setItem("customAdvocates", JSON.stringify(list));
+}
+async function loadAdvocatesFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?type=advocates&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    saveCustomAdvocatesLocal(data.map(a => ({ name: a.name, password: a.password })));
+  } catch(e) { console.log("Could not load advocates from sheet:", e); }
+}
+function addCustomAdvocate() {
+  const nameInput = document.getElementById("newAdvocateName");
+  const pwInput = document.getElementById("newAdvocatePassword");
+  const name = nameInput ? nameInput.value.trim() : "";
+  const password = pwInput ? pwInput.value.trim() : "";
+  if (!name || !password) { showToast("❌ Please enter both a name and a password."); return; }
+
+  const list = getCustomAdvocates();
+  if (list.some(a => a.name.toLowerCase() === name.toLowerCase())) {
+    showToast("⚠️ An advocate named " + name + " already exists.");
+    return;
+  }
+  list.push({ name, password });
+  saveCustomAdvocatesLocal(list);
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "saveAdvocate", name, password })
+  }).catch(() => {});
+
+  nameInput.value = "";
+  pwInput.value = "";
+  showToast("✅ Advocate " + name + " added.");
+  renderSuperAdminTab();
+}
+function updateCustomAdvocatePw(idx) {
+  const list = getCustomAdvocates();
+  const input = document.getElementById("advocatePw_" + idx);
+  const newPw = input ? input.value.trim() : "";
+  if (!newPw) { showToast("❌ Password can't be empty."); return; }
+  list[idx].password = newPw;
+  saveCustomAdvocatesLocal(list);
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "saveAdvocate", name: list[idx].name, password: newPw })
+  }).catch(() => {});
+  showToast("✅ Password updated for " + list[idx].name);
+}
+function deleteCustomAdvocate(idx) {
+  const list = getCustomAdvocates();
+  const removed = list[idx];
+  if (!removed) return;
+  if (!confirm("Remove advocate access for " + removed.name + "?")) return;
+  list.splice(idx, 1);
+  saveCustomAdvocatesLocal(list);
+  fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "deleteAdvocate", name: removed.name })
+  }).catch(() => {});
+  showToast("🗑️ " + removed.name + " removed as advocate.");
+  renderSuperAdminTab();
+}
+
 // Returns the next grade above the given one (for swap button)
 function getAdjacentGrade(grade) {
   const grades = getActiveGrades();
@@ -2337,8 +2408,8 @@ function showAdminLogin() {
   document.getElementById("mainApp").style.display = "none";
   document.getElementById("adminDash").style.display = "none";
   document.getElementById("adminLogin").style.display = "flex";
-  // Load any classes created on other devices so their passwords work here too
-  Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet()]).catch(() => {});
+  // Load any classes/advocates created on other devices so their passwords work here too
+  Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadAdvocatesFromSheet()]).catch(() => {});
 }
 function showVerify() {
   const ids = ["adminLogin","adminDash","advocateDash","mainApp","childInfoScreen","rollCallDash"];
@@ -2401,7 +2472,7 @@ async function verifyAdmin() {
     document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:30px;font-weight:700;'><span class='modern-spinner'></span>Loading data...</p>";
     try {
       await withTimeout(
-        Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadTeacherPhonesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
+        Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadTeacherPhonesFromSheet(), loadAdvocatesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
         15000,
         "Data load"
       );
@@ -2441,7 +2512,7 @@ async function verifyAdmin() {
     });
     if (gradeMatch !== null) {
       await loginAdmin("gradeadmin", gradeMatch);
-    } else if (pw === ADVOCATE_PASSWORD) {
+    } else if (pw === (customPws["advocate"] || ADVOCATE_PASSWORD) || getCustomAdvocates().some(a => a.password === pw)) {
       logLoginEvent("advocate", null);
       document.getElementById("adminLogin").style.display = "none";
       document.getElementById("advocateDash").style.display = "block";
@@ -2942,6 +3013,7 @@ function renderSuperAdminTab() {
 
   const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
   const adminPw   = customPws.admin || "Jesusislord";
+  const customAdvocatesLocal = getCustomAdvocates();
 
   // Admin users: built-in + custom
   const adminUsers = JSON.parse(localStorage.getItem("adminUsers") || "[]");
@@ -2955,7 +3027,7 @@ function renderSuperAdminTab() {
   const builtinAccounts = [
     { label:"👑 Super Admin",         key:"superadmin", pw:"Jesusislord4SuperAdmin",  deletable:false },
     { label:"🛡️ Admin",              key:"admin",      pw:adminPw,                   deletable:false },
-    { label:"💚 Advocate (Lemlem)",   key:"lemlem",     pw:"Jesusislord4Lemlem",      deletable:false },
+    { label:"💚 Advocate (built-in)",  key:"advocate",   pw:customPws["advocate"] || ADVOCATE_PASSWORD, deletable:false },
     ...allActiveGradeKeys.map(g => ({
       label: "📚 Grade " + g + " Teacher",
       key: "gradeadmin_" + g,
@@ -3273,6 +3345,69 @@ function renderSuperAdminTab() {
       </div>
     </div>
 
+    <!-- ── ADVOCATE MANAGEMENT ──────────────────────────────────────── -->
+    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(13,122,138,0.08);margin-bottom:14px;">
+      <div onclick="toggleCollapsibleSection('advocateMgmtBody','advocateMgmtChevron')" style="background:linear-gradient(135deg,#0e6b47,#22c55e);padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:15px;font-weight:800;color:white;">💚 Advocate Management</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.85);">Add or remove advocates — each with their own password</div>
+        </div>
+        <span id="advocateMgmtChevron" style="font-size:14px;color:white;transition:transform 0.2s;flex-shrink:0;margin-left:10px;">▶</span>
+      </div>
+      <div id="advocateMgmtBody" style="display:none;">
+        <div style="padding:14px;background:#fff8f0;border-top:2px solid #f0eefb;">
+          <div style="font-size:11px;color:#7b7a90;margin-bottom:12px;line-height:1.5;">⚠️ Advocates can see behavior tracker notes across every family in the program — treat this access as sensitive. There was only ever one shared advocate password before; this lets you give each advocate their own, so access can be granted or revoked individually instead of everyone sharing one password.</div>
+
+          <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:10px;">🔒 Built-in Advocate Password</div>
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="pw_advocate" type="text" value="${customPws["advocate"] || ADVOCATE_PASSWORD}" placeholder="Password"
+                style="flex:1;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;" />
+              <button onclick="saveAdminPassword('advocate')"
+                style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:linear-gradient(135deg,#0e6b47,#22c55e);color:white;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;">
+                💾 Save
+              </button>
+            </div>
+          </div>
+
+          <div style="font-size:12px;font-weight:800;color:#7b7a90;margin-bottom:10px;">✨ Additional Advocates</div>
+          <div id="customAdvocatesList">
+            ${customAdvocatesLocal.length === 0
+              ? `<div style="font-size:12px;color:#bbb;text-align:center;padding:8px;">No additional advocates yet</div>`
+              : customAdvocatesLocal.map((a, idx) => `
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px;background:white;border-radius:12px;border:1.5px solid #f0eefb;">
+                <div style="flex:1;">
+                  <div style="font-size:12px;font-weight:800;color:#0a3d45;">💚 ${a.name}</div>
+                  <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
+                    <input id="advocatePw_${idx}" type="text" value="${a.password}"
+                      style="flex:1;padding:6px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;border:1.5px solid #c0eaf0;border-radius:8px;outline:none;color:#0a3d45;" />
+                    <button onclick="updateCustomAdvocatePw(${idx})"
+                      style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:linear-gradient(135deg,#0e6b47,#22c55e);color:white;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">
+                      💾
+                    </button>
+                    <button onclick="deleteCustomAdvocate(${idx})"
+                      style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:#fff0f0;color:#c0392b;border:1.5px solid #fbbcbc;border-radius:8px;cursor:pointer;">
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>`).join("")}
+          </div>
+
+          <div style="margin-top:12px;padding-top:12px;border-top:1.5px dashed #f0d9c0;">
+            <input id="newAdvocateName" type="text" placeholder="Advocate's name"
+              style="width:100%;padding:10px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;margin-bottom:8px;box-sizing:border-box;" />
+            <input id="newAdvocatePassword" type="text" placeholder="Password for this advocate"
+              style="width:100%;padding:10px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:2px solid #c0eaf0;border-radius:10px;outline:none;color:#0a3d45;margin-bottom:8px;box-sizing:border-box;" />
+            <button onclick="addCustomAdvocate()"
+              style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;background:linear-gradient(135deg,#0e6b47,#22c55e);color:white;border:none;border-radius:10px;cursor:pointer;">
+              ➕ Add Advocate
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── ALL PASSWORDS SUMMARY ─────────────────────────────────────── -->
     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(13,122,138,0.08);">
       <div onclick="toggleCollapsibleSection('allPasswordsBody','allPasswordsChevron')" style="background:linear-gradient(135deg,#021a1e,#0a5260);padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
@@ -3289,6 +3424,11 @@ function renderSuperAdminTab() {
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
           <div style="font-size:13px;font-weight:700;color:#0a3d45;">✨ ${u.label}</div>
           <div style="font-size:12px;font-weight:800;color:#0d7a8a;background:#e0f5f7;padding:4px 10px;border-radius:8px;">${u.pw}</div>
+        </div>`).join("")}
+      ${customAdvocatesLocal.map(a => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:0.5px solid #f0eefb;">
+          <div style="font-size:13px;font-weight:700;color:#0a3d45;">💚 Advocate — ${a.name}</div>
+          <div style="font-size:12px;font-weight:800;color:#0d7a8a;background:#e0f5f7;padding:4px 10px;border-radius:8px;">${a.password}</div>
         </div>`).join("")}
       </div>
     </div>`;
