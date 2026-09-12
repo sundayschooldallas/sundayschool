@@ -2574,9 +2574,11 @@ function saveAdvocateNotes(parentName, notes) {
 }
 
 function getStrikeCount(parentName) {
-  // Count Sundays where any category is below 5
+  // Count Sundays where any category is below 5 — checks every date that
+  // actually has data recorded, not a fixed list of dates (which used to
+  // be a hardcoded old-season list that never matched real current dates)
   let strikes = 0;
-  ALL_SUNDAYS.forEach(date => {
+  getAllTrackerDates(parentName).forEach(date => {
     const data = getTrackerData(parentName, date);
     if (!data) return;
     const hasBelow5 = TRACKER_CATEGORIES.some(cat => (data[cat.key] || {}).stars < 5);
@@ -2586,10 +2588,10 @@ function getStrikeCount(parentName) {
 }
 
 function getCategoryStrikes(parentName) {
-  // Per category — count Sundays below 5
+  // Per category — count Sundays below 5, across every date with actual data
   const catStrikes = {};
   TRACKER_CATEGORIES.forEach(cat => { catStrikes[cat.key] = { count: 0, sundays: [], comments: [] }; });
-  ALL_SUNDAYS.forEach(date => {
+  getAllTrackerDates(parentName).forEach(date => {
     const data = getTrackerData(parentName, date);
     if (!data) return;
     TRACKER_CATEGORIES.forEach(cat => {
@@ -2641,21 +2643,31 @@ async function renderAdvocateDash() {
 
   const container = document.getElementById("advocateContent");
 
-  // Find all parents with any below-5 ratings
+  // Find all parents with any below-5 ratings — based on who actually HAS
+  // tracker ratings recorded, not who currently happens to be on the
+  // volunteer duty roster. A parent's duty-roster status shouldn't affect
+  // whether their child's behavior ratings show up here.
   const flaggedKids = [];
-  const allParents = [];
-  roster.forEach(week => week.parents.forEach(p => {
-    if (!allParents.find(x => x.name === p.name)) allParents.push(p);
-  }));
+  const trackerParentNames = new Set();
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("tracker__")) {
+      const parts = key.split("__");
+      if (parts[1]) trackerParentNames.add(parts[1]);
+    }
+  }
+  // Also include every parent currently on the roster, so parents with a
+  // registered child but no ratings yet are still discoverable if needed
+  roster.forEach(week => week.parents.forEach(p => trackerParentNames.add(p.name)));
 
-  allParents.forEach(p => {
-    const ci = getChildInfoByParent(p.name);
+  trackerParentNames.forEach(parentName => {
+    const ci = getChildInfoByParent(parentName);
     if (!ci || !ci.name) return;
-    const strikes = getStrikeCount(p.name);
+    const strikes = getStrikeCount(parentName);
     if (strikes === 0) return;
-    const catStrikes = getCategoryStrikes(p.name);
+    const catStrikes = getCategoryStrikes(parentName);
     const needsEscalation = strikes >= 2;
-    flaggedKids.push({ parent: p, ci, strikes, catStrikes, needsEscalation });
+    flaggedKids.push({ parent: { name: parentName }, ci, strikes, catStrikes, needsEscalation });
   });
 
   if (flaggedKids.length === 0) {
@@ -5650,6 +5662,25 @@ const ALL_SUNDAYS = [
   "Aug 2","Aug 9","Aug 16","Aug 23","Aug 30"
 ];
 
+// Real, current Sundays for the Tracker date picker — replaces the fixed
+// May-Aug list above, which never matched real dates once the app moved
+// past that original hardcoded season.
+function getTrackerPickerSundays() {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const now = getMockNow ? getMockNow() : new Date();
+  const day = now.getDay();
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  const thisSunday = new Date(now);
+  thisSunday.setDate(now.getDate() + daysToSunday);
+  const dates = [];
+  for (let i = 20; i >= -4; i--) {
+    const d = new Date(thisSunday);
+    d.setDate(thisSunday.getDate() - i * 7);
+    dates.push(months[d.getMonth()] + " " + d.getDate());
+  }
+  return dates;
+}
+
 // ── PARENTS TAB ───────────────────────────────────────
 function renderParentsTab() {
   // For grade admins — only show their grade's slots
@@ -6028,7 +6059,7 @@ function renderClassesTab() {
 
   Object.keys(gradeConfig).map(Number).sort((a,b)=>a-b).forEach(g => {
     const cfg = gradeConfig[g];
-    const students = allGrades[g];
+    const students = allGrades[g] || [];
     const mine = isMyGrade(g);
     const sectionId = "classSection_" + g;
 
@@ -6324,7 +6355,7 @@ function renderTrackerTab() {
     <select id="trackerDateSelect" onchange="loadTrackerForm()" style="width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;border:2px solid #c0eaf0;border-radius:12px;outline:none;color:#0a3d45;background:white;">
       <option value="">-- Select Sunday --</option>`;
 
-  ALL_SUNDAYS.forEach(d => {
+  getTrackerPickerSundays().forEach(d => {
     html += `<option value="${d}" ${d === todayStr ? "selected" : ""}>📅 ${d}</option>`;
   });
 
