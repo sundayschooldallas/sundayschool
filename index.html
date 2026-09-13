@@ -7016,6 +7016,8 @@ function showScoringScreen(dateStr) {
 
       TRACKER_CATEGORIES.forEach(function(cat) {
         const current = existing[cat.key] || { stars: (cat.key === "punctuality" && absent ? 1 : 5), comment: "" };
+        if (!window.rcRatings[pfx]) window.rcRatings[pfx] = {};
+        window.rcRatings[pfx][cat.key] = current.stars;
         html += `
             <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid #f0eefb;">
               <div style="font-size:13px;font-weight:800;color:#0a3d45;margin-bottom:2px;">${cat.label}</div>
@@ -7063,6 +7065,12 @@ function rcToggle(pfx) {
   arrow.textContent   = open ? "▼" : "▲";
 }
 
+// Tracks the currently-selected star rating per student+category on the
+// roll call scoring screen. Previously this was read back from a CSS
+// "opacity" style that rcSetStar() never actually set — meaning every
+// save silently fell back to a hardcoded 5, no matter what was clicked.
+window.rcRatings = window.rcRatings || {};
+
 function rcSetStar(parentName, date, catKey, stars, prefix) {
   const colors = ["","#c0392b","#e67e22","#f1c40f","#2980b9","#27ae60"];
   for (let n = 1; n <= 5; n++) {
@@ -7073,14 +7081,15 @@ function rcSetStar(parentName, date, catKey, stars, prefix) {
       el.style.borderColor = n <= stars ? colors[n] : "#e0e0e0";
     }
   }
+  if (!window.rcRatings[prefix]) window.rcRatings[prefix] = {};
+  window.rcRatings[prefix][catKey] = stars;
   const commentBox = document.getElementById("rccomment_" + prefix + "_" + catKey);
   if (commentBox) commentBox.style.display = stars < 5 ? "block" : "none";
 }
 
 function rcGetStars(prefix, catKey) {
-  for (let n = 5; n >= 1; n--) {
-    const el = document.getElementById("rcstar_" + prefix + "_" + catKey + "_" + n);
-    if (el && parseFloat(el.style.opacity) === 1) return n;
+  if (window.rcRatings[prefix] && window.rcRatings[prefix][catKey] !== undefined) {
+    return window.rcRatings[prefix][catKey];
   }
   return 5;
 }
