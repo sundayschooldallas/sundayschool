@@ -5716,15 +5716,36 @@ function getTrackerPickerSundays() {
 }
 
 // ── PARENTS TAB ───────────────────────────────────────
+// Generates a few real upcoming Sunday dates (with year) for the "add a
+// new date" option in the parent date picker — replaces a hardcoded,
+// yearless "Aug 16/23/30" list that no longer matched any real calendar date.
+function getNewParentDateOptions() {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const now = getMockNow ? getMockNow() : new Date();
+  const day = now.getDay();
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  const nextSunday = new Date(now);
+  nextSunday.setDate(now.getDate() + daysToSunday);
+  let html = "";
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(nextSunday);
+    d.setDate(nextSunday.getDate() + i * 7);
+    const label = months[d.getMonth()] + " " + d.getDate() + " " + d.getFullYear();
+    html += `<option value="new_${label}">📅 ${label} — new date</option>`;
+  }
+  return html;
+}
+
 function renderParentsTab() {
   // For grade admins — only show their grade's slots
   const gradePrefix = adminGrade ? "G" + adminGrade + "-" : null;
 
-  // Filter roster to only relevant slots
+  // Filter roster to only relevant slots. (Previously this had an
+  // unreachable second branch trying to exclude "G6-"/"G9-" for a
+  // non-grade admin — that condition could never actually be true, since
+  // reaching it already required adminGrade to be falsy. Simplified.)
   const relevantRoster = adminGrade
     ? roster.filter(w => w.date.startsWith(gradePrefix))
-    : adminGrade
-    ? roster.filter(w => !w.date.startsWith("G6-") && !w.date.startsWith("G9-"))
     : roster;
 
   const openSlots = relevantRoster.filter(w => w.parents.length < 2).map(w => w.date);
@@ -5734,10 +5755,7 @@ function renderParentsTab() {
 
   const allDatesHTML = relevantRoster.map(w =>
     `<option value="${w.date}">📅 ${w.date} (${w.parents.length}/2 parents)</option>`
-  ).join("") + (adminGrade ? "" :
-    `<option value="new_aug16">📅 Aug 16 — new date</option>
-     <option value="new_aug23">📅 Aug 23 — new date</option>
-     <option value="new_aug30">📅 Aug 30 — new date</option>`);
+  ).join("") + (adminGrade ? "" : getNewParentDateOptions());
 
   const gradeNote = adminGrade ? `
     <div style="background:#e4f7ef;border-radius:14px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#0e6b47;font-weight:700;">
@@ -5907,28 +5925,34 @@ function addNewParent() {
         }
       }
     } else {
-      // Regular admin — find first date with < 2 parents
-      assignedWeek = roster.find(w => w.parents.length < 2 && !w.date.startsWith("G6-") && !w.date.startsWith("G9-"));
-      if (!assignedWeek) {
-        const newDates = ["Aug 16","Aug 23","Aug 30"];
-        for (const d of newDates) {
-          if (!roster.find(w => w.date === d)) { assignedDate = d; break; }
-        }
-        if (assignedDate) {
-          roster.push({ date: assignedDate, parents: [newParent] });
-        } else {
-          errEl.textContent = "❌ All slots are full. Please add a new date manually.";
-          errEl.style.display = "block";
-          return;
-        }
+      // Regular admin — find the first open slot across any currently
+      // active grade, using the real duty calendar system. Previously this
+      // only excluded "G6-"/"G9-" (a leftover from before Grade 7/8 and
+      // custom classes existed) and fell back to a hardcoded, yearless
+      // August date list that no longer matched any real calendar date.
+      const activeGrades = getActiveGrades();
+      let bestWeek = null;
+      for (const g of activeGrades) {
+        const prefix = "G" + g + "-";
+        const w = roster.find(w => w.date.startsWith(prefix) && w.parents.length < 2);
+        if (w) { bestWeek = w; break; }
+      }
+      if (!bestWeek && activeGrades.length > 0) {
+        bestWeek = findNextOpenGradeDate(activeGrades[0]);
+      }
+      if (bestWeek) {
+        bestWeek.parents.push(newParent);
+        assignedDate = bestWeek.date;
       } else {
-        assignedWeek.parents.push(newParent);
-        assignedDate = assignedWeek.date;
+        errEl.textContent = "❌ No classes are set up yet. Please create a class first in Super Admin.";
+        errEl.style.display = "block";
+        return;
       }
     }
   } else if (dateChoice.startsWith("new_")) {
-    // New date
-    assignedDate = dateChoice.replace("new_","").replace("aug","Aug ");
+    // New date — now a real, dynamically-generated date (with year), not
+    // the old hardcoded "aug16/23/30" placeholder pattern
+    assignedDate = dateChoice.replace("new_", "");
     const existing = roster.find(w => w.date === assignedDate);
     if (existing) { existing.parents.push(newParent); }
     else { roster.push({ date: assignedDate, parents: [newParent] }); }
@@ -5944,8 +5968,11 @@ function addNewParent() {
     week.parents.push(newParent);
   }
 
-  // Ensure date is in clean format before saving
-  assignedDate = normalizeRosterDate(assignedDate);
+  // Every branch above already sets assignedDate to exactly match the
+  // roster week's own .date value, so no further normalization is applied
+  // here — doing so previously risked sending a slightly different string
+  // to the Sheet than what's actually stored in memory, causing the synced
+  // record to silently mismatch on the next load.
 
   resEl.innerHTML = `
     <div style="background:#e4f7ef;border-radius:12px;padding:14px;color:#0e6b47;font-weight:800;font-size:13px;">
