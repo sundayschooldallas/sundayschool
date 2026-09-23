@@ -1309,7 +1309,7 @@ async function loadStatusesFromSheet() {
   } catch(e) { console.log("Could not load from sheet, using local cache"); }
 }
 
-let myPhone = localStorage.getItem("myPhone") || "";
+let myPhone = ""; // Intentionally never restored from localStorage — the PIN is always required, every time, even on the same device, so a shared/public computer never stays logged in as a previous parent.
 let myName = "", myWeek = null, myParent = null, myPartner = null;
 let myChildren = []; // all children registered under the current phone number
 let myChildInfo = null; // the specific child the parent is currently viewing
@@ -1376,7 +1376,9 @@ async function verifyPhone() {
   myWeek = found.week;
   myParent = found.me;
   myPartner = found.partner;
-  localStorage.setItem("myPhone", myPhone);
+  // Intentionally NOT saved to localStorage — see note on the myPhone
+  // declaration above. This session lives in memory only, for as long as
+  // this tab stays open, and is gone the moment the page reloads.
   showApp();
 }
 
@@ -2038,29 +2040,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   // Load statuses from sheet then render banner — refreshes every 60s
   try { initTodayPairBanner(); } catch(e) {}
 
-  // Load new parents first so manually added parents can auto-login
+  // Load new parents so the sheet data is fresh for whoever logs in next.
+  // (Auto-login on page load was intentionally removed — the PIN is now
+  // required every time, on every device, so a shared/public computer
+  // never stays signed in as whichever parent last used it.)
   try { await loadNewParentsFromSheet(); } catch(e) {}
-
-  try {
-    if (myPhone) {
-      const found = findMe(myPhone);
-      if (found) {
-        found.week.date = normalizeRosterDate(found.week.date);
-        myName = found.me.name;
-        myWeek = found.week;
-        myParent = found.me;
-        myPartner = found.partner;
-        showMainApp(); // returning user — skip child info screen
-      } else {
-        // Phone not found even after loading sheet — clear it
-        localStorage.removeItem("myPhone");
-        myPhone = "";
-      }
-    }
-  } catch(e) {
-    console.log("Auto-login failed:", e);
-    localStorage.removeItem("myPhone");
-  }
   try {
     document.getElementById("phoneInput").addEventListener("keydown", e => {
       if (e.key === "Enter") verifyPhone();
