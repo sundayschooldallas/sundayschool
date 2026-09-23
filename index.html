@@ -4713,6 +4713,92 @@ async function loadArchivesFromSheet() {
   }
 }
 
+// Shows every unique parent (name + phone) whose child was in a given
+// grade at the time of this archive — e.g. look up "Grade 8" to find the
+// parents of students now promoted to Grade 9. Pulls phone numbers
+// straight from the archived student records, since that's the only
+// place this data still exists once a family moves on from a grade.
+function renderArchiveContacts(yearLabel, grade) {
+  const el = document.getElementById("archiveContactsList");
+  if (!el) return;
+  if (!grade) { el.innerHTML = ""; return; }
+
+  const snap = (window._archiveSnapCache || {})[yearLabel];
+  if (!snap) { el.innerHTML = `<div style="font-size:12px;color:rgba(255,140,140,0.8);">Archive data not loaded — reopen this report.</div>`; return; }
+
+  const studentsInGrade = (snap.students || []).filter(s => String(s.grade) === String(grade));
+  const byParent = {};
+  studentsInGrade.forEach(s => {
+    const key = (s.parentName || "Unknown") + "__" + (s.phone || "");
+    if (!byParent[key]) byParent[key] = { name: s.parentName || "Unknown", phone: s.phone || "", children: [] };
+    byParent[key].children.push(s.name || "Unnamed");
+  });
+  const contacts = Object.values(byParent);
+
+  if (contacts.length === 0) {
+    el.innerHTML = `<div style="font-size:12px;color:rgba(255,255,255,0.4);">No students found for Grade ${grade} in this archive.</div>`;
+    return;
+  }
+
+  const listText = contacts.map(c => c.name + " — " + (c.phone ? "+1" + c.phone : "no phone on file") + " (" + c.children.join(", ") + ")").join("\n");
+
+  el.innerHTML = `
+    ${contacts.map(c => `
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+        <div style="font-size:12px;font-weight:800;color:white;">${c.name}</div>
+        <div style="font-size:12px;color:#7effd4;margin-top:2px;">${c.phone ? "📞 +1" + c.phone : "No phone on file"}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">Child${c.children.length>1?"ren":""}: ${c.children.join(", ")}</div>
+      </div>`).join("")}
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button onclick="navigator.clipboard.writeText(${JSON.stringify(listText)});showToast('✅ Contact list copied')"
+        style="flex:1;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+        📋 Copy List
+      </button>
+      <button onclick="reAddParentsFromArchive('${yearLabel}','${grade}')"
+        style="flex:1;padding:10px;background:linear-gradient(135deg,#0f6e56,#1db88a);border:none;border-radius:9px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">
+        ➕ Re-Add These Parents
+      </button>
+    </div>`;
+}
+
+// Re-creates a fresh parent + PIN record for every unique parent found for
+// a given grade in an archive snapshot, so those families can log back in.
+// Each parent gets a brand-new PIN (their old one isn't restored) — you'll
+// need to re-add their child separately under the class they're in now.
+async function reAddParentsFromArchive(yearLabel, grade) {
+  const snap = (window._archiveSnapCache || {})[yearLabel];
+  if (!snap) { showToast("❌ Archive data not loaded — reopen this report."); return; }
+
+  const studentsInGrade = (snap.students || []).filter(s => String(s.grade) === String(grade));
+  const byParent = {};
+  studentsInGrade.forEach(s => {
+    const key = (s.parentName || "Unknown") + "__" + (s.phone || "");
+    if (!byParent[key]) byParent[key] = { name: s.parentName || "Unknown", phone: s.phone || "" };
+  });
+  const contacts = Object.values(byParent).filter(c => c.phone);
+
+  if (contacts.length === 0) { showToast("❌ No parents with a phone number found for this grade."); return; }
+  if (!confirm("Re-add " + contacts.length + " parent(s) from Grade " + grade + " (" + yearLabel + ")?\n\nEach will get a brand-new PIN — their old PIN is not restored. You'll still need to register their child under their current class separately.")) return;
+
+  showToast("⏳ Re-adding " + contacts.length + " parent(s)...");
+  let added = 0;
+  for (const c of contacts) {
+    const norm = normalize(c.phone);
+    if (!norm) continue;
+    const encoded = btoa("+1" + norm);
+    const newPin = String(Math.floor(1000 + Math.random() * 9000));
+    fetch(SHEET_URL, {
+      method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ type: "newParent", name: c.name, phone: "+1" + norm, h: norm, e: encoded, pin: newPin, date: "" })
+    }).catch(() => {});
+    added++;
+  }
+  showToast("✅ Re-added " + added + " parent(s). New PINs generated — check the PIN tab to share them.");
+  await loadNewParentsFromSheet();
+  try { renderPinTab(); } catch(e) {}
+  try { renderParentsTab(); } catch(e) {}
+}
+
 async function restoreChildrenFromArchive(yearLabel) {
   if (!confirm("Restore every student from the " + yearLabel + " archive back into the live Children sheet?\n\nExisting matching students (same phone + name) will be updated, not duplicated. This will NOT delete anything currently in the live sheet.")) return;
 
@@ -4866,10 +4952,27 @@ function renderArchiveDetail(snap) {
     Object.keys(byGrade).sort().forEach(g => {
       html += `<div style="font-size:12px;font-weight:800;color:#7effd4;margin:8px 0 4px;">Grade ${g} — ${byGrade[g].length} student${byGrade[g].length!==1?"s":""}</div>`;
       byGrade[g].forEach(s => {
-        html += `<div style="${R}">• ${s.name||"—"} <span style="opacity:0.6;font-size:11px;">· Parent: ${s.parentName||"—"}</span></div>`;
+        html += `<div style="${R}">• ${s.name||"—"} <span style="opacity:0.6;font-size:11px;">· Parent: ${s.parentName||"—"}${s.phone?" · 📞 +1"+s.phone:""}</span></div>`;
       });
     });
   }
+
+  // ── Parent Contacts by Grade — surfaces phone numbers for a specific
+  //    grade (e.g. last year's Grade 8, now promoted to Grade 9), and lets
+  //    you re-add those parents so the family can log back in ───────────
+  const archiveGrades = Object.keys(byGrade).sort();
+  if (archiveGrades.length > 0) {
+    html += `<div style="${H}">📞 Parent Contacts by Grade</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:10px;">Pick the grade these students were in <em>at the time of this archive</em> (e.g. Grade 8, if they've since been promoted to Grade 9) to see their parents' phone numbers, and optionally re-add those parents so the families can log in again.</div>
+    <select id="archiveContactGrade" onchange="renderArchiveContacts('${snap.yearLabel}', this.value)"
+      style="width:100%;padding:10px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid rgba(255,255,255,0.25);border-radius:10px;background:rgba(255,255,255,0.1);color:white;outline:none;margin-bottom:10px;">
+      <option value="">— Select a grade —</option>
+      ${archiveGrades.map(g => `<option value="${g}">Grade ${g} (${byGrade[g].length} student${byGrade[g].length!==1?"s":""})</option>`).join("")}
+    </select>
+    <div id="archiveContactsList"></div>`;
+  }
+  window._archiveSnapCache = window._archiveSnapCache || {};
+  window._archiveSnapCache[snap.yearLabel] = snap;
 
   // ── Parents ─────────────────────────────────────────────────────────
   const parents = snap.parents || [];
