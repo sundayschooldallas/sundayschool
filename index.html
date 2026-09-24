@@ -1771,32 +1771,43 @@ function saveChildInfo() {
   const name = document.getElementById("childNameInput").value.trim();
   // Add current child if filled
   if (name && selectedGrade) {
-    // Check for duplicate full name across ALL grades and parents
+    // Check for a duplicate ONLY within THIS SAME FAMILY (same phone).
+    // This previously checked every child in the entire system, across
+    // every family — meaning a brand-new registration could be wrongly
+    // blocked just because some unrelated family (or old/graduated/
+    // orphaned data) happened to have a child with the same name.
     const nameLower = name.trim().toLowerCase();
     let isDuplicate = false;
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || !k.startsWith("childInfo__")) continue;
-      try {
-        const ci = JSON.parse(localStorage.getItem(k));
-        if (!ci || !ci.name) continue;
-        // Check primary child name
-        if (ci.name.trim().toLowerCase() === nameLower) { isDuplicate = true; break; }
-        // Check allChildren array too
-        if (ci.allChildren) {
-          for (const c of ci.allChildren) {
-            if (c.name && c.name.trim().toLowerCase() === nameLower) { isDuplicate = true; break; }
-          }
-        }
-        if (isDuplicate) break;
-      } catch(e) {}
-    }
-    // Also check childrenSheetData
+    const myNorm = normalize(myPhone);
+
+    // Check children already added in this same sitting (this batch)
+    pendingChildren.forEach(c => {
+      if (c.name && c.name.trim().toLowerCase() === nameLower) isDuplicate = true;
+    });
+
+    // Check this family's already-registered children (sheet data)
     if (!isDuplicate && childrenSheetData) {
       for (const row of childrenSheetData) {
+        if (!row.phone) continue;
+        const rowBasePhone = String(row.phone).split("_child")[0]; // strip legacy _child2/_child3 suffix
+        if (normalize(rowBasePhone) !== myNorm) continue; // different family — not a duplicate
         const rowName = row.childName || row.name;
         if (rowName && rowName.trim().toLowerCase() === nameLower) { isDuplicate = true; break; }
       }
+    }
+
+    // Check this family's locally-cached child info (legacy fallback,
+    // scoped to just this phone's own key, not every cached family)
+    if (!isDuplicate) {
+      try {
+        const ci = JSON.parse(localStorage.getItem("childInfo__" + myPhone) || "null");
+        if (ci) {
+          if (ci.name && ci.name.trim().toLowerCase() === nameLower) isDuplicate = true;
+          if (ci.allChildren) {
+            ci.allChildren.forEach(c => { if (c.name && c.name.trim().toLowerCase() === nameLower) isDuplicate = true; });
+          }
+        }
+      } catch(e) {}
     }
     if (isDuplicate) {
       const errEl = document.getElementById("childInfoError");
