@@ -1464,6 +1464,344 @@ async function showApp() {
 
 const TEACHERS = { 6: "Yemane Tsegay & Amots Michael", 7: "Bereket Isayas", 8: "Amanuel Habte", 9: "Ruth" };
 
+// ── LESSON PLANS ───────────────────────────────────────────────────────
+// lessonPlansData: { "<grade>": [ {week, quarter, topic, scripture, focus,
+//   objective, activity, discussion}, ... 52 weeks, sorted by week ] }
+// Loaded from the LessonPlans sheet; edited/uploaded from Super Admin;
+// viewed read-only from each class's dashboard and the roll call screen.
+let lessonPlansData = {};
+
+async function loadLessonPlansFromSheet() {
+  try {
+    const res = await fetch(SHEET_URL + "?type=lessonPlans&nocache=" + Date.now(), { mode: "cors" });
+    if (!res.ok) return;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return;
+    const byGrade = {};
+    rows.forEach(r => {
+      const g = String(r.grade);
+      if (!byGrade[g]) byGrade[g] = [];
+      byGrade[g].push(r);
+    });
+    Object.keys(byGrade).forEach(g => byGrade[g].sort((a,b) => a.week - b.week));
+    lessonPlansData = byGrade;
+    try { localStorage.setItem("lessonPlansCache", JSON.stringify(lessonPlansData)); } catch(e) {}
+  } catch(e) {
+    console.error("loadLessonPlansFromSheet failed:", e);
+    try { lessonPlansData = JSON.parse(localStorage.getItem("lessonPlansCache") || "{}"); } catch(e2) {}
+  }
+}
+
+function getLessonPlanForGrade(grade) {
+  return lessonPlansData[String(grade)] || [];
+}
+
+async function saveLessonPlanWeek(grade, weekObj) {
+  await fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(Object.assign({ type: "saveLessonPlanWeek", grade: grade }, weekObj))
+  }).catch(() => {});
+  // Update local cache optimistically
+  const g = String(grade);
+  if (!lessonPlansData[g]) lessonPlansData[g] = [];
+  const idx = lessonPlansData[g].findIndex(w => Number(w.week) === Number(weekObj.week));
+  if (idx > -1) lessonPlansData[g][idx] = Object.assign({}, lessonPlansData[g][idx], weekObj);
+  else lessonPlansData[g].push(Object.assign({ grade: grade }, weekObj));
+  lessonPlansData[g].sort((a,b) => a.week - b.week);
+}
+
+async function deleteLessonPlanWeek(grade, week) {
+  await fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "deleteLessonPlanWeek", grade: grade, week: week })
+  }).catch(() => {});
+  const g = String(grade);
+  if (lessonPlansData[g]) lessonPlansData[g] = lessonPlansData[g].filter(w => Number(w.week) !== Number(week));
+}
+
+async function saveLessonPlanBulk(grade, weeksArray) {
+  await fetch(SHEET_URL, {
+    method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "saveLessonPlanBulk", grade: grade, weeks: weeksArray })
+  }).catch(() => {});
+  lessonPlansData[String(grade)] = weeksArray.slice().sort((a,b) => a.week - b.week);
+}
+
+// Finds which week of the plan corresponds to "now" — the plan is simply
+// walked in order starting from Week 1 on the first Sunday of the school
+// year (promotion Sunday), one week advancing every Sunday after that.
+function getCurrentLessonWeekNumber() {
+  const now = getMockNow ? getMockNow() : new Date();
+  // Find the most recent Promotion Sunday (first Sunday of September) on
+  // or before today, which is week 1 of the curriculum year.
+  let year = now.getFullYear();
+  function firstSundayOfSept(y) {
+    const d = new Date(y, 8, 1); // Sept 1
+    const offset = (7 - d.getDay()) % 7;
+    return new Date(y, 8, 1 + offset);
+  }
+  let start = firstSundayOfSept(year);
+  if (now < start) { year -= 1; start = firstSundayOfSept(year); }
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const weekNum = Math.floor((now - start) / msPerWeek) + 1;
+  return Math.max(1, Math.min(52, weekNum));
+}
+
+function getTodaysLessonPlan(grade) {
+  const plan = getLessonPlanForGrade(grade);
+  if (!plan.length) return null;
+  const wk = getCurrentLessonWeekNumber();
+  return plan.find(w => Number(w.week) === wk) || null;
+}
+
+// A collapsed-by-default "today's lesson" card for use during class/roll
+// call — the section that "opens in the class view whenever they are
+// being taught". Starts collapsed so it doesn't block the roll call UI,
+// but is right at the top and one tap away.
+function renderTodaysLessonCard(grade) {
+  const today = getTodaysLessonPlan(grade);
+  if (!today) return "";
+  const uid = "todaysLesson_" + grade;
+  return `
+    <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border-radius:16px;padding:14px 16px;margin-bottom:16px;color:white;box-shadow:0 8px 24px rgba(59,47,143,0.3);">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleCollapsibleSection('${uid}Body','${uid}Chevron')">
+        <div>
+          <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:0.5px;">📖 TODAY'S LESSON — WEEK ${today.week}</div>
+          <div style="font-size:15px;font-weight:900;margin-top:2px;">${today.topic || ""}</div>
+        </div>
+        <span id="${uid}Chevron" style="font-size:14px;color:rgba(255,255,255,0.7);">▶</span>
+      </div>
+      <div id="${uid}Body" style="display:none;margin-top:10px;">
+        <div style="font-size:13px;font-weight:700;color:#a5f3fc;margin-bottom:8px;">${today.scripture || ""}</div>
+        ${today.focus ? `<div style="font-size:13px;color:rgba(255,255,255,0.9);margin-bottom:8px;"><b>Focus:</b> ${today.focus}</div>` : ""}
+        ${today.objective ? `<div style="font-size:13px;color:rgba(255,255,255,0.9);margin-bottom:8px;"><b>Objective:</b> ${today.objective}</div>` : ""}
+        ${today.activity ? `<div style="font-size:13px;color:rgba(255,255,255,0.9);margin-bottom:8px;"><b>Activity:</b> ${today.activity}</div>` : ""}
+        ${today.discussion ? `<div style="font-size:13px;color:rgba(255,255,255,0.9);"><b>Discussion:</b> ${today.discussion}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+// ── STARTER TEMPLATE — elaborated from the Grade 7 1-Year Curriculum ────
+// Organized into 4 quarters of 13 weeks. Super Admin can load this as a
+// starting point for any class from the Lesson Plans section, then edit
+// or replace any week for that class.
+function buildLessonTemplateWeek(week, quarter, topic, scripture, focus, objective, activity, discussion) {
+  return { week, quarter, topic, scripture, focus, objective, activity, discussion };
+}
+const GRADE7_LESSON_TEMPLATE = [
+  buildLessonTemplateWeek(1,"Q1: God's Love for Us","Introduction: God's Love","1 John 4:9-10","God's love demonstrated through Jesus",
+    "Students will be able to explain, in their own words, how sending Jesus proves God's love for us.",
+    "Icebreaker: 'Show me love' — students list ways people show love, then compare to how God showed love by sending Jesus.",
+    "How is God's love different from human love? Why did God have to send Jesus specifically?"),
+  buildLessonTemplateWeek(2,"Q1: God's Love for Us","God's Sacrifice","John 3:16","Jesus' death as the ultimate act of love",
+    "Students will understand John 3:16 as the summary of the Gospel and be able to recite it.",
+    "Memory verse challenge in pairs; unpack each phrase of John 3:16 on the whiteboard together.",
+    "What does 'whoever believes' mean? Who is included in 'the world'?"),
+  buildLessonTemplateWeek(3,"Q1: God's Love for Us","Love in Action","1 John 3:16-17","Loving others sacrificially",
+    "Students will identify a practical way to sacrificially love someone this week.",
+    "Case-study role play: a classmate needs help — what does sacrificial love look like in that moment?",
+    "What's the difference between loving in word and loving in action?"),
+  buildLessonTemplateWeek(4,"Q1: God's Love for Us","What Is Agape Love?","1 Corinthians 13","Characteristics of true love",
+    "Students will list at least 5 characteristics of agape love from 1 Corinthians 13.",
+    "Read 1 Corinthians 13 aloud, replacing 'love' with each student's own name to self-check.",
+    "Which characteristic of love is hardest for you personally? Why?"),
+  buildLessonTemplateWeek(5,"Q1: God's Love for Us","Loving God & Neighbor","Matthew 22:36-40","The greatest commandments",
+    "Students will connect loving God with loving others as two inseparable commands.",
+    "Draw two overlapping circles labeled 'Love God' and 'Love Others' and fill in examples in the overlap.",
+    "Why do you think Jesus said all the Law and Prophets hang on these two commands?"),
+  buildLessonTemplateWeek(6,"Q1: God's Love for Us","God's Love Is Constant","Romans 8:35-39","Nothing separates us from His love",
+    "Students will name the list of things Paul says cannot separate us from God's love.",
+    "'Can this separate us?' quick-fire game using Paul's list plus modern examples (a bad grade, a mistake, etc).",
+    "Has there been a time you felt far from God's love? What brought you back?"),
+  buildLessonTemplateWeek(7,"Q1: God's Love for Us","Abiding in Christ's Love","John 15:9-12","Obedience and love",
+    "Students will explain how obedience is connected to remaining in God's love.",
+    "Vine and branches diagram — students draw themselves as a branch and label what 'abiding' looks like day to day.",
+    "What commands of Jesus are hardest to obey, and why do you think He gives them anyway?"),
+  buildLessonTemplateWeek(8,"Q1: God's Love for Us","Love and the Holy Spirit","Romans 5:5","Spirit pours out God's love",
+    "Students will describe the Holy Spirit's role in helping us feel and share God's love.",
+    "Guided reflection/quiet time: ask the Spirit to make God's love 'real' before sharing in small groups.",
+    "How do you experience the Holy Spirit's presence in your daily life?"),
+  buildLessonTemplateWeek(9,"Q1: God's Love for Us","Love vs. Law","Galatians 5:22-23","Fruit of the Spirit",
+    "Students will memorize the fruit of the Spirit and identify one they want to grow in.",
+    "Fruit basket activity — each student picks a paper fruit representing one fruit of the Spirit to focus on this month.",
+    "Which fruit of the Spirit do you see growing in you already? Which needs the most work?"),
+  buildLessonTemplateWeek(10,"Q1: God's Love for Us","Forgiveness and Love","1 John 1:9","Confession and restoration",
+    "Students will understand confession as the pathway back into close fellowship with God.",
+    "Anonymous 'confession box' — write a struggle on paper (not shared aloud), then pray together over the box.",
+    "Why is it sometimes hard to admit we did something wrong, even to God?"),
+  buildLessonTemplateWeek(11,"Q1: God's Love for Us","God's Love in the Old Testament","Psalm 103:12","God's mercy and compassion",
+    "Students will find examples of God's mercy toward Israel despite their failures.",
+    "Timeline activity: mark moments of Israel's disobedience and God's mercy side by side on a shared timeline.",
+    "How far is 'as far as the east is from the west'? What does that image tell you about forgiveness?"),
+  buildLessonTemplateWeek(12,"Q1: God's Love for Us","Living Water","John 4:5-14","Jesus satisfies our deepest needs",
+    "Students will contrast temporary satisfaction with the lasting satisfaction Jesus offers.",
+    "Object lesson with a cup of water that keeps 'running out' vs. a sealed bottle representing living water.",
+    "What are people around you thirsting for that only Jesus can truly satisfy?"),
+  buildLessonTemplateWeek(13,"Q1: God's Love for Us","Review & Activity","Mixed","Quarter 1 review and celebration",
+    "Students will recall and connect the major themes of Quarter 1 — God's love for us.",
+    "Review game (Jeopardy-style or relay race) covering weeks 1-12, followed by a group craft or worship activity.",
+    "Of everything we learned this quarter about God's love, what stands out to you most and why?"),
+
+  buildLessonTemplateWeek(14,"Q2: Faith - Pleasing God","What Is Faith?","Hebrews 11:1, 6","Definition and importance of faith",
+    "Students will define biblical faith and explain why it's impossible to please God without it.",
+    "Trust-fall or blindfolded-guide exercise to physically experience what trust/faith feels like.",
+    "What's the difference between faith in God and just 'positive thinking'?"),
+  buildLessonTemplateWeek(15,"Q2: Faith - Pleasing God","Created for God's Glory","Isaiah 43:7","Purpose of life",
+    "Students will articulate that they were created for God's glory, not just their own plans.",
+    "Students design a personal 'coat of arms' showing gifts/talents they can use for God's glory.",
+    "What's one talent or gift you have that could bring glory to God?"),
+  buildLessonTemplateWeek(16,"Q2: Faith - Pleasing God","God's Standard","Colossians 1:16","Living by God's principles",
+    "Students will compare living by God's standard versus the world's shifting standards.",
+    "Sort activity: cards with 'world says' vs. 'God says' statements, students sort and discuss.",
+    "Where do you feel the most pressure to follow the world's standard instead of God's?"),
+  buildLessonTemplateWeek(17,"Q2: Faith - Pleasing God","Faith vs. Works","Ephesians 2:8-10","Salvation by grace",
+    "Students will explain that salvation is a free gift, not something earned by good works.",
+    "'Earn it or receive it?' — sort everyday examples (a paycheck vs. a birthday gift) then connect to grace.",
+    "If good works don't save us, why does the Bible still say we should do them?"),
+  buildLessonTemplateWeek(18,"Q2: Faith - Pleasing God","Trusting God Daily","Proverbs 3:5-6","Dependence on God",
+    "Students will identify an area of life where they need to trust God instead of their own understanding.",
+    "Maze activity blindfolded, guided only by a partner's voice — connect to trusting God's direction.",
+    "What's one decision coming up where you need to trust God more than your own plan?"),
+  buildLessonTemplateWeek(19,"Q2: Faith - Pleasing God","Misconceptions About God","Malachi 3:6","Correcting false views",
+    "Students will identify and correct common misconceptions about who God is.",
+    "'True or false' quiz on common misconceptions about God, discussing each answer as a group.",
+    "What's a wrong idea about God you used to believe (or still wrestle with)?"),
+  buildLessonTemplateWeek(20,"Q2: Faith - Pleasing God","God's Nature","Psalm 90:1-2","Eternal, unchanging, omnipresent",
+    "Students will list attributes of God's nature (eternal, unchanging, everywhere-present).",
+    "Attribute matching game — match verses to the attribute of God they reveal.",
+    "Which attribute of God gives you the most comfort right now, and why?"),
+  buildLessonTemplateWeek(21,"Q2: Faith - Pleasing God","Head vs. Heart Belief","James 2:19","True saving faith",
+    "Students will distinguish between merely knowing facts about God and truly trusting Him.",
+    "Discussion starter: 'even the demons believe' — what makes faith more than just knowing facts?",
+    "How can you tell the difference between head-knowledge and heart-faith in your own life?"),
+  buildLessonTemplateWeek(22,"Q2: Faith - Pleasing God","Faith in Action","Daniel 6","Daniel's trust in God",
+    "Students will describe how Daniel's faith shaped his actions even under threat.",
+    "Act out or narrate the lions' den story, then discuss what gave Daniel courage to keep praying.",
+    "What's a 'lions' den' situation in your own life where your faith is being tested?"),
+  buildLessonTemplateWeek(23,"Q2: Faith - Pleasing God","Faith Under Pressure","Daniel's friends","Standing firm in trials",
+    "Students will identify strategies for standing firm in faith when facing peer pressure.",
+    "Fiery furnace story discussion, then brainstorm a list of real peer-pressure situations and faith responses.",
+    "Have you ever stood firm for your faith even when it was unpopular? What happened?"),
+  buildLessonTemplateWeek(24,"Q2: Faith - Pleasing God","Overcoming Worry","Matthew 6:25-34","Faith replaces fear",
+    "Students will practice replacing anxious thoughts with trust in God's provision.",
+    "Write a worry on a card, then physically 'trade' it for a promise card with a relevant scripture.",
+    "What do you worry about most, and what does this passage say to that worry?"),
+  buildLessonTemplateWeek(25,"Q2: Faith - Pleasing God","Walking with God","1 John 1:3","Daily fellowship",
+    "Students will commit to one practical habit of daily fellowship with God.",
+    "Build a simple 'daily walk with God' habit tracker students can start using that week.",
+    "What gets in the way of spending time with God daily, and how can you overcome it?"),
+  buildLessonTemplateWeek(26,"Q2: Faith - Pleasing God","Review & Activity","Mixed","Quarter 2 review and celebration",
+    "Students will recall and connect the major themes of Quarter 2 — faith that pleases God.",
+    "Review game covering weeks 14-25, followed by a group craft or worship activity.",
+    "What's one way your faith grew stronger this quarter?"),
+
+  buildLessonTemplateWeek(27,"Q3: Grace Changes Everything","What Is Grace?","Romans 6:23","God's undeserved favor",
+    "Students will define grace as an undeserved gift and contrast it with earning a wage.",
+    "'Wages vs. gift' object lesson using play money to illustrate earned pay versus a free gift.",
+    "Why is it hard for people to accept something they didn't earn?"),
+  buildLessonTemplateWeek(28,"Q3: Grace Changes Everything","Law vs. Grace","Romans 3:20","Law reveals sin; grace saves",
+    "Students will explain the purpose of the Law as a mirror that reveals our need for grace.",
+    "Mirror object lesson: a mirror shows dirt on your face but can't clean it — grace is the water that does.",
+    "Why does knowing the rules alone not make someone actually good?"),
+  buildLessonTemplateWeek(29,"Q3: Grace Changes Everything","Forgiveness Through Grace","2 Corinthians 5:21","Jesus took our place",
+    "Students will explain the concept of substitution — Jesus taking our sin so we could receive His righteousness.",
+    "Trade-places skit: one student 'takes the penalty' for another in a simple staged scenario.",
+    "How does knowing Jesus took your place change the way you see yourself?"),
+  buildLessonTemplateWeek(30,"Q3: Grace Changes Everything","Justified by Faith","Romans 4:5","Righteousness by belief",
+    "Students will explain justification as being declared righteous through faith, not performance.",
+    "Courtroom role-play: a 'judge' declares someone 'not guilty' though evidence says otherwise — grace in action.",
+    "How is being 'justified' different from just being 'let off the hook'?"),
+  buildLessonTemplateWeek(31,"Q3: Grace Changes Everything","New Creation","2 Corinthians 5:17","Transformation through grace",
+    "Students will identify what it means to be a 'new creation' in Christ.",
+    "Before/after collage — students create two sides showing 'old self' habits vs. 'new creation' hopes.",
+    "What's one 'old' habit or mindset you'd like grace to transform in you?"),
+  buildLessonTemplateWeek(32,"Q3: Grace Changes Everything","Grace and the Spirit","Galatians 3:2-3","Spirit-led life",
+    "Students will contrast starting the Christian life by grace with trying to finish it by self-effort.",
+    "Relay race where the second leg is done with a heavy backpack — illustrating trying to 'finish by works'.",
+    "In what area of your walk with God are you tempted to rely on your own effort instead of the Spirit?"),
+  buildLessonTemplateWeek(33,"Q3: Grace Changes Everything","Walking in the Spirit","Galatians 5:16","Feeding the spiritual nature",
+    "Students will identify practical ways to 'feed' their spiritual nature daily.",
+    "'Two wolves' style discussion — whichever nature (flesh or Spirit) you feed the most will grow.",
+    "What are you 'feeding' most right now — your flesh or your spirit? How do you know?"),
+  buildLessonTemplateWeek(34,"Q3: Grace Changes Everything","Fruitfulness in Grace","John 15:4, 8","Abiding in Christ",
+    "Students will connect abiding in Christ with bearing lasting spiritual fruit.",
+    "Revisit the vine and branches diagram from Week 7, adding what fruit has grown since then.",
+    "What fruit has God grown in you this year so far?"),
+  buildLessonTemplateWeek(35,"Q3: Grace Changes Everything","Grace vs. Flesh","Romans 7:18-19","Struggle and surrender",
+    "Students will acknowledge the ongoing struggle between wanting to do good and actually doing it.",
+    "Tug-of-war game illustrating the internal struggle Paul describes, followed by discussion.",
+    "Is it okay to still struggle with sin as a Christian? What does Paul teach us about that?"),
+  buildLessonTemplateWeek(36,"Q3: Grace Changes Everything","Victory Through Grace","Isaiah 26:3","Peace and purpose",
+    "Students will identify 'perfect peace' as a fruit of trusting God rather than circumstances.",
+    "Guided breathing/quiet reflection paired with memorizing Isaiah 26:3.",
+    "What steals your peace the most, and how can you keep your mind 'stayed on Him'?"),
+  buildLessonTemplateWeek(37,"Q3: Grace Changes Everything","Christian Liberty","Galatians 5:13","Freedom to serve",
+    "Students will explain that Christian freedom is meant to be used to serve others, not to sin.",
+    "Brainstorm: 'I'm free to... but I choose to...' — students complete the sentence with real examples.",
+    "How could someone misuse freedom in Christ? What keeps freedom from becoming an excuse?"),
+  buildLessonTemplateWeek(38,"Q3: Grace Changes Everything","Servanthood and Love","Matthew 22:37-39","Serving others in love",
+    "Students will plan one concrete act of service toward someone else this week.",
+    "Foot-washing style object lesson (or hand-washing) to illustrate humble service.",
+    "Who is someone in your life who needs you to serve them in love this week?"),
+  buildLessonTemplateWeek(39,"Q3: Grace Changes Everything","Review & Activity","Mixed","Group games, testimonies, art project",
+    "Students will recall and connect the major themes of Quarter 3 — grace changes everything.",
+    "Group games, student testimonies of grace in their own lives, and a shared art project.",
+    "Share one way grace has changed something in your life this quarter."),
+
+  buildLessonTemplateWeek(40,"Q4: Living It Out","The Armor of God","Ephesians 6:10-18","Spiritual protection",
+    "Students will name each piece of the armor of God and its purpose.",
+    "Craft/dress-up activity building a paper or cardboard 'armor of God' piece by piece.",
+    "Which piece of armor do you most need to 'put on' right now?"),
+  buildLessonTemplateWeek(41,"Q4: Living It Out","God's Promises","Jeremiah 29:11-13","Hope and future",
+    "Students will express hope for the future rooted in God's promises rather than circumstances.",
+    "Time-capsule letter — students write a letter to their future self about trusting God's plan.",
+    "What promise of God do you need to hold onto for something you're facing right now?"),
+  buildLessonTemplateWeek(42,"Q4: Living It Out","Prayer and Fellowship","1 Thessalonians 5:17","Talking with God",
+    "Students will build a habit of ongoing, conversational prayer throughout the day.",
+    "Prayer walk or prayer station rotation (praise, confession, thanksgiving, requests).",
+    "What makes it hard to 'pray without ceasing,' and what could help?"),
+  buildLessonTemplateWeek(43,"Q4: Living It Out","Serving Others","John 13:12-17","Jesus as servant",
+    "Students will identify Jesus washing feet as a model for humble service in their own life.",
+    "Re-enact or narrate the foot-washing scene, then discuss modern equivalents of that kind of humility.",
+    "What's a 'foot-washing' task you tend to avoid because it feels beneath you?"),
+  buildLessonTemplateWeek(44,"Q4: Living It Out","Evangelism and Witness","Romans 10:9","Sharing the Gospel",
+    "Students will practice sharing a simple, personal explanation of the Gospel.",
+    "Partner practice: 60-second Gospel pitch to a partner, then swap and give feedback.",
+    "Who is one person in your life you could share your faith with this month?"),
+  buildLessonTemplateWeek(45,"Q4: Living It Out","Living by the Word","Psalm 119:9-11","Scripture in daily life",
+    "Students will describe how hiding God's Word in their heart helps them resist sin.",
+    "Scripture memory relay — teams race to correctly recite/assemble a memorized verse.",
+    "What's a verse that has helped you resist temptation before?"),
+  buildLessonTemplateWeek(46,"Q4: Living It Out","Overcoming Temptation","1 Corinthians 10:13","God provides a way out",
+    "Students will identify their personal 'way out' when facing common temptations.",
+    "Scenario cards — students role-play finding the 'way out' in realistic temptation scenarios.",
+    "What's your usual 'way out' when you're tempted, and is it working?"),
+  buildLessonTemplateWeek(47,"Q4: Living It Out","Loving Difficult People","Luke 6:27-36","Radical love",
+    "Students will identify one difficult person they can choose to love and pray for this week.",
+    "Write the name of a hard-to-love person (kept private) and commit to praying for them daily.",
+    "Why does Jesus call us to love even our enemies? What does that reveal about God's heart?"),
+  buildLessonTemplateWeek(48,"Q4: Living It Out","Gratitude and Worship","Psalm 105:3-4","Seeking God joyfully",
+    "Students will practice expressing gratitude to God as an act of worship.",
+    "Gratitude jar — each student writes 3 things they're thankful for and adds them to a shared jar.",
+    "How does gratitude change the way you approach God?"),
+  buildLessonTemplateWeek(49,"Q4: Living It Out","Review of God's Love","Mixed","Recap and creative expression",
+    "Students will revisit and creatively express what they learned about God's love this year.",
+    "Creative expression station: drawing, writing, or music reflecting on God's love.",
+    "What has God's love meant to you this year?"),
+  buildLessonTemplateWeek(50,"Q4: Living It Out","Review of Faith","Mixed","Quiz, journaling, role-play",
+    "Students will revisit and reinforce what they learned about faith this year.",
+    "Quiz game, journaling prompt, and short role-plays reviewing faith lessons from Quarter 2.",
+    "How has your faith grown or changed this year?"),
+  buildLessonTemplateWeek(51,"Q4: Living It Out","Review of Grace","Mixed","Group discussion, art",
+    "Students will revisit and reinforce what they learned about grace this year.",
+    "Group discussion and an art project capturing what grace means to each student.",
+    "What would you tell someone who doesn't understand grace yet?"),
+  buildLessonTemplateWeek(52,"Q4: Living It Out","Celebration & Commitment","Mixed","Testimonies, worship, commitment cards",
+    "Students will articulate a personal commitment to continue growing in faith next year.",
+    "Testimony sharing, worship time, and signing personal commitment cards to close out the year.",
+    "What's one commitment you want to carry into next year with you?")
+];
+
 // ── PROMOTION SUNDAY ── First Sunday of September each year
 // Students move up one grade on this day each year
 function getPromotionSunday(year) {
@@ -2051,11 +2389,18 @@ window.addEventListener("DOMContentLoaded", async () => {
   // Load statuses from sheet then render banner — refreshes every 60s
   try { initTodayPairBanner(); } catch(e) {}
 
+  // Restore an admin / super admin / grade admin / roll call / advocate
+  // session so refreshing the page never signs staff out — only tapping
+  // "Sign out" does. Parent (PIN) logins are NOT restored here on purpose;
+  // those must always re-prompt for the PIN, even on the same device.
+  let restoredStaff = false;
+  try { restoredStaff = await restoreStaffSession(); } catch(e) {}
+
   // Load new parents so the sheet data is fresh for whoever logs in next.
-  // (Auto-login on page load was intentionally removed — the PIN is now
-  // required every time, on every device, so a shared/public computer
-  // never stays signed in as whichever parent last used it.)
-  try { await loadNewParentsFromSheet(); } catch(e) {}
+  // (Auto-login on page load was intentionally removed for PARENTS — the
+  // PIN is required every time, on every device, so a shared/public
+  // computer never stays signed in as whichever parent last used it.)
+  if (!restoredStaff) { try { await loadNewParentsFromSheet(); } catch(e) {} }
   try {
     document.getElementById("phoneInput").addEventListener("keydown", e => {
       if (e.key === "Enter") verifyPhone();
@@ -2399,6 +2744,96 @@ const GRADE_ADMIN_PASSWORDS = {
 let adminRole = "admin"; // "admin", "superadmin", or "gradeadmin"
 let adminGrade = null; // null = all grades, 6/7/8/9 = specific grade
 
+// ── STAFF SESSION PERSISTENCE ─────────────────────────────────────────
+// Keeps admin / super admin / grade admin / roll call / advocate logged in
+// across a page refresh. Parent (PIN) logins are deliberately excluded —
+// those must always re-prompt for the PIN, even on the same device.
+// Only an explicit "Sign out" tap (showVerify()) clears this.
+function saveStaffSession(session) {
+  try { localStorage.setItem("staffSession", JSON.stringify(session)); } catch(e) {}
+}
+function clearStaffSession() {
+  try { localStorage.removeItem("staffSession"); } catch(e) {}
+}
+function getStaffSession() {
+  try { return JSON.parse(localStorage.getItem("staffSession") || "null"); } catch(e) { return null; }
+}
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error((label || "Request") + " timed out after " + (ms/1000) + "s")), ms))
+  ]);
+}
+
+async function loginAdmin(role, grade) {
+  adminRole = role;
+  adminGrade = grade;
+  logLoginEvent(role, grade);
+  saveStaffSession({ kind: "admin", role: role, grade: grade });
+  document.getElementById("verifyScreen").style.display = "none";
+  document.getElementById("adminLogin").style.display = "none";
+  document.getElementById("adminDash").style.display = "block";
+  document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:30px;font-weight:700;'><span class='modern-spinner'></span>Loading data...</p>";
+  try {
+    await withTimeout(
+      Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadTeacherPhonesFromSheet(), loadAdvocatesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet(), loadLessonPlansFromSheet()]),
+      15000,
+      "Data load"
+    );
+  } catch(e) {
+    console.error("Admin data load failed:", e);
+    document.getElementById("adminContent").innerHTML =
+      "<p style='text-align:center;color:#a32d2d;padding:20px;font-weight:700;'>⚠️ Some data failed to load (" +
+      (e && e.message ? e.message : "unknown error") +
+      "). Showing what we have — try refreshing.</p>";
+  }
+  try {
+    renderAdminDash();
+  } catch(e) {
+    console.error("renderAdminDash failed:", e);
+    document.getElementById("adminContent").innerHTML =
+      "<p style='text-align:center;color:#a32d2d;padding:20px;font-weight:700;'>⚠️ Dashboard failed to render: " +
+      (e && e.message ? e.message : "unknown error") +
+      "<br><span style='font-size:12px;color:#7b7a90;font-weight:400;'>Check the browser console for details, or refresh and try again.</span></p>";
+  }
+}
+
+async function loginAdvocate(advocateName) {
+  logLoginEvent("advocate", advocateName);
+  saveStaffSession({ kind: "advocate", name: advocateName });
+  document.getElementById("verifyScreen").style.display = "none";
+  document.getElementById("adminLogin").style.display = "none";
+  document.getElementById("advocateDash").style.display = "block";
+  const nameDisplay = document.getElementById("advocateNameDisplay");
+  if (nameDisplay) nameDisplay.textContent = "👤 Logged in as: " + advocateName;
+  document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;"><span class="modern-spinner"></span>Loading data from server...</div>`;
+  await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
+  await renderAdvocateDash();
+}
+
+async function restoreStaffSession() {
+  const session = getStaffSession();
+  if (!session) return false;
+  try {
+    document.getElementById("verifyScreen").style.display = "none";
+    if (session.kind === "admin") {
+      await loginAdmin(session.role, session.grade);
+    } else if (session.kind === "advocate") {
+      await loginAdvocate(session.name);
+    } else if (session.kind === "rollcall") {
+      showRollCallDash(session.grade);
+    } else {
+      return false;
+    }
+    return true;
+  } catch(e) {
+    console.error("Failed to restore staff session:", e);
+    clearStaffSession();
+    return false;
+  }
+}
+
 function showAdminLogin() {
   document.getElementById("verifyScreen").style.display = "none";
   document.getElementById("mainApp").style.display = "none";
@@ -2412,6 +2847,7 @@ function showVerify() {
   ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
   document.getElementById("verifyScreen").style.display = "flex";
   try { localStorage.removeItem("myPhone"); } catch(e) {}
+  clearStaffSession(); // explicit sign-out — this is the only thing that ends a staff session
   clearInterval(rollCallInterval);
   adminRole = "admin";
   adminGrade = null;
@@ -2452,44 +2888,6 @@ async function verifyAdmin() {
   const customPws = JSON.parse(localStorage.getItem("customAdminPws") || "{}");
   const effectiveAdminPw = customPws.admin || ADMIN_PASSWORD;
 
-  function withTimeout(promise, ms, label) {
-    return Promise.race([
-      promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error((label || "Request") + " timed out after " + (ms/1000) + "s")), ms))
-    ]);
-  }
-
-  async function loginAdmin(role, grade) {
-    adminRole = role;
-    adminGrade = grade;
-    logLoginEvent(role, grade);
-    document.getElementById("adminLogin").style.display = "none";
-    document.getElementById("adminDash").style.display = "block";
-    document.getElementById("adminContent").innerHTML = "<p style='text-align:center;color:#7b7a90;padding:30px;font-weight:700;'><span class='modern-spinner'></span>Loading data...</p>";
-    try {
-      await withTimeout(
-        Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadTeacherPhonesFromSheet(), loadAdvocatesFromSheet(), loadStatusesFromSheet(), loadChildrenFromSheet(), loadNewParentsFromSheet()]),
-        15000,
-        "Data load"
-      );
-    } catch(e) {
-      console.error("Admin data load failed:", e);
-      document.getElementById("adminContent").innerHTML =
-        "<p style='text-align:center;color:#a32d2d;padding:20px;font-weight:700;'>⚠️ Some data failed to load (" +
-        (e && e.message ? e.message : "unknown error") +
-        "). Showing what we have — try refreshing.</p>";
-    }
-    try {
-      renderAdminDash();
-    } catch(e) {
-      console.error("renderAdminDash failed:", e);
-      document.getElementById("adminContent").innerHTML =
-        "<p style='text-align:center;color:#a32d2d;padding:20px;font-weight:700;'>⚠️ Dashboard failed to render: " +
-        (e && e.message ? e.message : "unknown error") +
-        "<br><span style='font-size:12px;color:#7b7a90;font-weight:400;'>Check the browser console for details, or refresh and try again.</span></p>";
-    }
-  }
-
   if (pw === SUPER_ADMIN_PASSWORD) {
     await loginAdmin("superadmin", null);
   } else if (pw === effectiveAdminPw) {
@@ -2511,14 +2909,8 @@ async function verifyAdmin() {
     } else if (pw === (customPws["advocate"] || ADVOCATE_PASSWORD) || getCustomAdvocates().some(a => a.password === pw)) {
       const matchedAdvocate = getCustomAdvocates().find(a => a.password === pw);
       const advocateName = matchedAdvocate ? matchedAdvocate.name : "Built-in Advocate";
-      logLoginEvent("advocate", advocateName);
       document.getElementById("adminLogin").style.display = "none";
-      document.getElementById("advocateDash").style.display = "block";
-      const nameDisplay = document.getElementById("advocateNameDisplay");
-      if (nameDisplay) nameDisplay.textContent = "👤 Logged in as: " + advocateName;
-      document.getElementById("advocateContent").innerHTML = `<div style="text-align:center;padding:40px;color:#7b7a90;font-size:14px;font-weight:700;"><span class="modern-spinner"></span>Loading data from server...</div>`;
-      await Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()]);
-      await renderAdvocateDash();
+      await loginAdvocate(advocateName);
     } else if (pw === ROLL_CALL_PASSWORD_G6 || pw === customPws["rollcall_6"]) {
       document.getElementById("adminLogin").style.display = "none";
       showRollCallDash(6);
@@ -2948,12 +3340,14 @@ function renderAdminDash() {
   const pinTab = `<button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🔐 PIN</button>`;
   const swapTab = `<button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🔄 Volunteer Swap</button>`;
   const parentsTab = `<button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">➕ Parents</button>`;
+  const lessonTab = `<button id="tabLesson" onclick="showAdminTab('lesson')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📖 Lesson</button>`;
 
   container.innerHTML = `
     <div style="display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap;">
       <button id="tabAttendance" onclick="showAdminTab('attendance')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#0a5260;color:white;cursor:pointer;">📋 Attendance</button>
       ${swapTab}
       ${pinTab}
+      ${lessonTab}
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🎓 Students</button>
       ${studentsTab}
@@ -2963,6 +3357,7 @@ function renderAdminDash() {
     <div id="tabAttendanceContent"></div>
     <div id="tabSwapContent" style="display:none;"></div>
     <div id="tabPinContent" style="display:none;"></div>
+    <div id="tabLessonContent" style="display:none;"></div>
     <div id="tabTrackerContent" style="display:none;"></div>
     <div id="tabClassesContent" style="display:none;"></div>
     <div id="tabStudentsContent" style="display:none;"></div>
@@ -2980,7 +3375,7 @@ function renderAdminDash() {
 }
 
 function showAdminTab(tab) {
-  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents"];
+  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson"];
   allTabs.forEach(t => {
     const idSuffix = t === "superadmin" ? "SuperAdmin" : t.charAt(0).toUpperCase() + t.slice(1);
     const content = document.getElementById("tab" + idSuffix + "Content");
@@ -3010,6 +3405,63 @@ function showAdminTab(tab) {
     Promise.all([loadNewParentsFromSheet(), loadChildrenFromSheet()])
       .then(() => renderParentsTab())
       .catch(() => renderParentsTab());
+  }
+  if (tab === "lesson") {
+    loadLessonPlansFromSheet().then(() => renderLessonPlanViewerTab()).catch(() => renderLessonPlanViewerTab());
+  }
+}
+
+// ── LESSON PLAN VIEWER (grade admin / teacher dashboard, read-only) ──────
+function renderLessonPlanViewerTab() {
+  const el = document.getElementById("tabLessonContent");
+  if (!el) return;
+  const isSuperOrAllAdmin = adminGrade === null;
+  const grades = isSuperOrAllAdmin ? getActiveGrades() : [adminGrade];
+
+  function renderForGrade(grade) {
+    const plan = getLessonPlanForGrade(grade);
+    if (!plan.length) {
+      return `<div style="text-align:center;padding:24px;color:#7b7a90;font-size:13px;font-weight:700;">No lesson plan has been uploaded yet for Grade ${grade}. Ask Super Admin to add one.</div>`;
+    }
+    const todaysWeek = getCurrentLessonWeekNumber();
+    const today = plan.find(w => Number(w.week) === todaysWeek);
+    const todayHtml = today ? `
+      <div style="background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border-radius:16px;padding:18px;color:white;margin-bottom:16px;box-shadow:0 8px 24px rgba(59,47,143,0.3);">
+        <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:0.5px;margin-bottom:4px;">📖 TODAY'S LESSON — WEEK ${today.week}</div>
+        <div style="font-size:18px;font-weight:900;margin-bottom:6px;">${today.topic || ""}</div>
+        <div style="font-size:13px;font-weight:700;color:#a5f3fc;margin-bottom:8px;">${today.scripture || ""}</div>
+        ${today.focus ? `<div style="font-size:13px;color:rgba(255,255,255,0.9);margin-bottom:8px;"><b>Focus:</b> ${today.focus}</div>` : ""}
+        ${today.objective ? `<div style="font-size:13px;color:rgba(255,255,255,0.9);margin-bottom:8px;"><b>Objective:</b> ${today.objective}</div>` : ""}
+        ${today.activity ? `<div style="font-size:13px;color:rgba(255,255,255,0.9);margin-bottom:8px;"><b>Activity:</b> ${today.activity}</div>` : ""}
+        ${today.discussion ? `<div style="font-size:13px;color:rgba(255,255,255,0.9);"><b>Discussion:</b> ${today.discussion}</div>` : ""}
+      </div>` : `<div style="text-align:center;padding:14px;color:#7b7a90;font-size:12px;font-weight:700;margin-bottom:16px;">No lesson mapped to this week yet (Week ${todaysWeek}).</div>`;
+
+    const fullListHtml = plan.map(w => `
+      <div style="background:white;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(13,122,138,0.06);${Number(w.week)===todaysWeek ? "border:2px solid #5c4ac7;" : ""}">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleCollapsibleSection('lpvWeek${grade}_${w.week}Body','lpvWeek${grade}_${w.week}Chevron')">
+          <div style="font-size:13px;font-weight:800;color:#0a3d45;">Week ${w.week} — ${w.topic || "(untitled)"}</div>
+          <span id="lpvWeek${grade}_${w.week}Chevron" style="font-size:12px;color:#9a99ac;">▶</span>
+        </div>
+        <div id="lpvWeek${grade}_${w.week}Body" style="display:none;margin-top:8px;font-size:12.5px;color:#3c3b52;line-height:1.6;">
+          <div style="color:#5c4ac7;font-weight:700;margin-bottom:4px;">${w.scripture || ""}</div>
+          ${w.focus ? `<div style="margin-bottom:4px;"><b>Focus:</b> ${w.focus}</div>` : ""}
+          ${w.objective ? `<div style="margin-bottom:4px;"><b>Objective:</b> ${w.objective}</div>` : ""}
+          ${w.activity ? `<div style="margin-bottom:4px;"><b>Activity:</b> ${w.activity}</div>` : ""}
+          ${w.discussion ? `<div><b>Discussion:</b> ${w.discussion}</div>` : ""}
+        </div>
+      </div>`).join("");
+
+    return todayHtml + `<div style="font-size:12px;font-weight:800;color:#0a5260;margin:14px 0 8px;">📚 Full Year Plan</div>` + fullListHtml;
+  }
+
+  if (isSuperOrAllAdmin) {
+    el.innerHTML = grades.map(g => `
+      <div style="margin-bottom:20px;">
+        <div style="font-size:14px;font-weight:900;color:#0a3d45;margin-bottom:10px;">Grade ${g}</div>
+        ${renderForGrade(g)}
+      </div>`).join("");
+  } else {
+    el.innerHTML = renderForGrade(adminGrade);
   }
 }
 
@@ -3188,6 +3640,22 @@ function renderSuperAdminTab() {
       </button>
 
       <div id="eventsCalendarList"></div>
+      </div>
+    </div>
+
+    <!-- ── LESSON PLANS ──────────────────────────────────────────────── -->
+    <div style="background:rgba(99,102,241,0.08);border:1.5px solid rgba(99,102,241,0.3);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div onclick="toggleCollapsibleSection('lessonPlansBody','lessonPlansChevron')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+        <div style="font-size:14px;font-weight:900;color:white;">📖 Lesson Plans</div>
+        <span id="lessonPlansChevron" style="font-size:14px;color:rgba(255,255,255,0.6);transition:transform 0.2s;">▶</span>
+      </div>
+      <div id="lessonPlansBody" style="display:none;margin-top:10px;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Upload or edit a full year (52-week) lesson plan for any class. Each class's plan shows up automatically in that class's dashboard and on the roll call screen during class time.</div>
+        <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:6px;">Class:</div>
+        <select id="lessonPlanGradeSelect" onchange="renderLessonPlanEditor()" style="width:100%;padding:11px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid rgba(255,255,255,0.2);border-radius:10px;background:rgba(255,255,255,0.08);color:white;outline:none;margin-bottom:10px;">
+          ${allGrades.map(g => `<option value="${g}">Grade ${g}</option>`).join("")}
+        </select>
+        <div id="lessonPlanEditorBody"></div>
       </div>
     </div>
 
@@ -3505,6 +3973,113 @@ function renderSuperAdminTab() {
   loadEventsCalendarFromSheet().then(renderEventsCalendarList).catch(()=>{});
   loadAndRenderDeletionLog();
   loadAndRenderLoginLog();
+  loadLessonPlansFromSheet().then(renderLessonPlanEditor).catch(()=>{});
+  try { renderLessonPlanEditor(); } catch(e) {}
+}
+
+// ── LESSON PLAN EDITOR (Super Admin) ─────────────────────────────────────
+function renderLessonPlanEditor() {
+  const sel = document.getElementById("lessonPlanGradeSelect");
+  const body = document.getElementById("lessonPlanEditorBody");
+  if (!sel || !body) return;
+  const grade = Number(sel.value);
+  const plan = getLessonPlanForGrade(grade);
+
+  if (!plan.length) {
+    body.innerHTML = `
+      <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.06);border-radius:10px;margin-bottom:10px;">
+        <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:10px;">No lesson plan uploaded yet for Grade ${grade}.</div>
+        <button onclick="loadStarterTemplateForGrade(${grade})" style="padding:10px 16px;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">📖 Load Starter Template (52 weeks)</button>
+        <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:8px;">Loads an organized, elaborated year plan you can then edit week by week.</div>
+      </div>`;
+    return;
+  }
+
+  const rowsHtml = plan.map(w => `
+    <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleCollapsibleSection('lpWeek${w.week}Body','lpWeek${w.week}Chevron')">
+        <div style="font-size:12px;font-weight:800;color:white;">Week ${w.week} — ${w.topic || "(untitled)"} <span style="color:rgba(255,255,255,0.4);font-weight:600;">(${w.quarter || ""})</span></div>
+        <span id="lpWeek${w.week}Chevron" style="font-size:12px;color:rgba(255,255,255,0.5);">▶</span>
+      </div>
+      <div id="lpWeek${w.week}Body" style="display:none;margin-top:10px;">
+        ${lpField("Topic", grade, w.week, "topic", w.topic)}
+        ${lpField("Key Scripture", grade, w.week, "scripture", w.scripture)}
+        ${lpField("Focus", grade, w.week, "focus", w.focus)}
+        ${lpField("Objective", grade, w.week, "objective", w.objective, true)}
+        ${lpField("Activity", grade, w.week, "activity", w.activity, true)}
+        ${lpField("Discussion Questions", grade, w.week, "discussion", w.discussion, true)}
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button onclick="saveLessonPlanWeekFromEditor(${grade},${w.week})" style="flex:1;padding:9px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">💾 Save Week</button>
+          <button onclick="handleDeleteLessonPlanWeek(${grade},${w.week})" style="padding:9px 14px;background:rgba(220,38,38,0.85);border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">🗑️</button>
+        </div>
+      </div>
+    </div>`).join("");
+
+  const nextWeekNum = plan.length ? Math.max(...plan.map(w => Number(w.week))) + 1 : 1;
+
+  body.innerHTML = `
+    <div style="max-height:480px;overflow-y:auto;margin-bottom:10px;">${rowsHtml}</div>
+    <button onclick="addLessonPlanWeek(${grade}, ${nextWeekNum})" style="width:100%;padding:11px;background:rgba(255,255,255,0.1);border:1.5px dashed rgba(255,255,255,0.3);border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;margin-bottom:8px;">➕ Add Week ${nextWeekNum}</button>
+    <button onclick="handleReloadStarterTemplate(${grade})" style="width:100%;padding:9px;background:rgba(255,255,255,0.06);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);cursor:pointer;">↻ Replace with Starter Template</button>
+  `;
+}
+
+function lpField(label, grade, week, key, value, isTextarea) {
+  const id = `lp_${grade}_${week}_${key}`;
+  const safeVal = (value || "").toString().replace(/</g,"&lt;");
+  if (isTextarea) {
+    return `<div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);margin-bottom:3px;">${label}</div>
+      <textarea id="${id}" rows="2" style="width:100%;padding:8px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:white;outline:none;margin-bottom:8px;resize:vertical;">${safeVal}</textarea>`;
+  }
+  return `<div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);margin-bottom:3px;">${label}</div>
+    <input id="${id}" type="text" value="${safeVal}" style="width:100%;padding:8px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:white;outline:none;margin-bottom:8px;" />`;
+}
+
+function readLpField(grade, week, key) {
+  const el = document.getElementById(`lp_${grade}_${week}_${key}`);
+  return el ? el.value : "";
+}
+
+async function saveLessonPlanWeekFromEditor(grade, week) {
+  const existing = getLessonPlanForGrade(grade).find(w => Number(w.week) === Number(week)) || {};
+  const weekObj = {
+    week: week,
+    quarter: readLpField(grade, week, "quarter") || existing.quarter || "",
+    topic: readLpField(grade, week, "topic"),
+    scripture: readLpField(grade, week, "scripture"),
+    focus: readLpField(grade, week, "focus"),
+    objective: readLpField(grade, week, "objective"),
+    activity: readLpField(grade, week, "activity"),
+    discussion: readLpField(grade, week, "discussion")
+  };
+  await saveLessonPlanWeek(grade, weekObj);
+  renderLessonPlanEditor();
+}
+
+async function handleDeleteLessonPlanWeek(grade, week) {
+  const ok = await modalConfirm("This removes Week " + week + " from Grade " + grade + "'s lesson plan.", { title: "Delete Week " + week + "?", danger: true, okLabel: "Delete" });
+  if (!ok) return;
+  await deleteLessonPlanWeek(grade, week);
+  renderLessonPlanEditor();
+}
+
+function addLessonPlanWeek(grade, week) {
+  const g = String(grade);
+  if (!lessonPlansData[g]) lessonPlansData[g] = [];
+  lessonPlansData[g].push({ grade: grade, week: week, quarter: "", topic: "", scripture: "", focus: "", objective: "", activity: "", discussion: "" });
+  renderLessonPlanEditor();
+  setTimeout(() => { const chev = document.getElementById("lpWeek" + week + "Chevron"); if (chev) toggleCollapsibleSection("lpWeek" + week + "Body", "lpWeek" + week + "Chevron"); }, 50);
+}
+
+async function loadStarterTemplateForGrade(grade) {
+  await saveLessonPlanBulk(grade, GRADE7_LESSON_TEMPLATE.map(w => Object.assign({}, w)));
+  renderLessonPlanEditor();
+}
+
+async function handleReloadStarterTemplate(grade) {
+  const ok = await modalConfirm("This replaces Grade " + grade + "'s entire lesson plan with the 52-week starter template. Any custom edits for this class will be lost.", { title: "Replace lesson plan?", danger: true, okLabel: "Replace" });
+  if (!ok) return;
+  await loadStarterTemplateForGrade(grade);
 }
 
 function getTeacherListHtml(grade, teacherStr, color) {
@@ -6825,6 +7400,8 @@ function saveRollCallEntry(date, childName, status) {
 function showRollCallDash(grade) {
   if (grade !== undefined) rollCallGrade = grade;
   logLoginEvent("rollcall", grade);
+  saveStaffSession({ kind: "rollcall", grade: rollCallGrade });
+  const vs = document.getElementById("verifyScreen"); if (vs) vs.style.display = "none";
   document.getElementById("rollCallDash").style.display = "block";
   function _setRCTitle() {
     const el = document.getElementById("rcSubtitle");
@@ -6833,7 +7410,7 @@ function showRollCallDash(grade) {
   _setRCTitle();
   renderRollCallScreen();
   _setRCTitle(); // set again after render in case element was recreated
-  Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet()])
+  Promise.all([loadChildrenFromSheet(), loadNewParentsFromSheet(), loadLessonPlansFromSheet()])
     .then(() => { renderRollCallScreen(); _setRCTitle(); })
     .catch(() => { _setRCTitle(); });
 }
@@ -6968,6 +7545,7 @@ function renderRollCallScreen() {
   const activeGrades = Object.keys(byGrade).map(Number).sort((a,b)=>a-b);
 
   container.innerHTML = `
+    ${renderTodaysLessonCard(rollCallGrade)}
     ${timerHtml}
     ${!isRealSunday ? `
     <div style="margin-bottom:16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;">
