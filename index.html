@@ -4033,8 +4033,17 @@ function renderLessonPlanEditor() {
   body.innerHTML = `
     <div style="max-height:480px;overflow-y:auto;margin-bottom:10px;">${rowsHtml}</div>
     <button onclick="addLessonPlanWeek(${grade}, ${nextWeekNum})" style="width:100%;padding:11px;background:rgba(255,255,255,0.1);border:1.5px dashed rgba(255,255,255,0.3);border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;margin-bottom:8px;">➕ Add Week ${nextWeekNum}</button>
-    <button onclick="handleReloadStarterTemplate(${grade})" style="width:100%;padding:9px;background:rgba(255,255,255,0.06);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);cursor:pointer;">↻ Replace with Starter Template</button>
+    <button onclick="handleReloadStarterTemplate(${grade})" style="width:100%;padding:9px;background:rgba(255,255,255,0.06);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);cursor:pointer;margin-bottom:8px;">↻ Replace with Starter Template</button>
+    <button onclick="handleClearLessonPlanForGrade(${grade})" style="width:100%;padding:9px;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.4);border-radius:10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:#ff9b9b;cursor:pointer;">🗑️ Clear This Class's Entire Lesson Plan</button>
   `;
+}
+
+async function handleClearLessonPlanForGrade(grade) {
+  const plan = getLessonPlanForGrade(grade);
+  const ok = await modalConfirm("This permanently deletes all " + plan.length + " week(s) currently saved for Grade " + grade + "'s lesson plan. This cannot be undone.", { title: "Clear Grade " + grade + "'s lesson plan?", danger: true, okLabel: "Delete All" });
+  if (!ok) return;
+  await saveLessonPlanBulk(grade, []);
+  renderLessonPlanEditor();
 }
 
 function lpField(label, grade, week, key, value, isTextarea) {
