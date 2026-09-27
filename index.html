@@ -3653,22 +3653,25 @@ function renderSuperAdminTab() {
         <span id="lessonPlansChevron" style="font-size:14px;color:rgba(255,255,255,0.6);transition:transform 0.2s;">▶</span>
       </div>
       <div id="lessonPlansBody" style="display:none;margin-top:10px;">
-        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Upload or edit a full year (52-week) lesson plan for any class. Each class's plan shows up automatically in that class's dashboard and on the roll call screen during class time.</div>
-        <div style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.6);margin-bottom:6px;">Class:</div>
-        <select id="lessonPlanGradeSelect" onchange="renderLessonPlanEditor()" style="width:100%;padding:11px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid rgba(255,255,255,0.2);border-radius:10px;background:rgba(255,255,255,0.08);color:white;outline:none;margin-bottom:10px;">
-          ${allGrades.map(g => `<option value="${g}">Grade ${g}</option>`).join("")}
-        </select>
-
-        <div style="background:rgba(255,255,255,0.06);border:1.5px dashed rgba(255,255,255,0.25);border-radius:10px;padding:12px;margin-bottom:14px;">
-          <div style="font-size:11px;font-weight:800;color:white;margin-bottom:6px;">📤 Upload a curriculum file (.docx or .pdf)</div>
-          <div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:8px;">The app will read it and try to split it into weeks automatically. You'll get to review and edit everything before it's saved — nothing is saved until you tap "Save All".</div>
-          <input type="file" id="lessonPlanFileInput" accept=".docx,.pdf" style="width:100%;font-size:11px;color:white;margin-bottom:8px;" />
-          <button onclick="handleLessonPlanFileUpload()" style="width:100%;padding:10px;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">🔍 Parse File & Preview</button>
-          <div id="lessonPlanUploadStatus" style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;"></div>
-        </div>
-
-        <div id="lessonPlanUploadPreview"></div>
-        <div id="lessonPlanEditorBody"></div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:14px;">Upload or edit a full year (52-week) lesson plan for each class below. Each one has its own upload box, so there's no dropdown to accidentally leave on the wrong class. A class's plan shows up automatically in that class's dashboard and on the roll call screen during class time.</div>
+        ${allGrades.map(g => `
+        <div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:12px;margin-bottom:12px;">
+          <div onclick="toggleCollapsibleSection('lpGrade${g}Body','lpGrade${g}Chevron')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+            <div style="font-size:13px;font-weight:900;color:white;">Grade ${g}</div>
+            <span id="lpGrade${g}Chevron" style="font-size:13px;color:rgba(255,255,255,0.6);">▶</span>
+          </div>
+          <div id="lpGrade${g}Body" style="display:none;margin-top:10px;">
+            <div style="background:rgba(255,255,255,0.06);border:1.5px dashed rgba(255,255,255,0.25);border-radius:10px;padding:12px;margin-bottom:14px;">
+              <div style="font-size:11px;font-weight:800;color:white;margin-bottom:6px;">📤 Upload a curriculum file for Grade ${g} (.docx or .pdf)</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:8px;">The app will read it and try to split it into weeks automatically. You'll get to review and edit everything before it's saved — nothing is saved until you tap "Save All to Grade ${g}".</div>
+              <input type="file" id="lessonPlanFileInput_${g}" accept=".docx,.pdf" style="width:100%;font-size:11px;color:white;margin-bottom:8px;" />
+              <button onclick="handleLessonPlanFileUpload(${g})" style="width:100%;padding:10px;background:linear-gradient(135deg,#6366f1,#06b6d4);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">🔍 Parse File &amp; Preview for Grade ${g}</button>
+              <div id="lessonPlanUploadStatus_${g}" style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;"></div>
+            </div>
+            <div id="lessonPlanUploadPreview_${g}"></div>
+            <div id="lessonPlanEditorBody_${g}"></div>
+          </div>
+        </div>`).join("")}
       </div>
     </div>
 
