@@ -3343,6 +3343,7 @@ function renderAdminDash() {
   const pinTab = `<button id="tabPin" onclick="showAdminTab('pin')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🔐 PIN</button>`;
   const swapTab = `<button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🔄 Volunteer Swap</button>`;
   const parentsTab = `<button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">➕ Parents</button>`;
+  const signupsTab = `<button id="tabSignups" onclick="showAdminTab('signups')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🙋 Sign-Ups</button>`;
   const lessonTab = `<button id="tabLesson" onclick="showAdminTab('lesson')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📖 Lesson</button>`;
 
   container.innerHTML = `
@@ -3351,6 +3352,7 @@ function renderAdminDash() {
       ${swapTab}
       ${pinTab}
       ${lessonTab}
+      ${signupsTab}
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🎓 Students</button>
       ${studentsTab}
@@ -3361,6 +3363,7 @@ function renderAdminDash() {
     <div id="tabSwapContent" style="display:none;"></div>
     <div id="tabPinContent" style="display:none;"></div>
     <div id="tabLessonContent" style="display:none;"></div>
+    <div id="tabSignupsContent" style="display:none;"></div>
     <div id="tabTrackerContent" style="display:none;"></div>
     <div id="tabClassesContent" style="display:none;"></div>
     <div id="tabStudentsContent" style="display:none;"></div>
@@ -3378,7 +3381,7 @@ function renderAdminDash() {
 }
 
 function showAdminTab(tab) {
-  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson"];
+  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson","signups"];
   allTabs.forEach(t => {
     const idSuffix = t === "superadmin" ? "SuperAdmin" : t.charAt(0).toUpperCase() + t.slice(1);
     const content = document.getElementById("tab" + idSuffix + "Content");
@@ -3411,6 +3414,12 @@ function showAdminTab(tab) {
   }
   if (tab === "lesson") {
     loadLessonPlansFromSheet().then(() => renderLessonPlanViewerTab()).catch(() => renderLessonPlanViewerTab());
+  }
+  if (tab === "signups") {
+    renderSignupGradeTab();
+    Promise.all([loadSignupsFromSheet(), loadChildrenFromSheet()])
+      .then(() => renderSignupGradeTab())
+      .catch(() => renderSignupGradeTab());
   }
 }
 
@@ -3672,6 +3681,40 @@ function renderSuperAdminTab() {
             <div id="lessonPlanEditorBody_${g}"></div>
           </div>
         </div>`).join("")}
+      </div>
+    </div>
+
+    <!-- ── VOLUNTEER SIGN-UPS ────────────────────────────────────────── -->
+    <div style="background:rgba(236,72,153,0.08);border:1.5px solid rgba(236,72,153,0.3);border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      <div onclick="toggleCollapsibleSection('signupsBody','signupsChevron')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+        <div style="font-size:14px;font-weight:900;color:white;">🙋 Volunteer Sign-Ups</div>
+        <span id="signupsChevron" style="font-size:14px;color:rgba(255,255,255,0.6);transition:transform 0.2s;">▶</span>
+      </div>
+      <div id="signupsBody" style="display:none;margin-top:10px;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Create an event (with its year) and pick the teams kids can sign up for. Every grade then sees it in their own <b>🙋 Sign-Ups</b> tab and registers their own kids. You can see everyone who signed up, from every grade, right here.</div>
+
+        <div style="background:rgba(255,255,255,0.06);border:1.5px dashed rgba(255,255,255,0.25);border-radius:10px;padding:12px;margin-bottom:14px;">
+          <div style="font-size:12px;font-weight:800;color:white;margin-bottom:8px;">➕ New event sign-up</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:2;">
+              <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);margin-bottom:3px;">Event name</div>
+              <input id="signupEventName" type="text" placeholder="e.g. Christmas Event" style="width:100%;padding:9px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:white;outline:none;" />
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);margin-bottom:3px;">Year</div>
+              <input id="signupEventYear" type="number" value="${(typeof getMockNow === "function" ? getMockNow() : new Date()).getFullYear()}" style="width:100%;padding:9px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:white;outline:none;" />
+            </div>
+          </div>
+          <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);margin-bottom:3px;">Details / songs (optional — shown to every grade)</div>
+          <input id="signupEventDesc" type="text" placeholder="e.g. Christmas play and songs, rehearsals start in December" style="width:100%;padding:9px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:white;outline:none;margin-bottom:10px;" />
+          <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);margin-bottom:6px;">Teams kids can sign up for</div>
+          ${SIGNUP_CATEGORIES.map(c => `<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:white;margin-bottom:6px;cursor:pointer;"><input type="checkbox" class="signupCatCheck" value="${c.key}" checked> ${c.icon} ${c.key}</label>`).join("")}
+          <input id="signupCustomTeam" type="text" placeholder="Another team? Type its name (optional)" style="width:100%;padding:9px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:white;outline:none;margin:6px 0 10px;" />
+          <button onclick="createSignupEvent()" style="width:100%;padding:11px;background:linear-gradient(135deg,#ec4899,#8b5cf6);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">Create Sign-Ups</button>
+          <div id="signupCreateStatus" style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:8px;"></div>
+        </div>
+
+        <div id="signupManagerList"></div>
       </div>
     </div>
 
@@ -3989,16 +4032,16 @@ function renderSuperAdminTab() {
   loadEventsCalendarFromSheet().then(renderEventsCalendarList).catch(()=>{});
   loadAndRenderDeletionLog();
   loadAndRenderLoginLog();
-  loadLessonPlansFromSheet().then(renderLessonPlanEditor).catch(()=>{});
-  try { renderLessonPlanEditor(); } catch(e) {}
+  loadLessonPlansFromSheet().then(() => { allGrades.forEach(g => { try { renderLessonPlanEditor(g); } catch(e) {} }); }).catch(()=>{});
+  try { allGrades.forEach(g => renderLessonPlanEditor(g)); } catch(e) {}
+  loadSignupsFromSheet().then(refreshSignupViews).catch(()=>{});
+  try { renderSignupManagerList(); } catch(e) {}
 }
 
 // ── LESSON PLAN EDITOR (Super Admin) ─────────────────────────────────────
-function renderLessonPlanEditor() {
-  const sel = document.getElementById("lessonPlanGradeSelect");
-  const body = document.getElementById("lessonPlanEditorBody");
-  if (!sel || !body) return;
-  const grade = Number(sel.value);
+function renderLessonPlanEditor(grade) {
+  const body = document.getElementById("lessonPlanEditorBody_" + grade);
+  if (!body) return;
   const plan = getLessonPlanForGrade(grade);
 
   if (!plan.length) {
@@ -4046,7 +4089,7 @@ async function handleClearLessonPlanForGrade(grade) {
   const ok = await modalConfirm("This permanently deletes all " + plan.length + " week(s) currently saved for Grade " + grade + "'s lesson plan. This cannot be undone.", { title: "Clear Grade " + grade + "'s lesson plan?", danger: true, okLabel: "Delete All" });
   if (!ok) return;
   await saveLessonPlanBulk(grade, []);
-  renderLessonPlanEditor();
+  renderLessonPlanEditor(grade);
 }
 
 function lpField(label, grade, week, key, value, isTextarea) {
@@ -4078,27 +4121,27 @@ async function saveLessonPlanWeekFromEditor(grade, week) {
     discussion: readLpField(grade, week, "discussion")
   };
   await saveLessonPlanWeek(grade, weekObj);
-  renderLessonPlanEditor();
+  renderLessonPlanEditor(grade);
 }
 
 async function handleDeleteLessonPlanWeek(grade, week) {
   const ok = await modalConfirm("This removes Week " + week + " from Grade " + grade + "'s lesson plan.", { title: "Delete Week " + week + "?", danger: true, okLabel: "Delete" });
   if (!ok) return;
   await deleteLessonPlanWeek(grade, week);
-  renderLessonPlanEditor();
+  renderLessonPlanEditor(grade);
 }
 
 function addLessonPlanWeek(grade, week) {
   const g = String(grade);
   if (!lessonPlansData[g]) lessonPlansData[g] = [];
   lessonPlansData[g].push({ grade: grade, week: week, quarter: "", topic: "", scripture: "", focus: "", objective: "", activity: "", discussion: "" });
-  renderLessonPlanEditor();
+  renderLessonPlanEditor(grade);
   setTimeout(() => { const chev = document.getElementById("lpWeek" + week + "Chevron"); if (chev) toggleCollapsibleSection("lpWeek" + week + "Body", "lpWeek" + week + "Chevron"); }, 50);
 }
 
 async function loadStarterTemplateForGrade(grade) {
   await saveLessonPlanBulk(grade, GRADE7_LESSON_TEMPLATE.map(w => Object.assign({}, w)));
-  renderLessonPlanEditor();
+  renderLessonPlanEditor(grade);
 }
 
 async function handleReloadStarterTemplate(grade) {
@@ -4110,7 +4153,10 @@ async function handleReloadStarterTemplate(grade) {
 // ── LESSON PLAN FILE UPLOAD (.docx / .pdf) — parsed entirely in-browser ──
 // Nothing is saved to the sheet until the admin reviews the preview and
 // taps "Save All" — parsing is a best-effort guess, never a silent write.
-let pendingUploadWeeks = null;
+// Keyed by grade so each class's upload box is fully independent — no
+// shared dropdown that could point at the wrong class between parsing
+// and saving.
+let pendingUploadWeeksByGrade = {};
 
 function generateElaboration(topic, focus, scripture) {
   const t = (topic || "this week's topic").trim();
@@ -4267,9 +4313,9 @@ async function parsePdfFile(file) {
   return parseWeeksFromLines(allLines);
 }
 
-async function handleLessonPlanFileUpload() {
-  const input = document.getElementById("lessonPlanFileInput");
-  const status = document.getElementById("lessonPlanUploadStatus");
+async function handleLessonPlanFileUpload(grade) {
+  const input = document.getElementById("lessonPlanFileInput_" + grade);
+  const status = document.getElementById("lessonPlanUploadStatus_" + grade);
   const file = input && input.files && input.files[0];
   if (!file) { status.textContent = "Choose a .docx or .pdf file first."; return; }
   status.textContent = "⏳ Reading and parsing " + file.name + "…";
@@ -4289,44 +4335,44 @@ async function handleLessonPlanFileUpload() {
       status.textContent = "⚠️ Couldn't find any week-by-week rows in that file. Try the manual editor below instead, or check the file's formatting.";
       return;
     }
-    pendingUploadWeeks = weeks;
-    status.textContent = "✅ Found " + weeks.length + " week(s). Review below, then tap Save All.";
-    renderLessonPlanUploadPreview();
+    pendingUploadWeeksByGrade[grade] = weeks;
+    status.textContent = "✅ Found " + weeks.length + " week(s) for Grade " + grade + ". Review below, then tap Save All to Grade " + grade + ".";
+    renderLessonPlanUploadPreview(grade);
   } catch (e) {
     console.error("Lesson plan parse failed:", e);
     status.textContent = "⚠️ Couldn't parse that file (" + (e && e.message ? e.message : "unknown error") + "). You can still enter it manually below.";
   }
 }
 
-function renderLessonPlanUploadPreview() {
-  const el = document.getElementById("lessonPlanUploadPreview");
+function renderLessonPlanUploadPreview(grade) {
+  const el = document.getElementById("lessonPlanUploadPreview_" + grade);
   if (!el) return;
-  if (!pendingUploadWeeks || !pendingUploadWeeks.length) { el.innerHTML = ""; return; }
-  const grade = Number(document.getElementById("lessonPlanGradeSelect").value);
-  const rows = pendingUploadWeeks.map((w, idx) => `
+  const weeks = pendingUploadWeeksByGrade[grade];
+  if (!weeks || !weeks.length) { el.innerHTML = ""; return; }
+  const rows = weeks.map((w, idx) => `
     <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
       <div style="font-size:12px;font-weight:800;color:white;margin-bottom:8px;">Week ${w.week}</div>
-      ${lpUploadField(idx, "topic", "Topic", w.topic)}
-      ${lpUploadField(idx, "scripture", "Key Scripture", w.scripture)}
-      ${lpUploadField(idx, "focus", "Focus", w.focus)}
-      ${lpUploadField(idx, "objective", "Objective", w.objective, true)}
-      ${lpUploadField(idx, "activity", "Activity", w.activity, true)}
-      ${lpUploadField(idx, "discussion", "Discussion Questions", w.discussion, true)}
+      ${lpUploadField(grade, idx, "topic", "Topic", w.topic)}
+      ${lpUploadField(grade, idx, "scripture", "Key Scripture", w.scripture)}
+      ${lpUploadField(grade, idx, "focus", "Focus", w.focus)}
+      ${lpUploadField(grade, idx, "objective", "Objective", w.objective, true)}
+      ${lpUploadField(grade, idx, "activity", "Activity", w.activity, true)}
+      ${lpUploadField(grade, idx, "discussion", "Discussion Questions", w.discussion, true)}
     </div>`).join("");
   el.innerHTML = `
     <div style="border:1.5px solid rgba(255,255,255,0.25);border-radius:12px;padding:12px;margin-bottom:14px;">
-      <div style="font-size:12px;font-weight:900;color:white;margin-bottom:4px;">📋 Preview — ${pendingUploadWeeks.length} week(s) parsed for Grade ${grade}</div>
+      <div style="font-size:12px;font-weight:900;color:white;margin-bottom:4px;">📋 Preview — ${weeks.length} week(s) parsed for Grade ${grade}</div>
       <div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:10px;">Nothing is saved yet. Fix anything that looks wrong, then tap Save All — this replaces Grade ${grade}'s current plan.</div>
       <div style="max-height:420px;overflow-y:auto;margin-bottom:10px;">${rows}</div>
       <div style="display:flex;gap:8px;">
-        <button onclick="commitLessonPlanUpload()" style="flex:1;padding:11px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">💾 Save All to Grade ${grade}</button>
-        <button onclick="discardLessonPlanUpload()" style="padding:11px 16px;background:rgba(255,255,255,0.1);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">Discard</button>
+        <button onclick="commitLessonPlanUpload(${grade})" style="flex:1;padding:11px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">💾 Save All to Grade ${grade}</button>
+        <button onclick="discardLessonPlanUpload(${grade})" style="padding:11px 16px;background:rgba(255,255,255,0.1);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">Discard</button>
       </div>
     </div>`;
 }
 
-function lpUploadField(idx, key, label, value, isTextarea) {
-  const id = `lpu_${idx}_${key}`;
+function lpUploadField(grade, idx, key, label, value, isTextarea) {
+  const id = `lpu_${grade}_${idx}_${key}`;
   const safeVal = (value || "").toString().replace(/</g,"&lt;");
   if (isTextarea) {
     return `<div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);margin-bottom:3px;">${label}</div>
@@ -4336,32 +4382,367 @@ function lpUploadField(idx, key, label, value, isTextarea) {
     <input id="${id}" type="text" value="${safeVal}" style="width:100%;padding:8px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:white;outline:none;margin-bottom:6px;" />`;
 }
 
-async function commitLessonPlanUpload() {
-  if (!pendingUploadWeeks) return;
-  const grade = Number(document.getElementById("lessonPlanGradeSelect").value);
-  const ok = await modalConfirm("This replaces Grade " + grade + "'s entire lesson plan with the " + pendingUploadWeeks.length + " week(s) parsed from your file.", { title: "Save uploaded plan?", danger: true, okLabel: "Save All" });
+async function commitLessonPlanUpload(grade) {
+  const weeks = pendingUploadWeeksByGrade[grade];
+  if (!weeks) return;
+  const ok = await modalConfirm("This replaces Grade " + grade + "'s entire lesson plan with the " + weeks.length + " week(s) parsed from your file.", { title: "Save uploaded plan to Grade " + grade + "?", danger: true, okLabel: "Save All" });
   if (!ok) return;
-  const finalWeeks = pendingUploadWeeks.map((w, idx) => ({
+  const finalWeeks = weeks.map((w, idx) => ({
     week: w.week,
     quarter: w.quarter || "",
-    topic: (document.getElementById(`lpu_${idx}_topic`) || {}).value || "",
-    scripture: (document.getElementById(`lpu_${idx}_scripture`) || {}).value || "",
-    focus: (document.getElementById(`lpu_${idx}_focus`) || {}).value || "",
-    objective: (document.getElementById(`lpu_${idx}_objective`) || {}).value || "",
-    activity: (document.getElementById(`lpu_${idx}_activity`) || {}).value || "",
-    discussion: (document.getElementById(`lpu_${idx}_discussion`) || {}).value || ""
+    topic: (document.getElementById(`lpu_${grade}_${idx}_topic`) || {}).value || "",
+    scripture: (document.getElementById(`lpu_${grade}_${idx}_scripture`) || {}).value || "",
+    focus: (document.getElementById(`lpu_${grade}_${idx}_focus`) || {}).value || "",
+    objective: (document.getElementById(`lpu_${grade}_${idx}_objective`) || {}).value || "",
+    activity: (document.getElementById(`lpu_${grade}_${idx}_activity`) || {}).value || "",
+    discussion: (document.getElementById(`lpu_${grade}_${idx}_discussion`) || {}).value || ""
   }));
   await saveLessonPlanBulk(grade, finalWeeks);
-  pendingUploadWeeks = null;
-  document.getElementById("lessonPlanUploadPreview").innerHTML = "";
-  document.getElementById("lessonPlanUploadStatus").textContent = "✅ Saved " + finalWeeks.length + " week(s) to Grade " + grade + ".";
-  renderLessonPlanEditor();
+  delete pendingUploadWeeksByGrade[grade];
+  document.getElementById("lessonPlanUploadPreview_" + grade).innerHTML = "";
+  document.getElementById("lessonPlanUploadStatus_" + grade).textContent = "✅ Saved " + finalWeeks.length + " week(s) to Grade " + grade + ".";
+  renderLessonPlanEditor(grade);
 }
 
-function discardLessonPlanUpload() {
-  pendingUploadWeeks = null;
-  document.getElementById("lessonPlanUploadPreview").innerHTML = "";
-  document.getElementById("lessonPlanUploadStatus").textContent = "";
+function discardLessonPlanUpload(grade) {
+  delete pendingUploadWeeksByGrade[grade];
+  document.getElementById("lessonPlanUploadPreview_" + grade).innerHTML = "";
+  document.getElementById("lessonPlanUploadStatus_" + grade).textContent = "";
+}
+
+// ── VOLUNTEER SIGN-UPS (events + teams, with year) ───────────────────────
+// Super Admin creates an EVENT (e.g. "Christmas Event", 2026) and picks which
+// TEAMS to open for it (Plays, Worship Team, Prayer Team, Fundraising Team, or
+// a custom one). Each grade's admin then sees those open sign-ups in their
+// own "Sign-Ups" tab and registers kids from their class. Every action carries
+// its grade explicitly, so there is no shared dropdown that can drift.
+let signupSections = [];   // [{id, category, eventName, year, description, open}]
+let signupRegs = [];       // [{id, sectionId, grade, childName, parentName, note, registeredBy}]
+let signupViewGrade = null; // only used by all-grade viewers (Admin / Super) to pick which class to show
+const signupExpanded = new Set();
+const SIGNUP_CATEGORIES = [
+  { key: "Plays", icon: "🎭" },
+  { key: "Worship Team", icon: "🎵" },
+  { key: "Prayer Team", icon: "🙏" },
+  { key: "Fundraising Team", icon: "💰" }
+];
+
+function signupCategoryIcon(cat) {
+  const m = SIGNUP_CATEGORIES.find(c => c.key.toLowerCase() === String(cat || "").toLowerCase());
+  return m ? m.icon : "🙋";
+}
+function signupCatOrder(cat) {
+  const i = SIGNUP_CATEGORIES.findIndex(c => c.key.toLowerCase() === String(cat || "").toLowerCase());
+  return i < 0 ? 99 : i;
+}
+function spEsc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function newSignupId(prefix) {
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+function spActorLabel() {
+  if (adminRole === "superadmin") return "Super Admin";
+  if (adminGrade) return "Grade " + adminGrade + " Admin";
+  return "Admin";
+}
+function postSignup(body) {
+  return fetch(SHEET_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(body) }).catch(() => {});
+}
+
+async function loadSignupsFromSheet() {
+  try {
+    const [sRes, rRes] = await Promise.all([
+      fetch(SHEET_URL + "?type=signupSections&nocache=" + Date.now(), { mode: "cors" }),
+      fetch(SHEET_URL + "?type=signupRegs&nocache=" + Date.now(), { mode: "cors" })
+    ]);
+    if (!sRes.ok || !rRes.ok) throw new Error("Bad response");
+    const secs = await sRes.json();
+    const regs = await rRes.json();
+    if (Array.isArray(secs)) signupSections = secs;
+    if (Array.isArray(regs)) signupRegs = regs;
+    try { localStorage.setItem("signupCache", JSON.stringify({ s: signupSections, r: signupRegs })); } catch (e) {}
+  } catch (e) {
+    console.error("loadSignupsFromSheet failed:", e);
+    try {
+      const c = JSON.parse(localStorage.getItem("signupCache") || "null");
+      if (c) { signupSections = c.s || []; signupRegs = c.r || []; }
+    } catch (e2) {}
+  }
+}
+
+function groupSignupSectionsByEvent() {
+  const groups = {};
+  signupSections.forEach(s => {
+    const k = s.year + "|" + String(s.eventName || "").trim().toLowerCase();
+    if (!groups[k]) groups[k] = { eventName: s.eventName, year: s.year, sections: [] };
+    groups[k].sections.push(s);
+  });
+  const list = Object.values(groups);
+  list.sort((a, b) => b.year - a.year || String(a.eventName).localeCompare(String(b.eventName)));
+  list.forEach(g => g.sections.sort((a, b) => signupCatOrder(a.category) - signupCatOrder(b.category) || String(a.category).localeCompare(String(b.category))));
+  return list;
+}
+
+function refreshSignupViews() {
+  try { renderSignupManagerList(); } catch (e) {}
+  try { renderSignupGradeTab(); } catch (e) {}
+}
+
+function toggleSignupCard(key) {
+  const body = document.getElementById("spBody_" + key);
+  const chev = document.getElementById("spChev_" + key);
+  if (!body) return;
+  const open = body.style.display === "none";
+  body.style.display = open ? "block" : "none";
+  if (chev) chev.textContent = open ? "▼" : "▶";
+  if (open) signupExpanded.add(key); else signupExpanded.delete(key);
+}
+
+// ── SUPER ADMIN: create events + teams, see everyone signed up ────────────
+async function createSignupEvent() {
+  const nameEl = document.getElementById("signupEventName");
+  const yearEl = document.getElementById("signupEventYear");
+  const descEl = document.getElementById("signupEventDesc");
+  const customEl = document.getElementById("signupCustomTeam");
+  const status = document.getElementById("signupCreateStatus");
+  if (!nameEl || !yearEl || !status) return;
+  const eventName = nameEl.value.trim();
+  const year = parseInt(yearEl.value, 10);
+  if (!eventName) { status.textContent = "⚠️ Enter an event name (for example: Christmas Event)."; return; }
+  if (!year || year < 2000 || year > 2100) { status.textContent = "⚠️ Enter a valid year (for example: 2026)."; return; }
+  const cats = Array.from(document.querySelectorAll(".signupCatCheck:checked")).map(c => c.value);
+  const custom = customEl ? customEl.value.trim() : "";
+  if (custom) cats.push(custom);
+  if (!cats.length) { status.textContent = "⚠️ Pick at least one team to open sign-ups for."; return; }
+  const description = descEl ? descEl.value.trim() : "";
+  const newSecs = [];
+  cats.forEach(cat => {
+    const dup = signupSections.some(s => Number(s.year) === year &&
+      String(s.eventName).trim().toLowerCase() === eventName.toLowerCase() &&
+      String(s.category).trim().toLowerCase() === cat.toLowerCase());
+    const alreadyInBatch = newSecs.some(s => s.category.toLowerCase() === cat.toLowerCase());
+    if (dup || alreadyInBatch) return;
+    newSecs.push({ id: newSignupId("s"), category: cat, eventName: eventName, year: year, description: description, open: true });
+  });
+  if (!newSecs.length) { status.textContent = "ℹ️ Those teams already exist for " + eventName + " " + year + "."; return; }
+  status.textContent = "⏳ Creating…";
+  signupSections = signupSections.concat(newSecs);
+  await postSignup({ type: "saveSignupSections", sections: newSecs });
+  nameEl.value = ""; if (descEl) descEl.value = ""; if (customEl) customEl.value = "";
+  status.textContent = "✅ Created " + newSecs.length + " sign-up" + (newSecs.length === 1 ? "" : "s") + " for " + eventName + " " + year + ". Every grade can see them now.";
+  refreshSignupViews();
+}
+
+function signupManagerCardHtml(sec) {
+  const regs = signupRegs.filter(r => r.sectionId === sec.id)
+    .sort((a, b) => a.grade - b.grade || String(a.childName).localeCompare(String(b.childName)));
+  const byGrade = {};
+  regs.forEach(r => { byGrade[r.grade] = (byGrade[r.grade] || 0) + 1; });
+  const gradeSummary = Object.keys(byGrade).sort((a, b) => a - b).map(g => "Gr " + g + ": " + byGrade[g]).join(" · ");
+  const key = "m_" + sec.id;
+  const expanded = signupExpanded.has(key);
+  const regRows = regs.length ? regs.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.06);border-radius:8px;margin-bottom:4px;">
+      <div style="font-size:12px;color:white;"><b>${spEsc(r.childName)}</b> <span style="color:rgba(255,255,255,0.5);">· Grade ${r.grade}${r.note ? " · " + spEsc(r.note) : ""}${r.parentName ? " · Parent: " + spEsc(r.parentName) : ""}</span></div>
+      <button onclick="removeSignupReg('${r.id}')" style="padding:4px 9px;background:rgba(220,38,38,0.8);border:none;border-radius:6px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">✕</button>
+    </div>`).join("") : `<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:6px;">Nobody has signed up yet.</div>`;
+  return `
+    <div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;" onclick="toggleSignupCard('${key}')">
+        <div>
+          <div style="font-size:13px;font-weight:800;color:white;">${signupCategoryIcon(sec.category)} ${spEsc(sec.category)}
+            <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:6px;background:${sec.open ? "rgba(34,197,94,0.25)" : "rgba(220,38,38,0.25)"};color:${sec.open ? "#86efac" : "#fca5a5"};">${sec.open ? "OPEN" : "CLOSED"}</span>
+          </div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:2px;">${regs.length} kid${regs.length === 1 ? "" : "s"} signed up${gradeSummary ? " · " + gradeSummary : ""}</div>
+        </div>
+        <span id="spChev_${key}" style="font-size:12px;color:rgba(255,255,255,0.5);">${expanded ? "▼" : "▶"}</span>
+      </div>
+      <div id="spBody_${key}" style="display:${expanded ? "block" : "none"};margin-top:10px;">
+        <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);margin-bottom:3px;">Details / songs / notes shown to every grade</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <input id="spDesc_${sec.id}" type="text" value="${spEsc(sec.description)}" placeholder="e.g. Christmas play: shepherds, angels, narrators" style="flex:1;padding:8px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:white;outline:none;" />
+          <button onclick="saveSignupDescription('${sec.id}')" style="padding:8px 12px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">💾</button>
+        </div>
+        ${regRows}
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button onclick="toggleSignupOpen('${sec.id}')" style="flex:1;padding:9px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">${sec.open ? "🔒 Close sign-ups" : "🔓 Reopen sign-ups"}</button>
+          <button onclick="deleteSignupSectionConfirm('${sec.id}')" style="padding:9px 14px;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.4);border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:#ff9b9b;cursor:pointer;">🗑️ Delete</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSignupManagerList() {
+  const el = document.getElementById("signupManagerList");
+  if (!el) return;
+  const groups = groupSignupSectionsByEvent();
+  if (!groups.length) {
+    el.innerHTML = `<div style="text-align:center;padding:14px;font-size:12px;color:rgba(255,255,255,0.5);">No sign-ups created yet. Create your first event above.</div>`;
+    return;
+  }
+  el.innerHTML = groups.map(g => `
+    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:900;color:#a5f3fc;margin-bottom:10px;">📅 ${spEsc(g.eventName)} — ${g.year}</div>
+      ${g.sections.map(signupManagerCardHtml).join("")}
+    </div>`).join("");
+}
+
+async function saveSignupDescription(id) {
+  const sec = signupSections.find(s => s.id === id);
+  const input = document.getElementById("spDesc_" + id);
+  if (!sec || !input) return;
+  sec.description = input.value.trim();
+  await postSignup({ type: "saveSignupSections", sections: [sec] });
+  refreshSignupViews();
+}
+
+async function toggleSignupOpen(id) {
+  const sec = signupSections.find(s => s.id === id);
+  if (!sec) return;
+  sec.open = !sec.open;
+  await postSignup({ type: "saveSignupSections", sections: [sec] });
+  refreshSignupViews();
+}
+
+async function deleteSignupSectionConfirm(id) {
+  const sec = signupSections.find(s => s.id === id);
+  if (!sec) return;
+  const count = signupRegs.filter(r => r.sectionId === id).length;
+  const ok = await modalConfirm(
+    "This deletes the " + sec.category + " sign-up for " + sec.eventName + " " + sec.year + (count ? " and removes all " + count + " kid(s) signed up for it." : ".") + " This cannot be undone.",
+    { title: "Delete this sign-up?", danger: true, okLabel: "Delete" }
+  );
+  if (!ok) return;
+  signupSections = signupSections.filter(s => s.id !== id);
+  signupRegs = signupRegs.filter(r => r.sectionId !== id);
+  await postSignup({ type: "deleteSignupSection", id: id });
+  refreshSignupViews();
+}
+
+async function removeSignupReg(id) {
+  const reg = signupRegs.find(r => r.id === id);
+  if (!reg) return;
+  const sec = signupSections.find(s => s.id === reg.sectionId);
+  const ok = await modalConfirm(
+    "Remove " + reg.childName + " from " + (sec ? sec.category + " (" + sec.eventName + " " + sec.year + ")" : "this sign-up") + "?",
+    { title: "Remove sign-up?", danger: true, okLabel: "Remove" }
+  );
+  if (!ok) return;
+  signupRegs = signupRegs.filter(r => r.id !== id);
+  await postSignup({ type: "deleteSignupReg", id: id });
+  refreshSignupViews();
+}
+
+// ── GRADE TAB: each class registers its own kids ──────────────────────────
+function getSignupStudentsForGrade(grade) {
+  const out = [];
+  const seen = new Set();
+  childrenSheetData.forEach(row => {
+    const name = String(row.childName || row.name || "").trim();
+    if (!name || row.unassigned || row.graduated) return;
+    if (Number(row.grade) !== Number(grade)) return;
+    const k = name.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ name: name, parentName: row.parentName || "" });
+  });
+  out.sort((a, b) => a.name.localeCompare(b.name));
+  return out;
+}
+
+function setSignupViewGrade(g) {
+  signupViewGrade = Number(g);
+  renderSignupGradeTab();
+}
+
+function signupGradeCardHtml(sec, grade) {
+  const regs = signupRegs.filter(r => r.sectionId === sec.id && Number(r.grade) === Number(grade))
+    .sort((a, b) => String(a.childName).localeCompare(String(b.childName)));
+  const taken = new Set(regs.map(r => String(r.childName).toLowerCase()));
+  const available = getSignupStudentsForGrade(grade).filter(s => !taken.has(s.name.toLowerCase()));
+  const idKey = sec.id + "_" + grade;
+  const regRows = regs.length ? regs.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:#f4f1ff;border-radius:10px;margin-bottom:6px;">
+      <div style="font-size:13px;color:#2d2a5a;"><b>${spEsc(r.childName)}</b>${r.note ? `<span style="color:#6b6990;"> · ${spEsc(r.note)}</span>` : ""}</div>
+      <button onclick="removeSignupReg('${r.id}')" style="padding:4px 10px;background:#fde8e8;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:#b42318;cursor:pointer;">✕</button>
+    </div>`).join("") : `<div style="font-size:12px;color:#8a89a3;margin-bottom:8px;">Nobody from Grade ${grade} signed up yet.</div>`;
+  const addForm = sec.open ? `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #d9d6f0;">
+      <div style="font-size:11px;font-weight:800;color:#3b2f8f;margin-bottom:6px;">➕ Sign up a child from Grade ${grade}</div>
+      <select id="spSel_${idKey}" onchange="document.getElementById('spCustomWrap_${idKey}').style.display = this.value === '__other__' ? 'block' : 'none';" style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid #d9d6f0;border-radius:10px;background:white;color:#2d2a5a;margin-bottom:6px;">
+        <option value="">Choose a child…</option>
+        ${available.map(s => `<option value="${spEsc(s.name)}">${spEsc(s.name)}</option>`).join("")}
+        <option value="__other__">✏️ Someone not on the list…</option>
+      </select>
+      <div id="spCustomWrap_${idKey}" style="display:none;"><input id="spCustom_${idKey}" type="text" placeholder="Type the child's name" style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid #d9d6f0;border-radius:10px;margin-bottom:6px;" /></div>
+      <input id="spNote_${idKey}" type="text" placeholder="Role / song / note (optional) — e.g. Angel, solo, reads verse" style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid #d9d6f0;border-radius:10px;margin-bottom:8px;" />
+      <button onclick="addSignupReg('${sec.id}', ${grade})" style="width:100%;padding:11px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:white;cursor:pointer;">Sign Up</button>
+      <div id="spStatus_${idKey}" style="font-size:12px;font-weight:700;color:#b42318;margin-top:6px;"></div>
+    </div>` : `<div style="font-size:12px;font-weight:700;color:#b42318;margin-top:6px;">🔒 Sign-ups are closed for this team.</div>`;
+  return `
+    <div style="background:white;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 10px rgba(59,47,143,0.08);">
+      <div style="font-size:15px;font-weight:900;color:#0a3d45;">${signupCategoryIcon(sec.category)} ${spEsc(sec.category)}
+        <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:6px;background:${sec.open ? "#dcfce7" : "#fee2e2"};color:${sec.open ? "#15803d" : "#b42318"};">${sec.open ? "OPEN" : "CLOSED"}</span>
+      </div>
+      ${sec.description ? `<div style="font-size:12px;color:#6b6990;margin:4px 0 10px;">${spEsc(sec.description)}</div>` : `<div style="height:8px;"></div>`}
+      ${regRows}
+      ${addForm}
+    </div>`;
+}
+
+function renderSignupGradeTab() {
+  const el = document.getElementById("tabSignupsContent");
+  if (!el) return;
+  const allViewer = adminGrade === null || adminGrade === undefined;
+  const grades = getActiveGrades();
+  if (allViewer && (signupViewGrade === null || !grades.includes(Number(signupViewGrade)))) signupViewGrade = grades[0] || null;
+  const grade = allViewer ? signupViewGrade : Number(adminGrade);
+  const pickerHtml = allViewer ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      ${grades.map(g => `<button onclick="setSignupViewGrade(${g})" style="padding:8px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:20px;cursor:pointer;background:${Number(g) === Number(grade) ? "#3b2f8f" : "#e0f5f7"};color:${Number(g) === Number(grade) ? "white" : "#3b2f8f"};">Grade ${g}</button>`).join("")}
+    </div>` : "";
+  const groups = groupSignupSectionsByEvent();
+  if (!groups.length) {
+    el.innerHTML = pickerHtml + `<div style="text-align:center;padding:30px 16px;color:#7b7a90;font-size:13px;font-weight:700;">No volunteer sign-ups are open yet.<br><span style="font-weight:600;font-size:12px;">When Super Admin creates an event (like the Christmas play), it will show up here for your class.</span></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="font-size:12px;color:#6b6990;margin-bottom:12px;">Sign up kids from <b>Grade ${grade}</b> for plays, worship, prayer and fundraising. Each event shows its year.</div>
+    ${pickerHtml}
+    ${groups.map(g => `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:15px;font-weight:900;color:#3b2f8f;margin-bottom:8px;">📅 ${spEsc(g.eventName)} — ${g.year}</div>
+        ${g.sections.map(sec => signupGradeCardHtml(sec, grade)).join("")}
+      </div>`).join("")}`;
+}
+
+async function addSignupReg(secId, grade) {
+  const idKey = secId + "_" + grade;
+  const sel = document.getElementById("spSel_" + idKey);
+  const custom = document.getElementById("spCustom_" + idKey);
+  const noteEl = document.getElementById("spNote_" + idKey);
+  const status = document.getElementById("spStatus_" + idKey);
+  if (!sel || !status) return;
+  let childName = "";
+  let parentName = "";
+  if (sel.value === "__other__") {
+    childName = (custom ? custom.value : "").trim();
+  } else if (sel.value) {
+    childName = sel.value;
+    const st = getSignupStudentsForGrade(grade).find(s => s.name === childName);
+    parentName = st ? st.parentName : "";
+  }
+  if (!childName) { status.textContent = "Choose a child (or type a name) first."; return; }
+  const dup = signupRegs.some(r => r.sectionId === secId && Number(r.grade) === Number(grade) && String(r.childName).toLowerCase() === childName.toLowerCase());
+  if (dup) { status.textContent = childName + " is already signed up for this team."; return; }
+  const reg = {
+    id: newSignupId("r"), sectionId: secId, grade: Number(grade), childName: childName,
+    parentName: parentName, note: (noteEl ? noteEl.value : "").trim(), registeredBy: spActorLabel()
+  };
+  signupRegs.push(reg);
+  await postSignup(Object.assign({ type: "saveSignupReg" }, reg));
+  refreshSignupViews();
 }
 
 function getTeacherListHtml(grade, teacherStr, color) {
