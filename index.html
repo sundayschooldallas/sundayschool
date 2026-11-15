@@ -4636,17 +4636,31 @@ async function removeSignupReg(id) {
 
 // ── GRADE TAB: each class registers its own kids ──────────────────────────
 function getSignupStudentsForGrade(grade) {
+  // Same two sources the Students tab uses: the Children sheet, plus parents
+  // from the roster whose child info is stored on this device (incl. siblings).
   const out = [];
   const seen = new Set();
-  childrenSheetData.forEach(row => {
-    const name = String(row.childName || row.name || "").trim();
-    if (!name || row.unassigned || row.graduated) return;
-    if (Number(row.grade) !== Number(grade)) return;
+  function add(name, parentName, g) {
+    name = String(name || "").trim();
+    if (!name || Number(g) !== Number(grade)) return;
     const k = name.toLowerCase();
     if (seen.has(k)) return;
     seen.add(k);
-    out.push({ name: name, parentName: row.parentName || "" });
+    out.push({ name: name, parentName: parentName || "" });
+  }
+  childrenSheetData.forEach(row => {
+    if (row.unassigned || row.graduated) return;
+    add(row.childName || row.name, row.parentName, row.grade);
   });
+  try {
+    roster.forEach(week => week.parents.forEach(p => {
+      let ci = null;
+      try { ci = JSON.parse(localStorage.getItem("childInfo__" + p.h) || "null"); } catch (e) {}
+      if (!ci || ci.unassigned || ci.graduated) return;
+      add(ci.name, p.name, ci.grade);
+      (ci.allChildren || []).forEach(ch => add(ch.name, p.name, ch.grade));
+    }));
+  } catch (e) {}
   out.sort((a, b) => a.name.localeCompare(b.name));
   return out;
 }
@@ -4657,27 +4671,43 @@ function setSignupViewGrade(g) {
 }
 
 function signupGradeCardHtml(sec, grade) {
-  const regs = signupRegs.filter(r => r.sectionId === sec.id && Number(r.grade) === Number(grade))
-    .sort((a, b) => String(a.childName).localeCompare(String(b.childName)));
-  const taken = new Set(regs.map(r => String(r.childName).toLowerCase()));
-  const available = getSignupStudentsForGrade(grade).filter(s => !taken.has(s.name.toLowerCase()));
+  const regs = signupRegs.filter(r => r.sectionId === sec.id && Number(r.grade) === Number(grade));
+  const regByName = {};
+  regs.forEach(r => { regByName[String(r.childName).toLowerCase()] = r; });
+  const students = getSignupStudentsForGrade(grade);
   const idKey = sec.id + "_" + grade;
-  const regRows = regs.length ? regs.map(r => `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:#f4f1ff;border-radius:10px;margin-bottom:6px;">
-      <div style="font-size:13px;color:#2d2a5a;"><b>${spEsc(r.childName)}</b>${r.note ? `<span style="color:#6b6990;"> · ${spEsc(r.note)}</span>` : ""}</div>
-      <button onclick="removeSignupReg('${r.id}')" style="padding:4px 10px;background:#fde8e8;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:#b42318;cursor:pointer;">✕</button>
-    </div>`).join("") : `<div style="font-size:12px;color:#8a89a3;margin-bottom:8px;">Nobody from Grade ${grade} signed up yet.</div>`;
-  const addForm = sec.open ? `
+  const enc = n => encodeURIComponent(n).replace(/'/g, "%27");
+  const signedCount = regs.length;
+  const rowStyle = "display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-radius:10px;margin-bottom:6px;";
+  const studentRows = students.map(st => {
+    const r = regByName[st.name.toLowerCase()];
+    if (r) return `
+      <div style="${rowStyle}background:#e7f8ee;">
+        <div style="font-size:13px;color:#14532d;"><b>✓ ${spEsc(st.name)}</b>${r.note ? `<span style="color:#3f7a58;"> · ${spEsc(r.note)}</span>` : ""}</div>
+        <button onclick="removeSignupReg('${r.id}')" style="padding:4px 10px;background:#fde8e8;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:#b42318;cursor:pointer;">✕ Remove</button>
+      </div>`;
+    return `
+      <div style="${rowStyle}background:#f6f5fb;">
+        <div style="font-size:13px;font-weight:700;color:#2d2a5a;">${spEsc(st.name)}</div>
+        ${sec.open ? `<button onclick="signupQuick('${sec.id}',${grade},'${enc(st.name)}')" style="padding:6px 14px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">Sign Up</button>` : `<span style="font-size:11px;color:#9a99ac;">closed</span>`}
+      </div>`;
+  }).join("");
+  // Kids typed in by hand (not on the class list) still show up so they can be removed
+  const extraRows = regs.filter(r => !students.some(st => st.name.toLowerCase() === String(r.childName).toLowerCase())).map(r => `
+      <div style="${rowStyle}background:#e7f8ee;">
+        <div style="font-size:13px;color:#14532d;"><b>✓ ${spEsc(r.childName)}</b><span style="color:#3f7a58;"> · added by name${r.note ? " · " + spEsc(r.note) : ""}</span></div>
+        <button onclick="removeSignupReg('${r.id}')" style="padding:4px 10px;background:#fde8e8;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:#b42318;cursor:pointer;">✕ Remove</button>
+      </div>`).join("");
+  const emptyMsg = !students.length && !extraRows ? `<div style="font-size:12px;color:#8a89a3;margin-bottom:8px;">No students found for Grade ${grade} yet. You can still type a child's name below.</div>` : "";
+  const addBox = sec.open ? `
     <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #d9d6f0;">
-      <div style="font-size:11px;font-weight:800;color:#3b2f8f;margin-bottom:6px;">➕ Sign up a child from Grade ${grade}</div>
-      <select id="spSel_${idKey}" onchange="document.getElementById('spCustomWrap_${idKey}').style.display = this.value === '__other__' ? 'block' : 'none';" style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid #d9d6f0;border-radius:10px;background:white;color:#2d2a5a;margin-bottom:6px;">
-        <option value="">Choose a child…</option>
-        ${available.map(s => `<option value="${spEsc(s.name)}">${spEsc(s.name)}</option>`).join("")}
-        <option value="__other__">✏️ Someone not on the list…</option>
-      </select>
-      <div id="spCustomWrap_${idKey}" style="display:none;"><input id="spCustom_${idKey}" type="text" placeholder="Type the child's name" style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid #d9d6f0;border-radius:10px;margin-bottom:6px;" /></div>
-      <input id="spNote_${idKey}" type="text" placeholder="Role / song / note (optional) — e.g. Angel, solo, reads verse" style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid #d9d6f0;border-radius:10px;margin-bottom:8px;" />
-      <button onclick="addSignupReg('${sec.id}', ${grade})" style="width:100%;padding:11px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:white;cursor:pointer;">Sign Up</button>
+      <div style="font-size:11px;font-weight:800;color:#3b2f8f;margin-bottom:4px;">Role / song for the next child you sign up (optional)</div>
+      <input id="spNote_${idKey}" type="text" placeholder="e.g. Angel, solo, reads verse" style="width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid #d9d6f0;border-radius:10px;margin-bottom:10px;" />
+      <div style="font-size:11px;font-weight:800;color:#3b2f8f;margin-bottom:4px;">✏️ Child not on the list? Type the name</div>
+      <div style="display:flex;gap:6px;">
+        <input id="spCustom_${idKey}" type="text" placeholder="Child's name" style="flex:1;padding:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:1.5px solid #d9d6f0;border-radius:10px;" />
+        <button onclick="addSignupReg('${sec.id}', ${grade})" style="padding:10px 16px;background:linear-gradient(135deg,#3b2f8f,#5c4ac7);border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:white;cursor:pointer;">Add</button>
+      </div>
       <div id="spStatus_${idKey}" style="font-size:12px;font-weight:700;color:#b42318;margin-top:6px;"></div>
     </div>` : `<div style="font-size:12px;font-weight:700;color:#b42318;margin-top:6px;">🔒 Sign-ups are closed for this team.</div>`;
   return `
@@ -4685,9 +4715,10 @@ function signupGradeCardHtml(sec, grade) {
       <div style="font-size:15px;font-weight:900;color:#0a3d45;">${signupCategoryIcon(sec.category)} ${spEsc(sec.category)}
         <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:6px;background:${sec.open ? "#dcfce7" : "#fee2e2"};color:${sec.open ? "#15803d" : "#b42318"};">${sec.open ? "OPEN" : "CLOSED"}</span>
       </div>
-      ${sec.description ? `<div style="font-size:12px;color:#6b6990;margin:4px 0 10px;">${spEsc(sec.description)}</div>` : `<div style="height:8px;"></div>`}
-      ${regRows}
-      ${addForm}
+      ${sec.description ? `<div style="font-size:12px;color:#6b6990;margin:4px 0 4px;">${spEsc(sec.description)}</div>` : ""}
+      <div style="font-size:12px;font-weight:800;color:#3b2f8f;margin:6px 0 10px;">Grade ${grade} · ${signedCount} signed up of ${students.length} student${students.length === 1 ? "" : "s"}</div>
+      ${emptyMsg}${studentRows}${extraRows}
+      ${addBox}
     </div>`;
 }
 
@@ -4717,32 +4748,35 @@ function renderSignupGradeTab() {
       </div>`).join("")}`;
 }
 
+async function createSignupReg(secId, grade, childName, parentName, note, statusEl) {
+  const dup = signupRegs.some(r => r.sectionId === secId && Number(r.grade) === Number(grade) && String(r.childName).toLowerCase() === childName.toLowerCase());
+  if (dup) { if (statusEl) statusEl.textContent = childName + " is already signed up for this team."; return false; }
+  const reg = { id: newSignupId("r"), sectionId: secId, grade: Number(grade), childName: childName, parentName: parentName || "", note: note || "", registeredBy: spActorLabel() };
+  signupRegs.push(reg);
+  await postSignup(Object.assign({ type: "saveSignupReg" }, reg));
+  return true;
+}
+
+// One tap on a child in the class list
+async function signupQuick(secId, grade, encName) {
+  const childName = decodeURIComponent(encName);
+  const noteEl = document.getElementById("spNote_" + secId + "_" + grade);
+  const st = getSignupStudentsForGrade(grade).find(x => x.name === childName);
+  await createSignupReg(secId, grade, childName, st ? st.parentName : "", (noteEl ? noteEl.value : "").trim(), null);
+  refreshSignupViews();
+}
+
+// Typed-in name for a child who is not on the class list
 async function addSignupReg(secId, grade) {
   const idKey = secId + "_" + grade;
-  const sel = document.getElementById("spSel_" + idKey);
   const custom = document.getElementById("spCustom_" + idKey);
   const noteEl = document.getElementById("spNote_" + idKey);
   const status = document.getElementById("spStatus_" + idKey);
-  if (!sel || !status) return;
-  let childName = "";
-  let parentName = "";
-  if (sel.value === "__other__") {
-    childName = (custom ? custom.value : "").trim();
-  } else if (sel.value) {
-    childName = sel.value;
-    const st = getSignupStudentsForGrade(grade).find(s => s.name === childName);
-    parentName = st ? st.parentName : "";
-  }
-  if (!childName) { status.textContent = "Choose a child (or type a name) first."; return; }
-  const dup = signupRegs.some(r => r.sectionId === secId && Number(r.grade) === Number(grade) && String(r.childName).toLowerCase() === childName.toLowerCase());
-  if (dup) { status.textContent = childName + " is already signed up for this team."; return; }
-  const reg = {
-    id: newSignupId("r"), sectionId: secId, grade: Number(grade), childName: childName,
-    parentName: parentName, note: (noteEl ? noteEl.value : "").trim(), registeredBy: spActorLabel()
-  };
-  signupRegs.push(reg);
-  await postSignup(Object.assign({ type: "saveSignupReg" }, reg));
-  refreshSignupViews();
+  if (!custom || !status) return;
+  const childName = custom.value.trim();
+  if (!childName) { status.textContent = "Type the child's name first."; return; }
+  const ok = await createSignupReg(secId, grade, childName, "", (noteEl ? noteEl.value : "").trim(), status);
+  if (ok) refreshSignupViews();
 }
 
 function getTeacherListHtml(grade, teacherStr, color) {
