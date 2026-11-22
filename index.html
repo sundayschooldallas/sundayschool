@@ -4562,6 +4562,114 @@ async function createSignupEvent() {
   refreshSignupViews();
 }
 
+// ══════════════ SIGN-UP PDF (Super Admin) ══════════════
+function spPdfLoadLib() {
+  return new Promise((resolve, reject) => {
+    if (window.jspdf && window.jspdf.jsPDF) return resolve(window.jspdf.jsPDF);
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    s.onload = () => (window.jspdf && window.jspdf.jsPDF) ? resolve(window.jspdf.jsPDF) : reject(new Error("jsPDF missing"));
+    s.onerror = () => reject(new Error("Could not load the PDF library"));
+    document.head.appendChild(s);
+  });
+}
+function spPdfClean(t) { return String(t == null ? "" : t).replace(/[^\x20-\x7E -ÿ]/g, "").replace(/\s+/g, " ").trim(); }
+function spPdfRow(r) {
+  const kid = String(r.childName || "").trim().toLowerCase();
+  const rows = (typeof childrenSheetData !== "undefined" ? childrenSheetData : []);
+  let c = rows.find(x => Number(x.grade) === Number(r.grade) && String(x.childName || x.name || "").trim().toLowerCase() === kid)
+       || rows.find(x => String(x.childName || x.name || "").trim().toLowerCase() === kid);
+  const phone = c ? incNorm(c.phone) : "";
+  const parent = r.parentName || (c ? c.parentName : "") || "";
+  const pi = (phone && parentInfoMap[phone]) || {};
+  return {
+    child: r.childName || "", grade: r.grade, parent: parent,
+    phone: phone ? incFmt(phone) : "", phone2: pi.phone2 ? incFmt(incNorm(pi.phone2)) : "",
+    address: pi.address || "", note: r.note || ""
+  };
+}
+async function spMakePdf(sectionIds, fileLabel) {
+  const secs = sectionIds.map(id => signupSections.find(s => s.id === id)).filter(Boolean);
+  if (!secs.length) return;
+  showToast("📄 Building PDF…");
+  await Promise.all([loadParentInfo(), loadSignupsFromSheet(), loadChildrenFromSheet()]);
+  let JsPDF;
+  try { JsPDF = await spPdfLoadLib(); } catch (x) { await customModal({ title: "Couldn't build the PDF", message: "The PDF tool could not load. Check your internet connection and try again.", type: "alert" }); return; }
+  const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 36;
+  const cols = [
+    { k: "#", w: 24 }, { k: "child", t: "Child", w: 118 }, { k: "grade", t: "Gr", w: 28 }, { k: "parent", t: "Parent / guardian", w: 118 },
+    { k: "phone", t: "Phone", w: 84 }, { k: "phone2", t: "2nd phone", w: 84 }, { k: "address", t: "Address", w: 190 }, { k: "note", t: "Note", w: 0 }
+  ];
+  cols[7].w = W - 2 * M - cols.slice(0, 7).reduce((a, c) => a + c.w, 0);
+  const first = secs[0];
+  const title = spPdfClean(first.eventName) + " " + first.year;
+  const gen = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  let y = 0, page = 1;
+  function banner() {
+    doc.setFillColor(59, 47, 143); doc.rect(0, 0, W, 64, "F");
+    doc.setFillColor(236, 72, 153); doc.rect(0, 64, W, 4, "F");
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+    doc.text(title + " - Sign-Up List", M, 32);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text("Sunday School  |  Generated " + gen, M, 50);
+    y = 86;
+  }
+  function footer() {
+    doc.setTextColor(140, 138, 170); doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    doc.text("Confidential - contains family contact information. For ministry use only.", M, H - 18);
+    doc.text("Page " + page, W - M, H - 18, { align: "right" });
+  }
+  function newPage() { footer(); doc.addPage(); page++; y = 40; }
+  function header() {
+    doc.setFillColor(238, 235, 252); doc.rect(M, y - 12, W - 2 * M, 20, "F");
+    doc.setTextColor(59, 47, 143); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+    let x = M;
+    cols.forEach(c => { doc.text(c.t || c.k, x + 5, y + 1); x += c.w; });
+    y += 18;
+  }
+  banner();
+  secs.forEach((sec, si) => {
+    const regs = signupRegs.filter(r => r.sectionId === sec.id)
+      .sort((a, b) => a.grade - b.grade || String(a.childName).localeCompare(String(b.childName))).map(spPdfRow);
+    if (y > H - 120) newPage();
+    doc.setTextColor(30, 27, 75); doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+    doc.text(spPdfClean(sec.category), M, y);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(107, 105, 144);
+    doc.text(regs.length + " signed up" + (sec.description ? "  |  " + spPdfClean(sec.description).slice(0, 110) : ""), M, y + 14);
+    y += 32;
+    if (!regs.length) { doc.setFontSize(10); doc.text("Nobody has signed up yet.", M, y); y += 24; return; }
+    header();
+    regs.forEach((r, i) => {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      const cells = cols.map((c, ci) => ci === 0 ? [String(i + 1)] : doc.splitTextToSize(spPdfClean(r[c.k]) || "-", c.w - 10));
+      const lines = Math.max.apply(null, cells.map(c => c.length));
+      const rh = lines * 11 + 8;
+      if (y + rh > H - 40) { newPage(); header(); }
+      if (i % 2 === 0) { doc.setFillColor(248, 247, 253); doc.rect(M, y - 10, W - 2 * M, rh, "F"); }
+      doc.setTextColor(30, 27, 75);
+      let x = M;
+      cells.forEach((c, ci) => {
+        doc.setFont("helvetica", ci === 1 ? "bold" : "normal");
+        if (ci === 4 || ci === 5) doc.setTextColor(10, 82, 96); else doc.setTextColor(30, 27, 75);
+        doc.text(c, x + 5, y, { baseline: "alphabetic" });
+        x += cols[ci].w;
+      });
+      y += rh;
+    });
+    y += 18;
+  });
+  footer();
+  const fname = (spPdfClean(fileLabel || title).replace(/[^A-Za-z0-9]+/g, "_") || "SignUps") + ".pdf";
+  doc.save(fname);
+  showToast("📄 PDF ready: " + fname);
+}
+function spPdfSection(id) { spMakePdf([id]); }
+function spPdfEvent(gi) {
+  const g = groupSignupSectionsByEvent()[gi];
+  if (g) spMakePdf(g.sections.map(s => s.id), g.eventName + "_" + g.year + "_SignUps");
+}
+
 function signupManagerCardHtml(sec) {
   const regs = signupRegs.filter(r => r.sectionId === sec.id)
     .sort((a, b) => a.grade - b.grade || String(a.childName).localeCompare(String(b.childName)));
@@ -4593,6 +4701,7 @@ function signupManagerCardHtml(sec) {
           <button onclick="saveSignupDescription('${sec.id}')" style="padding:8px 12px;background:linear-gradient(135deg,#15803d,#22c55e);border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">💾</button>
         </div>
         ${regRows}
+        ${adminRole === "superadmin" ? `<button onclick="spPdfSection('${sec.id}')" style="width:100%;margin-top:10px;padding:10px;background:linear-gradient(135deg,#ec4899,#8b5cf6);border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;color:white;cursor:pointer;">📄 Download PDF (names, parents, phones, addresses)</button>` : ""}
         <div style="display:flex;gap:8px;margin-top:10px;">
           <button onclick="toggleSignupOpen('${sec.id}')" style="flex:1;padding:9px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;">${sec.open ? "🔒 Close sign-ups" : "🔓 Reopen sign-ups"}</button>
           <button onclick="deleteSignupSectionConfirm('${sec.id}')" style="padding:9px 14px;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.4);border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:#ff9b9b;cursor:pointer;">🗑️ Delete</button>
@@ -4609,9 +4718,12 @@ function renderSignupManagerList() {
     el.innerHTML = `<div style="text-align:center;padding:14px;font-size:12px;color:rgba(255,255,255,0.5);">No sign-ups created yet. Create your first event above.</div>`;
     return;
   }
-  el.innerHTML = groups.map(g => `
+  el.innerHTML = groups.map((g, gi) => `
     <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:12px;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:900;color:#a5f3fc;margin-bottom:10px;">📅 ${spEsc(g.eventName)} — ${g.year}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:900;color:#a5f3fc;">📅 ${spEsc(g.eventName)} — ${g.year}</div>
+        ${adminRole === "superadmin" ? `<button onclick="spPdfEvent(${gi})" style="padding:7px 11px;background:linear-gradient(135deg,#ec4899,#8b5cf6);border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:white;cursor:pointer;white-space:nowrap;">📄 All teams PDF</button>` : ""}
+      </div>
       ${g.sections.map(signupManagerCardHtml).join("")}
     </div>`).join("");
 }
