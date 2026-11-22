@@ -5371,6 +5371,36 @@ function sdCanEdit(grade) {
   if (adminRole === "superadmin" || adminRole === "admin") return true;
   return adminRole === "gradeadmin" && Number(grade) === Number(adminGrade);
 }
+// ── Sign-ups inside the student Details modal ──
+function sdRenderSignups(idx) {
+  const box = document.getElementById("sdSignups");
+  const e = window._stuReg[idx];
+  if (!box || !e) return;
+  const groups = groupSignupSectionsByEvent().map(g => ({ eventName: g.eventName, year: g.year, sections: g.sections.filter(sc => sc.open !== false && String(sc.open).toLowerCase() !== "false") })).filter(g => g.sections.length);
+  if (!groups.length) { box.innerHTML = '<div style="font-size:12px;color:#9a98b5;font-weight:700;">No open sign-ups right now.</div>'; return; }
+  const kid = String(e.child).toLowerCase();
+  box.innerHTML = groups.map(g => `<div style="font-size:11px;font-weight:900;color:#6b6990;margin:8px 0 4px;">${spEsc(g.eventName)} ${spEsc(g.year)}</div>` + g.sections.map(sc => {
+    const reg = signupRegs.find(r => r.sectionId === sc.id && Number(r.grade) === Number(e.grade) && String(r.childName).toLowerCase() === kid);
+    const label = spEsc(signupCategoryIcon(sc.category) + " " + sc.category);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-radius:10px;margin-bottom:6px;background:${reg ? "#e6f7ee" : "#f4f3fb"};">
+      <div style="font-size:13px;font-weight:800;color:#2a2750;">${label}${reg ? ' <span style="color:#15803d;font-size:11px;">✅ signed up</span>' : ""}</div>
+      ${reg ? `<button onclick="sdSignupRemove(${idx},'${reg.id}')" style="padding:7px 11px;border:none;border-radius:8px;background:#fde8e8;color:#b91c1c;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">Remove</button>`
+            : `<button onclick="sdSignupAdd(${idx},'${sc.id}')" style="padding:7px 11px;border:none;border-radius:8px;background:#7360f2;color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">+ Add</button>`}
+    </div>`;
+  }).join("")).join("");
+}
+async function sdSignupAdd(idx, secId) {
+  const e = window._stuReg[idx];
+  if (!e) return;
+  await createSignupReg(secId, Number(e.grade), e.child, e.parent || "", "", null);
+  showToast("🙋 " + e.child + " added to the sign-up");
+  sdRenderSignups(idx);
+  try { refreshSignupViews(); } catch (x) {}
+}
+async function sdSignupRemove(idx, regId) {
+  await removeSignupReg(regId);
+  sdRenderSignups(idx);
+}
 function sdClose() { const o = document.getElementById("sdOverlay"); if (o) o.remove(); }
 function sdOpen(idx) {
   const e = window._stuReg[idx];
@@ -5432,6 +5462,11 @@ function sdOpen(idx) {
       </div>
     </div>
     <div style="margin-top:16px;padding-top:12px;border-top:2px solid #f0eefb;">
+      <div style="font-size:13px;font-weight:900;color:#3b2f8f;">🙋 Sign-ups</div>
+      <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Add ${spEsc(e.child)} to an open team or event.</div>
+      <div id="sdSignups"></div>
+    </div>
+    <div style="margin-top:16px;padding-top:12px;border-top:2px solid #f0eefb;">
       <div style="font-size:13px;font-weight:900;color:#3b2f8f;">🎓 Move / promote to another class</div>
       <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Use this if ${spEsc(e.child)} is in the wrong class or is being promoted.</div>
       <select id="sdGrade" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;background:white;">${grades.map(g => `<option value="${g}">Grade ${g}</option>`).join("")}</select>
@@ -5441,6 +5476,8 @@ function sdOpen(idx) {
   </div>`;
   document.body.appendChild(o);
   sdFillMsg(idx);
+  sdRenderSignups(idx);
+  loadSignupsFromSheet().then(() => sdRenderSignups(idx)).catch(() => {});
   Promise.all([loadStatusesFromSheet(), loadNewParentsFromSheet(), loadParentStars()]).then(() => sdFillMsg(idx)).catch(() => {});
   loadParentInfo().then(() => {
     const pi = parentInfoMap[norm] || {};
