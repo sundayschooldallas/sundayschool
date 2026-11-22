@@ -2264,7 +2264,8 @@ function showMainApp() {
   Promise.all([
     loadStatusesFromSheet(),
     loadTrackerFromSheet(myName),
-    loadNewParentsFromSheet()
+    loadNewParentsFromSheet(),
+    loadParentStars()
   ]).then(() => { try { renderMyCard(); } catch(e){} }).catch(() => {});
 }
 
@@ -2637,6 +2638,7 @@ function renderMyCard() {
         ${respondHTML}
       </div>
 
+      ${(function(){ try { return renderParentStarsCard(); } catch(e) { return ""; } })()}
       ${(function(){ try { return renderParentTracker(); } catch(e) { return ""; } })()}
 
     </div>`;
@@ -3396,6 +3398,7 @@ function showAdminTab(tab) {
     if (btn) { btn.style.background = tab === t ? "#3b2f8f" : "#e0f5f7"; btn.style.color = tab === t ? "white" : "#3b2f8f"; }
   });
   if (tab === "classes") {
+    loadParentStars().then(() => { try { renderClassesTab(); } catch (x) {} });
     // Load ALL children for the class tab (read-only view of all grades)
     const savedGrade = adminGrade;
     adminGrade = null; // temporarily clear so all grades load
@@ -3423,7 +3426,7 @@ function showAdminTab(tab) {
   }
   if (tab === "incoming" && adminRole === "superadmin") {
     renderIncomingTab();
-    loadIncomingFromSheet().then(() => loadPromoteCodes()).then(() => renderIncomingTab()).catch(() => renderIncomingTab());
+    loadIncomingFromSheet().then(() => loadPromoteCodes()).then(() => loadStarAdminData()).then(() => renderIncomingTab()).catch(() => renderIncomingTab());
   }
   if (tab === "upload" && adminRole === "gradeadmin") {
     renderUploadTab();
@@ -5090,6 +5093,7 @@ function renderIncomingTab() {
     <div style="font-size:12px;color:#6b6990;font-weight:700;margin-bottom:10px;">Confirm each family's phone number and parent name, then promote the student into the class.</div>
     ${picker}${seedBtn}
     <div id="incCodesBox"></div>
+    <div id="incStarBox"></div>
     <div id="incUploadsBox"></div>
     <input id="incSearchBox" oninput="setIncSearch(this.value)" value="${spEsc(incSearch)}" placeholder="🔍 Search name, parent or phone" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #d6d3f0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;margin-bottom:6px;">
     <div id="incStats" style="font-size:11px;font-weight:800;color:#3b2f8f;margin:4px 2px 10px;"></div>
@@ -5097,6 +5101,7 @@ function renderIncomingTab() {
   renderIncomingList();
   renderIncUploadsBox();
   renderPromoteCodesBox();
+  renderStarBox();
 }
 
 function incSubmittedFor(g) { return incStudents.filter(s => s.status === "submitted" && Number(s.targetGrade) === Number(g)); }
@@ -5422,7 +5427,7 @@ function sdOpen(idx) {
   </div>`;
   document.body.appendChild(o);
   sdFillMsg(idx);
-  Promise.all([loadStatusesFromSheet(), loadNewParentsFromSheet()]).then(() => sdFillMsg(idx)).catch(() => {});
+  Promise.all([loadStatusesFromSheet(), loadNewParentsFromSheet(), loadParentStars()]).then(() => sdFillMsg(idx)).catch(() => {});
   loadParentInfo().then(() => {
     const pi = parentInfoMap[norm] || {};
     const a = document.getElementById("sdAddr"), p2 = document.getElementById("sdPhone2"), line = document.getElementById("sdAddrLine");
@@ -5490,11 +5495,18 @@ function sdAutoMsg(e) {
   const next = weeks.find(x => x.dt.getTime() > t0);
   const lines = [];
   let anyMissed = false;
+  const listed = new Set();
   today.forEach(x => x.parents.forEach(p => {
     const kid = sdChildOf(p.name);
-    if (getStatus(x.week.date, p.name) === "confirmed") lines.push("Thank you " + p.name + " for joining us today" + (kid ? " (" + kid + "'s parent)" : "") + "! We really appreciate your participation and commitment. 💙");
+    listed.add(starKey(p.name));
+    if (getStatus(x.week.date, p.name) === "confirmed" || starredToday(p.name)) lines.push("Thank you " + p.name + " for joining us today" + (kid ? " (" + kid + "'s parent)" : "") + "! We really appreciate your participation and commitment. 💙");
     else { anyMissed = true; lines.push("We missed you " + p.name + " at today's session and hope everything is going well! 🙏"); }
   }));
+  const todayISO = starISO();
+  parentStars.filter(st => st.date === todayISO && Number(st.grade) === g && !listed.has(starKey(st.parentName))).forEach(st => {
+    listed.add(starKey(st.parentName));
+    lines.push("Thank you " + st.parentName + " for joining us today! We really appreciate your participation and commitment. 💙");
+  });
   if (!lines.length) lines.push("Thank you all for a wonderful Sunday School today in Grade " + g + "! 💙");
   let nextLine;
   if (next) {
@@ -5580,6 +5592,124 @@ async function sdPromote(idx) {
   sdClose();
   showToast("🎓 " + e.child + " moved to Grade " + newG);
   sdRefresh();
+}
+
+// ══════════════ PARENT STARS (two-step, class PIN) ══════════════
+let parentStars = [];
+let starPins = {};
+function starISO() { const n = getMockNow(); return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") + "-" + String(n.getDate()).padStart(2, "0"); }
+function starYear(iso) { const p = String(iso).split("-").map(Number); return p[1] >= 9 ? p[0] : p[0] - 1; }
+function starKey(n) { return String(n || "").trim().toLowerCase(); }
+function newStarPin() { return String(Math.floor(1000 + Math.random() * 9000)); }
+function starCount(name) {
+  const k = starKey(name), cy = starYear(starISO());
+  let yr = 0, all = 0;
+  parentStars.forEach(s => { if (starKey(s.parentName) === k) { all++; if (starYear(s.date) === cy) yr++; } });
+  return { yr, all };
+}
+function starredToday(name) { const t = starISO(), k = starKey(name); return parentStars.find(s => s.date === t && starKey(s.parentName) === k) || null; }
+function starBadge(name) {
+  const c = starCount(name), t = starredToday(name);
+  if (!c.yr && !t) return "";
+  return `<div style="font-size:11px;font-weight:800;color:#b8860b;">⭐ ${c.yr} this year${t ? ' · <span style="color:#15803d;">✅ starred today</span>' : ""}</div>`;
+}
+async function loadParentStars() {
+  try {
+    const r = await fetch(SHEET_URL + "?type=parentStars&nocache=" + Date.now(), { mode: "cors" });
+    const d = await r.json();
+    if (Array.isArray(d)) parentStars = d;
+  } catch (x) {}
+}
+function starLeaders() {
+  const cy = starYear(starISO()), m = {};
+  parentStars.forEach(s => { if (starYear(s.date) !== cy) return; const k = starKey(s.parentName); if (!m[k]) m[k] = { name: s.parentName, n: 0 }; m[k].n++; });
+  return Object.values(m).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+}
+async function starGive(idx) {
+  const e = window._stuReg[idx];
+  if (!e) return;
+  if (!sdCanEdit(e.grade)) { showToast("Only this class's teacher can give stars."); return; }
+  const today = starISO();
+  const have = starredToday(e.parent);
+  if (have) {
+    if (adminRole === "superadmin") {
+      const rm = await modalConfirm(spEsc(e.parent) + " already has a ⭐ for today.\n\nRemove it? (Super Admin correction)", { title: "Star already given", danger: true, okLabel: "Remove star" });
+      if (!rm) return;
+      parentStars = parentStars.filter(s => s.id !== have.id);
+      await postInc({ type: "deleteParentStar", id: have.id });
+      showToast("Star removed"); try { renderClassesTab(); } catch (x) {}
+    } else showToast("⭐ " + e.parent + " already has today's star.");
+    return;
+  }
+  const c = starCount(e.parent);
+  const step1 = await modalConfirm("Give a ⭐ to " + spEsc(e.parent) + " (parent of " + spEsc(e.child) + ") for coming to Grade " + e.grade + " today?\n\nThey have " + c.yr + " ⭐ this school year.", { title: "Step 1 of 2 — Give star?", okLabel: "Continue" });
+  if (!step1) return;
+  if (adminRole === "gradeadmin") {
+    const pin = await modalPrompt("Enter your class star PIN to confirm. (Ask the Super Admin if you don't have it.)", "Class star PIN", { title: "Step 2 of 2 — Teacher PIN", okLabel: "Give ⭐" });
+    if (pin === null) return;
+    let res = null;
+    try { const r = await fetch(SHEET_URL + "?type=verifyStarPin&grade=" + Number(e.grade) + "&code=" + encodeURIComponent(String(pin).trim()) + "&nocache=" + Date.now(), { mode: "cors" }); res = await r.json(); } catch (x) {}
+    if (!res) { await customModal({ title: "Couldn't check", message: "Check your connection and try again.", type: "alert" }); return; }
+    if (res.nocode) { await customModal({ title: "No PIN yet", message: "No star PIN exists for your class yet. Ask the Super Admin.", type: "alert" }); return; }
+    if (!res.ok) { await customModal({ title: "Wrong PIN", message: "❌ That star PIN is not correct. No star was given.", type: "alert" }); return; }
+  } else {
+    const step2 = await modalConfirm("Final check: give " + spEsc(e.parent) + " a ⭐ for today (" + today + ")?", { title: "Step 2 of 2 — Confirm", okLabel: "Give ⭐" });
+    if (!step2) return;
+  }
+  const star = { id: "star_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), parentName: e.parent, phone: incNorm(e.h), childName: e.child, grade: Number(e.grade), date: today, givenBy: adminRole + (adminGrade ? " G" + adminGrade : "") };
+  parentStars.push(star);
+  try { renderClassesTab(); } catch (x) {}
+  await postInc(Object.assign({ type: "saveParentStar" }, star));
+  const n = starCount(e.parent).yr;
+  showToast("⭐ Star given to " + e.parent + " — " + n + " this year");
+}
+function renderParentStarsCard() {
+  if (!myName) return "";
+  const c = starCount(myName), lead = starLeaders();
+  const myRank = lead.findIndex(x => starKey(x.name) === starKey(myName)) + 1;
+  const rows = lead.slice(0, 5).map((x, i) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #f3efdc;font-size:13px;font-weight:${starKey(x.name) === starKey(myName) ? "900" : "700"};color:${starKey(x.name) === starKey(myName) ? "#0a5260" : "#5a5775"};"><span>${["🥇","🥈","🥉","4.","5."][i]} ${spEsc(x.name)}</span><span>⭐ ${x.n}</span></div>`).join("");
+  return `<div style="margin:16px 20px 0;background:linear-gradient(135deg,#fff9e6,#fff);border:1.5px solid #f3dfa5;border-radius:20px;padding:16px 18px;">
+    <div style="font-size:15px;font-weight:900;color:#854f0b;">⭐ My Stars</div>
+    <div style="font-size:34px;font-weight:900;color:#b8860b;line-height:1.1;margin:4px 0;">${c.yr}<span style="font-size:13px;font-weight:800;color:#9a8660;"> this school year</span></div>
+    <div style="font-size:12px;font-weight:700;color:#7b7a90;">${c.all} all-time${myRank ? " · You are #" + myRank + " 🎉" : ""}</div>
+    <div style="font-size:12px;color:#7b7a90;margin-top:6px;">You earn a star each Sunday you come and serve. Top parents are recognized at the end of the school year!</div>
+    ${rows ? `<div style="margin-top:10px;"><div style="font-size:12px;font-weight:900;color:#854f0b;margin-bottom:2px;">🏆 Star parents this year</div>${rows}</div>` : ""}
+  </div>`;
+}
+function renderStarBox() {
+  const box = document.getElementById("incStarBox");
+  if (!box) return;
+  if (adminRole !== "superadmin") { box.innerHTML = ""; return; }
+  const rows = getActiveGrades().map(g => `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #f3dfa5;">
+      <div style="flex:1;font-size:12px;font-weight:800;color:#0a3d45;">Grade ${g}</div>
+      <div style="font-size:15px;font-weight:900;letter-spacing:2px;color:#3b2f8f;">${starPins[g] ? spEsc(starPins[g]) : "—"}</div>
+      <button onclick="regenStarPin(${g})" style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#e0f5f7;color:#0a5260;cursor:pointer;">New PIN</button>
+    </div>`).join("");
+  const lead = starLeaders().slice(0, 10).map((x, i) => `<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e1b4b;padding:3px 0;"><span>${i + 1}. ${spEsc(x.name)}</span><span>⭐ ${x.n}</span></div>`).join("");
+  box.innerHTML = `<div style="background:#fffbea;border:1.5px solid #f3dfa5;border-radius:14px;padding:10px 12px;margin-bottom:12px;">
+    <div style="font-size:13px;font-weight:900;color:#854f0b;">⭐ Parent stars</div>
+    <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Each teacher needs their class star PIN to give a star (after a first confirm). Give each teacher their PIN privately.</div>
+    ${rows}
+    <div style="margin-top:8px;border-top:2px solid #f3dfa5;padding-top:6px;"><div style="font-size:11px;font-weight:900;color:#854f0b;margin-bottom:3px;">🏆 Top parents this school year</div>${lead || '<div style="font-size:11px;color:#9a98b5;font-weight:700;">No stars given yet.</div>'}</div></div>`;
+}
+async function regenStarPin(g) {
+  const ok = await modalConfirm("Make a new star PIN for Grade " + g + "? The old PIN stops working.", { title: "New star PIN", okLabel: "Make new PIN" });
+  if (!ok) return;
+  starPins[g] = newStarPin();
+  renderStarBox();
+  await postInc({ type: "saveStarPin", grade: g, pin: starPins[g] });
+}
+async function loadStarAdminData() {
+  await loadParentStars();
+  let loaded = false;
+  try {
+    const r = await fetch(SHEET_URL + "?type=starPins&nocache=" + Date.now(), { mode: "cors" });
+    const d = await r.json();
+    if (Array.isArray(d)) { starPins = {}; d.forEach(x => { starPins[x.grade] = x.pin; }); loaded = true; }
+  } catch (x) {}
+  if (loaded) {
+    for (const g of getActiveGrades()) { if (!starPins[g]) { starPins[g] = newStarPin(); await postInc({ type: "saveStarPin", grade: g, pin: starPins[g] }); } }
+  }
 }
 
 function getTeacherListHtml(grade, teacherStr, color) {
@@ -8270,8 +8400,10 @@ function renderClassesTab() {
       <div style="flex:1;min-width:100px;">
         <div style="font-size:14px;font-weight:800;color:#0a3d45;">${e.child}</div>
         <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div>
+        ${starBadge(e.parent)}
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
+        <button onclick="starGive(${ri})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:${starredToday(e.parent) ? "#dcfce7" : "#fff4cc"};color:${starredToday(e.parent) ? "#15803d" : "#854f0b"};">${starredToday(e.parent) ? "⭐ ✓" : "⭐ Star"}</button>
         ${adminRole === "superadmin" ? `
         
         <button onclick="unassignStudent('${e.h}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;">⏸ Unassign</button>
@@ -8287,6 +8419,7 @@ function renderClassesTab() {
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:700;color:#0a3d45;">${e.child}</div>
         <div style="font-size:11px;color:#bbb;">Parent: ${e.parent}</div>
+        ${starBadge(e.parent)}
       </div>
       <button onclick="sdOpen(${ri})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#f0eefb;color:#6b6990;">👁 View</button>
     </div>`; };
