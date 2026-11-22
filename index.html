@@ -4881,9 +4881,16 @@ function renderSignupGradeTab() {
   el.innerHTML = `
     <div style="font-size:12px;color:#6b6990;margin-bottom:12px;">Sign up kids from <b>Grade ${grade}</b> for plays, worship, prayer and fundraising. Each event shows its year.</div>
     ${pickerHtml}
-    ${groups.map(g => `
+    ${groups.map((g, gi) => `
       <div style="margin-bottom:18px;">
         <div style="font-size:15px;font-weight:900;color:#3b2f8f;margin-bottom:8px;">📅 ${spEsc(g.eventName)} — ${g.year}</div>
+        ${adminRole === "superadmin" ? `<div style="background:#f4f3fb;border:1.5px solid #e0dcf7;border-radius:12px;padding:10px;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:900;color:#3b2f8f;margin-bottom:6px;">📄 PDF of everyone signed up (all grades) with parent, phone &amp; address</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="spPdfEvent(${gi})" style="padding:8px 12px;border:none;border-radius:10px;background:linear-gradient(135deg,#ec4899,#8b5cf6);color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">📄 All teams</button>
+            ${g.sections.map(sc => `<button onclick="spPdfSection('${sc.id}')" style="padding:8px 12px;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">📄 ${spEsc(sc.category)}</button>`).join("")}
+          </div>
+        </div>` : ""}
         ${g.sections.map(sec => signupGradeCardHtml(sec, grade)).join("")}
       </div>`).join("")}`;
 }
