@@ -5493,6 +5493,11 @@ function sdGradeWeeks(g) {
   return out;
 }
 function sdChildOf(name) { const ci = getChildInfoByParent(name); return ci && ci.name ? ci.name : ""; }
+function sdStarLine(name) {
+  if (!starredToday(name)) return "";
+  const n = starCount(name).yr;
+  return "\n⭐ You earned a star today — that's " + n + " star" + (n === 1 ? "" : "s") + " this school year! 🌟";
+}
 function sdAutoMsg(e) {
   const g = Number(e.grade);
   const now = getMockNow();
@@ -5506,20 +5511,20 @@ function sdAutoMsg(e) {
   today.forEach(x => x.parents.forEach(p => {
     const kid = sdChildOf(p.name);
     listed.add(starKey(p.name));
-    if (getStatus(x.week.date, p.name) === "confirmed" || starredToday(p.name)) lines.push("Thank you " + p.name + " for joining us today" + (kid ? " (" + kid + "'s parent)" : "") + "! We really appreciate your participation and commitment. 💙");
+    if (getStatus(x.week.date, p.name) === "confirmed" || starredToday(p.name)) lines.push("Thank you " + p.name + " for joining us today" + (kid ? " (" + kid + "'s parent)" : "") + "! We really appreciate your participation and commitment. 💙" + sdStarLine(p.name));
     else { anyMissed = true; lines.push("We missed you " + p.name + " at today's session and hope everything is going well! 🙏"); }
   }));
   const todayISO = starISO();
   parentStars.filter(st => st.date === todayISO && Number(st.grade) === g && !listed.has(starKey(st.parentName))).forEach(st => {
     listed.add(starKey(st.parentName));
-    lines.push("Thank you " + st.parentName + " for joining us today! We really appreciate your participation and commitment. 💙");
+    lines.push("Thank you " + st.parentName + " for joining us today! We really appreciate your participation and commitment. 💙" + sdStarLine(st.parentName));
   });
   if (!lines.length) lines.push("Thank you all for a wonderful Sunday School today in Grade " + g + "! 💙");
   let nextLine;
   if (next) {
     const who = next.parents.map(p => { const kid = sdChildOf(p.name); return p.name + "'s turn" + (kid ? ", representing " + kid : ""); });
     nextLine = (anyMissed ? "As a reminder, next week is " : "Next week it will be ") + who.join(", and ") + ". " + (anyMissed ? "We hope to see you then!" : "We look forward to seeing everyone again!");
-  } else nextLine = "Next week's volunteer schedule will be shared soon. We look forward to seeing everyone again!";
+  } else nextLine = "Next week's schedule will be shared soon. We look forward to seeing everyone again!";
   return "Hello Grade " + g + " families 🙏\n\n" + lines.join("\n") + "\n\n" + nextLine;
 }
 async function sdCopyMsg() {
