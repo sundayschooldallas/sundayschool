@@ -5508,39 +5508,47 @@ function sdStarLine(name) {
   const n = starCount(name).yr;
   return "\n⭐ " + (t.type === "volunteer" ? "You earned a star for volunteering today" : "You earned a star today") + " — that's " + n + " star" + (n === 1 ? "" : "s") + " this school year! 🌟";
 }
-function sdThankLine(name, kid) {
-  const t = starredToday(name);
-  if (t && t.type === "volunteer") return "🙌 Thank you " + name + " for also volunteering today, outside of your scheduled turn! We truly appreciate your extra help and heart for serving. 💙" + sdStarLine(name);
-  return "Thank you " + name + " for joining us today" + (kid ? " (" + kid + "'s parent)" : "") + "! We really appreciate your participation and commitment. 💙" + sdStarLine(name);
-}
+function sdNames(list) { return list.length <= 1 ? (list[0] || "") : list.slice(0, -1).join(", ") + " and " + list[list.length - 1]; }
+function sdWithKid(name, kid) { return name + (kid ? " (" + kid + "'s parent)" : ""); }
 function sdAutoMsg(e) {
-  const g = Number(e.grade);
+  const g = Number(e.grade), me = e.parent, myKey = starKey(me), myKid = e.child;
   const now = getMockNow();
   const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayISO = starISO();
   const weeks = sdGradeWeeks(g).sort((a, b) => a.dt - b.dt);
   const today = weeks.filter(x => x.dt.getTime() === t0);
   const next = weeks.find(x => x.dt.getTime() > t0);
+  const myStar = starredToday(me);
+  const gradeStars = parentStars.filter(st => st.date === todayISO && Number(st.grade) === g);
+  // my own line
+  let mySched = false, myConfirmed = false;
+  today.forEach(x => x.parents.forEach(p => { if (starKey(p.name) === myKey) { mySched = true; if (getStatus(x.week.date, p.name) === "confirmed") myConfirmed = true; } }));
   const lines = [];
-  let anyMissed = false;
-  const listed = new Set();
+  let missed = false;
+  if (myStar && myStar.type === "volunteer") lines.push("🙌 Thank you " + me + " for also volunteering today, outside of your scheduled turn! We truly appreciate your extra help and heart for serving. 💙" + sdStarLine(me));
+  else if (myStar || myConfirmed) lines.push("Thank you " + me + " for participating today" + (myKid ? " (" + myKid + "'s parent)" : "") + "! We really appreciate your participation and commitment. 💙" + sdStarLine(me));
+  else if (mySched) { missed = true; lines.push("We missed you " + me + " at today's session and hope everything is going well! 🙏"); }
+  else lines.push("Thank you " + me + " for being part of our Grade " + g + " family" + (myKid ? " with " + myKid : "") + "! 💙");
+  // other parents who attended as their required turn
+  const seen = new Set([myKey]);
+  const reqOthers = [];
   today.forEach(x => x.parents.forEach(p => {
-    const kid = sdChildOf(p.name);
-    listed.add(starKey(p.name));
-    if (getStatus(x.week.date, p.name) === "confirmed" || starredToday(p.name)) lines.push(sdThankLine(p.name, kid));
-    else { anyMissed = true; lines.push("We missed you " + p.name + " at today's session and hope everything is going well! 🙏"); }
+    const k = starKey(p.name); if (seen.has(k)) return;
+    const st = starredToday(p.name);
+    if (getStatus(x.week.date, p.name) === "confirmed" || (st && st.type !== "volunteer")) { seen.add(k); reqOthers.push(sdWithKid(p.name, sdChildOf(p.name))); }
   }));
-  const todayISO = starISO();
-  parentStars.filter(st => st.date === todayISO && Number(st.grade) === g && !listed.has(starKey(st.parentName))).forEach(st => {
-    listed.add(starKey(st.parentName));
-    lines.push(sdThankLine(st.parentName, sdChildOf(st.parentName)));
-  });
-  if (!lines.length) lines.push("Thank you all for a wonderful Sunday School today in Grade " + g + "! 💙");
+  gradeStars.filter(st => st.type !== "volunteer").forEach(st => { const k = starKey(st.parentName); if (seen.has(k)) return; seen.add(k); reqOthers.push(sdWithKid(st.parentName, st.childName)); });
+  if (reqOthers.length) lines.push("Thank you also " + sdNames(reqOthers) + " for participating today. 💙");
+  // other parents who volunteered today
+  const vols = [];
+  gradeStars.filter(st => st.type === "volunteer").forEach(st => { const k = starKey(st.parentName); if (k === myKey || seen.has(k)) return; seen.add(k); vols.push(sdWithKid(st.parentName, st.childName)); });
+  if (vols.length) lines.push("🙌 A special thank you to " + sdNames(vols) + " for volunteering today! ⭐");
   let nextLine;
   if (next) {
     const who = next.parents.map(p => { const kid = sdChildOf(p.name); return p.name + "'s turn" + (kid ? ", representing " + kid : ""); });
-    nextLine = (anyMissed ? "As a reminder, next week is " : "Next week it will be ") + who.join(", and ") + ". " + (anyMissed ? "We hope to see you then!" : "We look forward to seeing everyone again!");
+    nextLine = (missed ? "As a reminder, next week is " : "Next week it will be ") + who.join(", and ") + ". " + (missed ? "We hope to see you then!" : "We look forward to seeing everyone again!");
   } else nextLine = "Next week's schedule will be shared soon. We look forward to seeing everyone again!";
-  return "Hello Grade " + g + " families 🙏\n\n" + lines.join("\n") + "\n\n" + nextLine;
+  return "Hello " + me + " 🙏\n\n" + lines.join("\n\n") + "\n\n" + nextLine;
 }
 // ── Image card for Viber ──
 function sdRoundRect(ctx, x, y, w, h, r) {
@@ -5728,11 +5736,28 @@ function starBadge(name) {
   if (!c.yr && !t) return "";
   return `<div style="font-size:11px;font-weight:800;color:#b8860b;">⭐ ${c.yr} this year${c.vol ? " · 🙌 " + c.vol + " extra" : ""}${t ? ' · <span style="color:#15803d;">✅ starred today' + (t.type === "volunteer" ? " (volunteered)" : "") + "</span>" : ""}</div>`;
 }
+function starNormDate(d) {
+  const t = String(d || "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const dt = new Date(t);
+  if (!isNaN(dt)) return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
+  return t;
+}
+function starPendingGet() { try { return JSON.parse(localStorage.getItem("pendingStars") || "[]"); } catch (x) { return []; } }
+function starPendingSet(a) { try { localStorage.setItem("pendingStars", JSON.stringify(a)); } catch (x) {} }
+function starSyncPending() { const ids = new Set(parentStars.map(x => x.id)); starPendingSet(starPendingGet().filter(p => ids.has(p.id))); }
+// Stars given on this phone stay visible until the Google Sheet confirms them
 async function loadParentStars() {
   try {
     const r = await fetch(SHEET_URL + "?type=parentStars&nocache=" + Date.now(), { mode: "cors" });
     const d = await r.json();
-    if (Array.isArray(d)) parentStars = d;
+    if (Array.isArray(d) && d.every(x => x && typeof x === "object" && "parentName" in x)) {
+      d.forEach(x => { x.date = starNormDate(x.date); });
+      const sheetIds = new Set(d.map(x => x.id));
+      const pending = starPendingGet().filter(p => !sheetIds.has(p.id));
+      starPendingSet(pending);
+      parentStars = d.concat(pending);
+    }
   } catch (x) {}
 }
 function starLeaders() {
@@ -5773,6 +5798,7 @@ async function starGive(idx) {
       const rm = await modalConfirm(spEsc(e.parent) + " already has a ⭐ for today.\n\nRemove it? (Super Admin correction)", { title: "Star already given", danger: true, okLabel: "Remove star" });
       if (!rm) return;
       parentStars = parentStars.filter(s => s.id !== have.id);
+      starSyncPending();
       await postInc({ type: "deleteParentStar", id: have.id });
       showToast("Star removed"); try { renderClassesTab(); } catch (x) {}
     } else showToast("⭐ " + e.parent + " already has today's star.");
@@ -5797,11 +5823,18 @@ async function starGive(idx) {
   }
   const star = { id: "star_" + Date.now().toString(36) + Math.floor(Math.random() * 1000), parentName: e.parent, phone: incNorm(e.h), childName: e.child, grade: Number(e.grade), date: today, type: isVol ? "volunteer" : "required", givenBy: adminRole + (adminGrade ? " G" + adminGrade : "") };
   parentStars.push(star);
+  starPendingSet(starPendingGet().concat([star]));
   try { renderClassesTab(); } catch (x) {}
   await postInc(Object.assign({ type: "saveParentStar" }, star));
   const n = starCount(e.parent).yr;
   showToast("⭐ Star given to " + e.parent + (isVol ? " (volunteered)" : "") + " — " + n + " this year");
   starShowResult(star);
+  setTimeout(async () => {
+    await loadParentStars();
+    if (starPendingGet().some(p => p.id === star.id)) {
+      await customModal({ title: "⚠️ Star not saved to the sheet", message: "The star for " + spEsc(star.parentName) + " is showing on this phone only — the Google Sheet did not confirm it.\n\nMost likely the newest Code.gs is not deployed yet:\nApps Script → Deploy → Manage deployments → pencil → New version → Deploy.\n\nAfter that, open this class again and the star will sync.", type: "alert" });
+    }
+  }, 3500);
 }
 function starCardText(star) {
   const n = starCount(star.parentName).yr;
@@ -5825,7 +5858,7 @@ function starShowResult(star) {
       <button onclick="cvSave('starCardCanvas')" style="flex:1;padding:11px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">⬇️ Save image</button>
     </div></div>`;
   document.body.appendChild(o);
-  sdDrawCard(document.getElementById("starCardCanvas"), starCardText(star), star.grade);
+  sdDrawCard(document.getElementById("starCardCanvas"), starCardText(star), star.grade).catch(() => {});
 }
 function renderParentStarsCard() {
   if (!myName) return "";
@@ -5874,6 +5907,7 @@ async function starClearParent(key) {
   const ok = await modalConfirm("Remove all " + list.length + " ⭐ for " + spEsc(nm) + "? This is meant for test stars and cannot be undone.", { title: "Clear stars", danger: true, okLabel: "Clear stars" });
   if (!ok) return;
   parentStars = parentStars.filter(x => starKey(x.parentName) !== key);
+  starSyncPending();
   renderStarBox();
   try { renderClassesTab(); } catch (e) {}
   await starDeleteMany(list);
@@ -5886,6 +5920,7 @@ async function starClearAll() {
   const t = await modalPrompt("This removes ALL " + list.length + " stars for EVERY parent and cannot be undone.\n\nType CLEAR to confirm.", "CLEAR", { title: "Clear all stars", danger: true, okLabel: "Clear all" });
   if (t === null || String(t).trim().toUpperCase() !== "CLEAR") { if (t !== null) showToast("Not cleared — you must type CLEAR"); return; }
   parentStars = [];
+  starSyncPending();
   renderStarBox();
   try { renderClassesTab(); } catch (e) {}
   await starDeleteMany(list);
