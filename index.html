@@ -3344,7 +3344,8 @@ function renderAdminDash() {
   const swapTab = `<button id="tabSwap" onclick="showAdminTab('swap')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🔄 Volunteer Swap</button>`;
   const parentsTab = `<button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">➕ Parents</button>`;
   const signupsTab = `<button id="tabSignups" onclick="showAdminTab('signups')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🙋 Sign-Ups</button>`;
-  const incomingTab = `<button id="tabIncoming" onclick="showAdminTab('incoming')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📥 Incoming</button>`;
+  const incomingTab = !isSuperAdmin ? "" : `<button id="tabIncoming" onclick="showAdminTab('incoming')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📥 Incoming</button>`;
+  const uploadTab = adminRole !== "gradeadmin" ? "" : `<button id="tabUpload" onclick="showAdminTab('upload')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📤 Upload</button>`;
   const lessonTab = `<button id="tabLesson" onclick="showAdminTab('lesson')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📖 Lesson</button>`;
 
   container.innerHTML = `
@@ -3355,6 +3356,7 @@ function renderAdminDash() {
       ${lessonTab}
       ${signupsTab}
       ${incomingTab}
+      ${uploadTab}
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🎓 Students</button>
       ${studentsTab}
@@ -3366,7 +3368,8 @@ function renderAdminDash() {
     <div id="tabPinContent" style="display:none;"></div>
     <div id="tabLessonContent" style="display:none;"></div>
     <div id="tabSignupsContent" style="display:none;"></div>
-    <div id="tabIncomingContent" style="display:none;"></div>
+    ${isSuperAdmin ? `<div id="tabIncomingContent" style="display:none;"></div>` : ""}
+    ${adminRole === "gradeadmin" ? `<div id="tabUploadContent" style="display:none;"></div>` : ""}
     <div id="tabTrackerContent" style="display:none;"></div>
     <div id="tabClassesContent" style="display:none;"></div>
     <div id="tabStudentsContent" style="display:none;"></div>
@@ -3384,7 +3387,7 @@ function renderAdminDash() {
 }
 
 function showAdminTab(tab) {
-  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson","signups","incoming"];
+  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson","signups","incoming","upload"];
   allTabs.forEach(t => {
     const idSuffix = t === "superadmin" ? "SuperAdmin" : t.charAt(0).toUpperCase() + t.slice(1);
     const content = document.getElementById("tab" + idSuffix + "Content");
@@ -3418,9 +3421,13 @@ function showAdminTab(tab) {
   if (tab === "lesson") {
     loadLessonPlansFromSheet().then(() => renderLessonPlanViewerTab()).catch(() => renderLessonPlanViewerTab());
   }
-  if (tab === "incoming") {
+  if (tab === "incoming" && adminRole === "superadmin") {
     renderIncomingTab();
     loadIncomingFromSheet().then(() => renderIncomingTab()).catch(() => renderIncomingTab());
+  }
+  if (tab === "upload" && adminRole === "gradeadmin") {
+    renderUploadTab();
+    loadIncomingFromSheet().then(() => renderUploadTab()).catch(() => renderUploadTab());
   }
   if (tab === "signups") {
     renderSignupGradeTab();
@@ -4826,7 +4833,7 @@ function incSharedWith(st) {
   const mine = [st.phone1, st.phone2].filter(incOk).map(incNorm);
   const names = [];
   incStudents.forEach(o => {
-    if (o.id === st.id || o.status === "promoted") return;
+    if (o.id === st.id || o.status === "promoted" || o.status === "submitted") return;
     const theirs = [o.phone1, o.phone2].filter(incOk).map(incNorm);
     if (mine.some(m => theirs.includes(m))) names.push(o.childName);
   });
@@ -4852,6 +4859,20 @@ async function loadIncomingFromSheet() {
     const d2 = await res2.json();
     if (Array.isArray(d2)) incAllChildren = d2;
   } catch (e) {}
+  try {
+    const res3 = await fetch(SHEET_URL + "?type=uploadSettings&nocache=" + Date.now(), { mode: "cors" });
+    const d3 = await res3.json();
+    if (Array.isArray(d3)) { uploadSettings = {}; d3.forEach(r => { uploadSettings[r.grade] = !!r.enabled; }); }
+  } catch (e) {}
+  try { await loadNewParentsFromSheet(); } catch (e) {}
+}
+let uploadSettings = {};
+let incReviewGrade = null;
+function incParentRecord(norm) {
+  const a = (typeof newParentsFromSheet !== "undefined" ? newParentsFromSheet : []).find(p => String(p.h) === norm || incNorm(p.phone) === norm);
+  if (a) return a;
+  for (const w of roster) { const x = (w.parents || []).find(p => String(p.h) === norm); if (x) return { name: x.name, h: x.h, pin: x.pin, date: w.date }; }
+  return null;
 }
 function postInc(body) {
   return fetch(SHEET_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(body) }).catch(() => {});
@@ -4920,9 +4941,11 @@ function incCard(st) {
         <div style="flex:1;">${lbl("Phone 1 (main)")}${inp("incP1_" + st.id, st.phone1, "10-digit number", 'inputmode="tel"')}</div>
         <div style="flex:1;">${lbl("Phone 2")}${inp("incP2_" + st.id, st.phone2, "optional", 'inputmode="tel"')}</div>
       </div>
+      ${lbl("Promote into class")}
+      <select id="incGrade_${st.id}" style="width:100%;box-sizing:border-box;padding:9px 10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:#1e1b4b;background:white;">${getActiveGrades().map(g => `<option value="${g}" ${Number(g) === Number(st.targetGrade) ? "selected" : ""}>Grade ${g}</option>`).join("")}</select>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button onclick="incSave('${st.id}')" style="flex:1;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">💾 Save</button>
-        <button onclick="incPromote('${st.id}')" style="flex:1.4;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:linear-gradient(135deg,#0a5260,#3b2f8f);color:white;cursor:pointer;">🎓 Promote to Grade ${st.targetGrade}</button>
+        <button onclick="incPromote('${st.id}')" style="flex:1.4;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:linear-gradient(135deg,#0a5260,#3b2f8f);color:white;cursor:pointer;">🎓 Promote</button>
         <button onclick="incRemove('${st.id}')" style="padding:10px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#fee2e2;color:#b42318;cursor:pointer;">🗑</button>
       </div>
     </div>`;
@@ -4937,6 +4960,8 @@ function incReadInputs(id) {
   if (p !== null) st.parentName = p.trim();
   if (a !== null) st.phone1 = incNorm(a).length >= 10 ? incNorm(a) : String(a).replace(/\D/g, "");
   if (b !== null) st.phone2 = incNorm(b).length >= 10 ? incNorm(b) : String(b).replace(/\D/g, "");
+  const gsel = document.getElementById("incGrade_" + id);
+  if (gsel && gsel.value) st.targetGrade = Number(gsel.value);
   return st;
 }
 function incUseSuggestion(id, key, num) {
@@ -5001,12 +5026,25 @@ async function incPromote(id) {
   const dupe = incNameInSystem(st);
   if (dupe) notes.push("A student named " + spEsc(st.childName) + " is already in the system (Grade " + spEsc(dupe.grade) + "). Promoting will update that record if the number is the same, or add a second one.");
   if (incOk(st.phone1) && incOk(st.phone2) && incNorm(st.phone1) !== incNorm(st.phone2)) notes.push("Two numbers on file. Main number used: " + incFmt(primary) + " (Phone 2 stays on the incoming record).");
+  // Parent record / PIN / schedule check
+  const rec = incParentRecord(primary);
+  let needParentPost = false, newPin = "";
+  if (!rec) { needParentPost = true; newPin = String(Math.floor(1000 + Math.random() * 9000)); notes.push("No parent record exists for this number. One will be created with a new login PIN (" + newPin + ") — you'll see it after promoting."); }
+  else if (!rec.pin) { needParentPost = true; newPin = String(Math.floor(1000 + Math.random() * 9000)); notes.push("Parent record found (" + spEsc(rec.name) + ") but it has no PIN. A new PIN (" + newPin + ") will be added."); }
+  else notes.push("Parent record already exists (" + spEsc(rec.name) + ") with a PIN — it is kept as is.");
+  if (!rec || !rec.date) notes.push("Nobody is scheduled for volunteer duty for this family yet — add a duty date in the Parents tab.");
   const msg = spEsc(st.childName) + "\nParent: " + spEsc(st.parentName) + "\nMain phone: " + incFmt(primary) + "\nNew class: Grade " + st.targetGrade + (notes.length ? "\n\n📝 Please confirm:\n" + notes.map(n => "• " + n).join("\n") : "");
   const ok = await modalConfirm(msg, { title: "Promote to Grade " + st.targetGrade + "?", okLabel: "✅ Confirm & promote" });
   if (!ok) { renderIncomingList(); return; }
 
   const teacher = getTeacherForGrade(st.targetGrade) || "";
   await postInc({ type: "childInfo", phone: primary, parentName: st.parentName, childName: st.childName, grade: st.targetGrade, teacher: teacher, unassigned: false, graduated: false });
+  let pinMsg = "";
+  if (needParentPost) {
+    await postInc({ type: "newParent", name: rec ? rec.name : st.parentName, phone: "+1" + primary, h: primary, e: btoa("+1" + primary), pin: newPin, date: rec && rec.date ? rec.date : "" });
+    if (rec) { rec.pin = newPin; } else { newParentsFromSheet.push({ name: st.parentName, phone: "+1" + primary, h: primary, e: btoa("+1" + primary), pin: newPin, date: "", timestamp: "" }); }
+    pinMsg = "Parent login created for " + spEsc(rec ? rec.name : st.parentName) + "\nPhone: " + incFmt(primary) + "\nPIN: " + newPin + "\n\nSend this PIN to the parent privately.";
+  }
   st.status = "promoted";
   st.note = notes.map(n => n.replace(/<[^>]+>/g, "")).join(" | ");
   st.promotedAt = new Date().toLocaleString();
@@ -5015,6 +5053,8 @@ async function incPromote(id) {
   incAllChildren.push(row);
   if (!adminGrade || Number(adminGrade) === Number(st.targetGrade)) childrenSheetData.push(row);
   renderIncomingList();
+  try { renderPinTab(); } catch (e) {}
+  if (pinMsg) await customModal({ title: "✅ Promoted", message: pinMsg, type: "alert" });
 }
 
 function renderIncomingList() {
@@ -5022,7 +5062,7 @@ function renderIncomingList() {
   if (!box) return;
   const grade = incGradeNow();
   const q = incSearch.trim().toLowerCase();
-  const mine = incStudents.filter(s => Number(s.targetGrade) === grade);
+  const mine = incStudents.filter(s => Number(s.targetGrade) === grade && s.status !== "submitted");
   const pending = mine.filter(s => s.status !== "promoted" && (!q || s.childName.toLowerCase().includes(q) || String(s.parentName).toLowerCase().includes(q) || incNorm(s.phone1).includes(q.replace(/\D/g, "") || "~") || incNorm(s.phone2).includes(q.replace(/\D/g, "") || "~")));
   const done = mine.filter(s => s.status === "promoted");
   const total = mine.length;
@@ -5039,7 +5079,7 @@ function renderIncomingList() {
 
 function renderIncomingTab() {
   const el = document.getElementById("tabIncomingContent");
-  if (!el) return;
+  if (!el || adminRole !== "superadmin") return;
   const grade = incGradeNow();
   const grades = getActiveGrades();
   const picker = adminGrade ? "" : `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">${grades.map(g => `<button onclick="setIncGrade(${g})" style="padding:8px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:20px;cursor:pointer;background:${g === grade ? "#3b2f8f" : "#e0f5f7"};color:${g === grade ? "white" : "#3b2f8f"};">Grade ${g}</button>`).join("")}</div>`;
@@ -5049,11 +5089,221 @@ function renderIncomingTab() {
     <div style="font-size:16px;font-weight:900;color:#0a3d45;margin-bottom:2px;">📥 Incoming Students</div>
     <div style="font-size:12px;color:#6b6990;font-weight:700;margin-bottom:10px;">Confirm each family's phone number and parent name, then promote the student into the class.</div>
     ${picker}${seedBtn}
+    <div id="incUploadsBox"></div>
     <input id="incSearchBox" oninput="setIncSearch(this.value)" value="${spEsc(incSearch)}" placeholder="🔍 Search name, parent or phone" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #d6d3f0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;margin-bottom:6px;">
     <div id="incStats" style="font-size:11px;font-weight:800;color:#3b2f8f;margin:4px 2px 10px;"></div>
     <div id="incListBox"></div>`;
   renderIncomingList();
+  renderIncUploadsBox();
 }
+
+function incSubmittedFor(g) { return incStudents.filter(s => s.status === "submitted" && Number(s.targetGrade) === Number(g)); }
+function renderIncUploadsBox() {
+  const box = document.getElementById("incUploadsBox");
+  if (!box) return;
+  const rows = getActiveGrades().map(g => {
+    const n = incSubmittedFor(g).length, on = !!uploadSettings[g];
+    return `<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-top:1px solid #ece9fb;">
+      <div style="flex:1;font-size:12px;font-weight:800;color:#0a3d45;">Grade ${g} ${on ? '<span style="color:#15803d;">· uploads ON</span>' : '<span style="color:#9a98b5;">· off</span>'}</div>
+      ${n ? `<button onclick="incReview(${g})" style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#fef3c7;color:#92400e;cursor:pointer;">Review ${n}</button>` : ""}
+      <button onclick="incToggleUpload(${g})" style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#e0f5f7;color:#0a5260;cursor:pointer;">${on ? "Turn off" : "Turn on"}</button>
+    </div>`;
+  }).join("");
+  box.innerHTML = `<div style="background:#f7f6ff;border:1.5px solid #e0dcf7;border-radius:14px;padding:10px 12px;margin-bottom:12px;">
+    <div style="font-size:13px;font-weight:900;color:#3b2f8f;">📤 Class uploads</div>
+    <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Teachers turn uploads on for their class, upload a checked list, and you approve it here. Approved students appear below, ready to promote.</div>
+    ${rows}<div id="incReviewBox"></div></div>`;
+  if (incReviewGrade !== null) incRenderReview();
+}
+async function incToggleUpload(g) {
+  uploadSettings[g] = !uploadSettings[g];
+  renderIncUploadsBox();
+  await postInc({ type: "saveUploadSetting", grade: g, enabled: !!uploadSettings[g] });
+}
+function incReview(g) { incReviewGrade = Number(g); incRenderReview(); }
+function incRenderReview() {
+  const el = document.getElementById("incReviewBox");
+  if (!el) return;
+  const g = incReviewGrade, list = incSubmittedFor(g);
+  if (!list.length) { incReviewGrade = null; el.innerHTML = ""; return; }
+  const all = list.map(x => ({ name: x.childName, p1: x.phone1 }));
+  const bad = list.filter(r => upValidate({ name: r.childName, parent: r.parentName, p1: r.phone1, p2: r.phone2 }, all).length);
+  el.innerHTML = `<div style="margin-top:10px;border-top:2px solid #e0dcf7;padding-top:10px;">
+    <div style="font-size:13px;font-weight:900;color:#0a3d45;">Grade ${g} upload — ${list.length} students</div>
+    ${bad.length ? `<div style="background:#fee2e2;color:#b42318;border-radius:10px;padding:8px;font-size:11px;font-weight:800;margin:6px 0;">⚠️ ${bad.length} row(s) have problem data (${spEsc(bad.map(r => r.childName).join(", "))}). Reject and ask the teacher to re-upload.</div>` : `<div style="background:#dcfce7;color:#15803d;border-radius:10px;padding:8px;font-size:11px;font-weight:800;margin:6px 0;">✅ All rows have a name, parent and valid 10-digit phone.</div>`}
+    <div style="max-height:260px;overflow-y:auto;font-size:11px;font-weight:700;color:#1e1b4b;">${list.map(r => { const dup = incNameInSystem({ childName: r.childName }); return `<div style="padding:5px 0;border-bottom:1px solid #f0eefc;">${spEsc(r.childName)} · ${spEsc(r.parentName)} · ${spEsc(incFmt(incNorm(r.phone1)))}${r.phone2 ? " / " + spEsc(incFmt(incNorm(r.phone2))) : ""}${dup ? ' <span style="color:#b42318;">⚠️ name already in Grade ' + spEsc(dup.grade) + '</span>' : ""}</div>`; }).join("")}</div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button onclick="incApprove(${g})" ${bad.length ? "disabled" : ""} style="flex:1.4;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:${bad.length ? "#c9c7dc" : "linear-gradient(135deg,#0a5260,#3b2f8f)"};color:white;cursor:${bad.length ? "not-allowed" : "pointer"};">✅ Approve all</button>
+      <button onclick="incRejectUpload(${g})" style="flex:1;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#fee2e2;color:#b42318;cursor:pointer;">Reject</button>
+    </div></div>`;
+}
+async function incApprove(g) {
+  const list = incSubmittedFor(g);
+  if (!list.length) return;
+  const ok = await modalConfirm("Approve " + list.length + " students for Grade " + g + "? They will appear in the Incoming list so you can confirm and promote them.", { title: "Approve upload", okLabel: "Approve" });
+  if (!ok) return;
+  list.forEach(r => { r.status = "pending"; r.note = "Approved class upload"; });
+  incReviewGrade = null;
+  renderIncomingTab();
+  await postInc({ type: "saveIncomingStudents", students: list });
+}
+async function incRejectUpload(g) {
+  const list = incSubmittedFor(g);
+  const ok = await modalConfirm("Reject this Grade " + g + " upload (" + list.length + " students)? The teacher will need to upload again.", { title: "Reject upload", danger: true, okLabel: "Reject" });
+  if (!ok) return;
+  const ids = list.map(r => r.id);
+  incStudents = incStudents.filter(r => !ids.includes(r.id));
+  incReviewGrade = null;
+  renderIncomingTab();
+  for (const id of ids) await postInc({ type: "deleteIncomingStudent", id });
+}
+
+// ══════════════ CLASS UPLOAD (teacher / grade admin) ══════════════
+let upRows = [];
+function upValidate(r, all) {
+  const e = [];
+  if (!String(r.name || "").trim()) e.push("Student name is missing");
+  if (!String(r.parent || "").trim()) e.push("Parent name is missing");
+  if (!incOk(r.p1)) e.push("Phone 1 must be exactly 10 digits (has " + incNorm(r.p1).length + ")");
+  if (String(r.p2 || "").trim() && !incOk(r.p2)) e.push("Phone 2 must be 10 digits or left empty (has " + incNorm(r.p2).length + ")");
+  if (all && r.name) {
+    const same = all.filter(o => String(o.name || "").trim().toLowerCase() === String(r.name).trim().toLowerCase() && incNorm(o.p1) === incNorm(r.p1));
+    if (same.length > 1) e.push("Exact duplicate row — remove one");
+  }
+  return e;
+}
+function upParseLine(line) {
+  if (line.indexOf("\t") >= 0) return line.split("\t").map(c => c.trim());
+  const out = []; let cur = "", q = false;
+  for (const ch of line) { if (ch === '"') q = !q; else if (ch === "," && !q) { out.push(cur.trim()); cur = ""; } else cur += ch; }
+  out.push(cur.trim());
+  return out;
+}
+function upParse(text) {
+  const lines = String(text || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  let cells = lines.map(upParseLine);
+  const first = cells[0];
+  const hasDigits = first.some(c => c.replace(/\D/g, "").length >= 7);
+  let iS = 0, iP = 1, i1 = 2, i2 = 3;
+  if (!hasDigits) {
+    const low = first.map(c => c.toLowerCase());
+    const ph = low.map((c, i) => /phone|mobile|cell|number/.test(c) ? i : -1).filter(i => i >= 0);
+    const p = low.findIndex(c => /parent|guardian|mother|father/.test(c) && !/phone|mobile|cell|number/.test(c));
+    const sIdx = low.findIndex(c => /student|child|name/.test(c) && !/parent|guardian|mother|father/.test(c));
+    if (sIdx >= 0) iS = sIdx;
+    if (p >= 0) iP = p;
+    if (ph.length) { i1 = ph[0]; i2 = ph.length > 1 ? ph[1] : -1; }
+    cells = cells.slice(1);
+  }
+  return cells.map(c => ({ name: c[iS] || "", parent: c[iP] || "", p1: c[i1] || "", p2: i2 >= 0 ? (c[i2] || "") : "" }));
+}
+function renderUploadTab() {
+  const el = document.getElementById("tabUploadContent");
+  if (!el || adminRole !== "gradeadmin") return;
+  const g = Number(adminGrade), on = !!uploadSettings[g];
+  const waiting = incSubmittedFor(g).length;
+  const approved = incStudents.filter(s => Number(s.targetGrade) === g && s.status === "pending").length;
+  el.innerHTML = `
+    <div style="font-size:16px;font-weight:900;color:#0a3d45;margin-bottom:6px;">📤 Upload my class list — Grade ${g}</div>
+    <div style="background:white;border:1.5px solid #e0f5f7;border-radius:14px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:800;color:#1e1b4b;">Uploads for my class are <b style="color:${on ? "#15803d" : "#b42318"};">${on ? "ON" : "OFF"}</b></div>
+      <button onclick="upToggle()" style="margin-top:8px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:${on ? "#fee2e2" : "linear-gradient(135deg,#0a5260,#3b2f8f)"};color:${on ? "#b42318" : "white"};cursor:pointer;">${on ? "Turn uploads off" : "Turn uploads on"}</button>
+    </div>
+    ${on ? `
+    <div style="background:white;border:1.5px solid #e0f5f7;border-radius:14px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:800;color:#3b2f8f;">Columns, in order: Student name · Parent name · Phone 1 · Phone 2 (optional)</div>
+      <div style="font-size:11px;color:#6b6990;font-weight:700;margin:4px 0 8px;">Upload a CSV file, or copy the rows from Excel/Sheets and paste them below. Every phone must be exactly 10 digits — you must fix any problems before you can send it.</div>
+      <input type="file" id="upFile" accept=".csv,.tsv,.txt" onchange="upLoadFile(this)" style="font-size:12px;margin-bottom:8px;">
+      <textarea id="upPaste" rows="4" placeholder="Or paste rows here" style="width:100%;box-sizing:border-box;padding:9px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;"></textarea>
+      <button onclick="upCheck()" style="margin-top:8px;width:100%;padding:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🔍 Check my data</button>
+    </div>
+    <div id="upPreview"></div>` : ""}
+    <div style="font-size:12px;font-weight:800;color:#6b6990;margin-top:8px;">Waiting for approval: ${waiting} · Approved (not yet promoted): ${approved}</div>
+    ${waiting ? `<button onclick="upWithdraw()" style="margin-top:8px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#fee2e2;color:#b42318;cursor:pointer;">Withdraw my submitted list</button>` : ""}`;
+  if (on && upRows.length) upRenderPreview();
+}
+async function upToggle() {
+  const g = Number(adminGrade);
+  uploadSettings[g] = !uploadSettings[g];
+  renderUploadTab();
+  await postInc({ type: "saveUploadSetting", grade: g, enabled: !!uploadSettings[g] });
+}
+function upLoadFile(inp) {
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { const t = document.getElementById("upPaste"); if (t) t.value = String(r.result || ""); upCheck(); };
+  r.readAsText(f);
+}
+function upCheck() {
+  const t = document.getElementById("upPaste");
+  upRows = upParse(t ? t.value : "");
+  if (!upRows.length) { customModal({ title: "Nothing to check", message: "Choose a CSV file or paste rows first.", type: "alert" }); return; }
+  upRenderPreview();
+}
+function upRenderPreview() {
+  const box = document.getElementById("upPreview");
+  if (!box) return;
+  const inp = (i, k, v, ph) => `<input id="up_${k}_${i}" value="${spEsc(v)}" placeholder="${ph}" oninput="upEdit(${i})" style="width:100%;box-sizing:border-box;padding:8px;border:1.5px solid #d6d3f0;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;">`;
+  box.innerHTML = `<div style="font-size:13px;font-weight:900;color:#0a3d45;margin-bottom:6px;">Your data (${upRows.length} rows) — fix anything in red</div>
+    <div id="upSummary" style="font-size:12px;font-weight:800;margin-bottom:8px;"></div>
+    ${upRows.map((r, i) => `<div id="upRow_${i}" style="background:white;border:1.5px solid #e0f5f7;border-radius:12px;padding:8px;margin-bottom:8px;">
+      <div style="display:flex;gap:6px;margin-bottom:6px;"><div style="flex:1;">${inp(i, "n", r.name, "Student")}</div><div style="flex:1;">${inp(i, "pa", r.parent, "Parent")}</div></div>
+      <div style="display:flex;gap:6px;"><div style="flex:1;">${inp(i, "p1", r.p1, "Phone 1")}</div><div style="flex:1;">${inp(i, "p2", r.p2, "Phone 2")}</div>
+      <button onclick="upDelRow(${i})" style="padding:0 10px;border:none;border-radius:8px;background:#fee2e2;color:#b42318;font-weight:800;cursor:pointer;">🗑</button></div>
+      <div id="upErr_${i}" style="font-size:11px;font-weight:800;color:#b42318;margin-top:4px;"></div></div>`).join("")}
+    <button onclick="upAddRow()" style="padding:8px 12px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#e0f5f7;color:#0a5260;cursor:pointer;margin-bottom:10px;">➕ Add a row</button>
+    <button id="upSubmit" onclick="upSubmit()" style="display:block;width:100%;padding:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;border:none;border-radius:12px;color:white;"></button>`;
+  upRevalidate();
+}
+function upReadRow(i) {
+  const v = k => { const e = document.getElementById("up_" + k + "_" + i); return e ? e.value : ""; };
+  if (upRows[i]) upRows[i] = { name: v("n"), parent: v("pa"), p1: v("p1"), p2: v("p2") };
+}
+function upEdit(i) { upReadRow(i); upRevalidate(); }
+function upRevalidate() {
+  let bad = 0;
+  upRows.forEach((r, i) => {
+    const e = upValidate(r, upRows);
+    const el = document.getElementById("upErr_" + i);
+    if (el) el.textContent = e.length ? "⚠️ " + e.join(" · ") : "";
+    const row = document.getElementById("upRow_" + i);
+    if (row) row.style.borderColor = e.length ? "#f5a3a3" : "#bfe9d0";
+    if (e.length) bad++;
+  });
+  const sum = document.getElementById("upSummary");
+  if (sum) { sum.textContent = bad ? "❌ " + bad + " row(s) need fixing before you can send" : "✅ All " + upRows.length + " rows look good"; sum.style.color = bad ? "#b42318" : "#15803d"; }
+  const btn = document.getElementById("upSubmit");
+  if (btn) { btn.disabled = !!bad || !upRows.length; btn.style.background = btn.disabled ? "#c9c7dc" : "linear-gradient(135deg,#0a5260,#3b2f8f)"; btn.style.cursor = btn.disabled ? "not-allowed" : "pointer"; btn.textContent = btn.disabled ? "Fix the red rows to send" : "📤 Send " + upRows.length + " students for approval"; }
+}
+function upDelRow(i) { upRows.forEach((_, k) => upReadRow(k)); upRows.splice(i, 1); upRenderPreview(); }
+function upAddRow() { upRows.forEach((_, k) => upReadRow(k)); upRows.push({ name: "", parent: "", p1: "", p2: "" }); upRenderPreview(); }
+async function upSubmit() {
+  upRows.forEach((_, k) => upReadRow(k));
+  if (upRows.some(r => upValidate(r, upRows).length)) { upRevalidate(); return; }
+  const g = Number(adminGrade);
+  if (!uploadSettings[g]) { await customModal({ title: "Uploads are off", message: "Turn uploads on first.", type: "alert" }); return; }
+  const ok = await modalConfirm("Send " + upRows.length + " students for Grade " + g + " to the Super Admin for approval?", { title: "Send for approval", okLabel: "Send" });
+  if (!ok) return;
+  const stamp = Date.now().toString(36);
+  const fresh = upRows.map((r, i) => ({ id: "inc_" + stamp + "_u" + i, childName: r.name.trim(), parentName: r.parent.trim(), phone1: incNorm(r.p1), phone2: incNorm(r.p2), targetGrade: g, status: "submitted", note: "Uploaded by Grade " + g + " teacher" }));
+  incStudents = incStudents.concat(fresh);
+  upRows = [];
+  renderUploadTab();
+  await postInc({ type: "saveIncomingStudents", students: fresh });
+  customModal({ title: "Sent ✅", message: "Your list was sent to the Super Admin for approval.", type: "alert" });
+}
+async function upWithdraw() {
+  const g = Number(adminGrade), list = incSubmittedFor(g);
+  const ok = await modalConfirm("Withdraw your submitted list (" + list.length + " students)?", { title: "Withdraw", danger: true, okLabel: "Withdraw" });
+  if (!ok) return;
+  const ids = list.map(r => r.id);
+  incStudents = incStudents.filter(r => !ids.includes(r.id));
+  renderUploadTab();
+  for (const id of ids) await postInc({ type: "deleteIncomingStudent", id });
+}
+
 
 function getTeacherListHtml(grade, teacherStr, color) {
   // teacherStr may be "Name1" or "Name1 & Name2" or "Name1, Name2"
