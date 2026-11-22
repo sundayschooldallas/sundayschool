@@ -5371,6 +5371,8 @@ function sdOpen(idx) {
   const lab = t => `<div style="font-size:10px;font-weight:800;color:#6b6990;margin:10px 0 3px;">${t}</div>`;
   const fld = (id, v, extra) => `<input id="${id}" value="${spEsc(v)}" ${canEdit ? "" : "disabled"} ${extra || ""} style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:#1e1b4b;background:${canEdit ? "white" : "#f4f3fb"};">`;
   const grades = getActiveGrades().filter(g => Number(g) !== Number(e.grade));
+  const duty = [];
+  roster.forEach(w => { if ((w.parents || []).some(p => (norm && String(p.h) === norm) || (e.parent && p.name === e.parent))) duty.push(w.date); });
   const o = document.createElement("div");
   o.id = "sdOverlay";
   o.style.cssText = "position:fixed;inset:0;background:rgba(10,8,30,0.7);z-index:99998;display:flex;align-items:flex-end;justify-content:center;";
@@ -5380,12 +5382,35 @@ function sdOpen(idx) {
       <button onclick="sdClose()" style="border:none;background:#f0eefb;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;">✕</button>
     </div>
     <div style="font-size:12px;color:#6b6990;font-weight:700;margin-top:2px;">Grade ${spEsc(e.grade)} · ${spEsc(e.teacher || "No teacher")}</div>
-    <div style="font-size:11px;font-weight:800;margin-top:6px;color:${rec && rec.pin ? "#15803d" : "#92400e"};">${rec && rec.pin ? "🔐 Parent login set up" : "⚠️ No parent login (PIN) yet"} · ${rec && rec.date ? "📅 Duty: " + spEsc(rec.date) : "No duty date scheduled"}</div>
+    <div style="background:#f7f6ff;border:1.5px solid #e0dcf7;border-radius:14px;padding:10px 12px;margin-top:10px;">
+      <div style="font-size:13px;font-weight:900;color:#3b2f8f;">👪 Parent details</div>
+      <div style="font-size:13px;font-weight:800;color:#1e1b4b;margin-top:4px;">${spEsc(e.parent || "—")}</div>
+      <div style="font-size:12px;font-weight:700;color:#6b6990;">📱 ${spEsc(incFmt(norm) || e.h || "no phone")}</div>
+      <div style="font-size:12px;font-weight:800;margin-top:6px;color:${rec && rec.pin ? "#15803d" : "#92400e"};">${rec && rec.pin ? (canEdit ? "🔐 Login PIN: " + spEsc(rec.pin) : "🔐 Parent login set up") : "⚠️ No parent login (PIN) yet — add them in the Parents tab"}</div>
+      <div style="font-size:12px;font-weight:800;margin-top:3px;color:${duty.length ? "#0a5260" : "#92400e"};">${duty.length ? "📅 Scheduled: " + spEsc(duty.join(", ")) : "📅 Not scheduled for duty yet"}</div>
+      <div id="sdAddrLine" style="font-size:12px;font-weight:700;color:#6b6990;margin-top:3px;">🏠 Loading address…</div>
+    </div>
     ${lab("Student name")}${fld("sdName", e.child)}
     ${lab("Parent name")}${fld("sdParent", e.parent)}
     ${lab("Phone (10 digits)")}${fld("sdPhone", e.h, 'inputmode="tel"')}
+    ${lab("Second phone (optional)")}${fld("sdPhone2", "", 'inputmode="tel"')}
+    ${lab("Home address")}${fld("sdAddr", "", 'placeholder="Street, city, ZIP"')}
     <div id="sdMsg" style="font-size:12px;font-weight:800;color:#b42318;margin-top:8px;"></div>
     ${canEdit ? `<button onclick="sdSave(${idx})" style="width:100%;margin-top:10px;padding:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;border:none;border-radius:12px;background:#e0f5f7;color:#0a5260;cursor:pointer;">💾 Save changes</button>
+    <div style="margin-top:16px;padding-top:12px;border-top:2px solid #f0eefb;">
+      <div style="font-size:13px;font-weight:900;color:#3b2f8f;">💬 Message for the family Viber group</div>
+      <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Pick a message, edit if you like, then copy it or open Viber. Send it at the end of class (12 PM). It never includes the PIN, since the group can see it.</div>
+      <select id="sdMsgType" onchange="sdFillMsg(${idx})" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;background:white;">
+        <option value="thanks">🙏 Thank you (end of class)</option>
+        <option value="reminder">⏰ Duty reminder</option>
+        <option value="info">📝 Please confirm your info</option>
+      </select>
+      <textarea id="sdMsgText" rows="6" style="width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:600;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button onclick="sdCopyMsg()" style="flex:1;padding:11px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📋 Copy</button>
+        <button onclick="sdShareMsg()" style="flex:1.3;padding:11px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#7360f2;color:white;cursor:pointer;">💜 Open in Viber</button>
+      </div>
+    </div>
     <div style="margin-top:16px;padding-top:12px;border-top:2px solid #f0eefb;">
       <div style="font-size:13px;font-weight:900;color:#3b2f8f;">🎓 Move / promote to another class</div>
       <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Use this if ${spEsc(e.child)} is in the wrong class or is being promoted.</div>
@@ -5395,6 +5420,47 @@ function sdOpen(idx) {
     </div>` : `<div style="font-size:12px;color:#9a98b5;font-weight:700;margin-top:12px;">👁 View only — this is another teacher's class.</div>`}
   </div>`;
   document.body.appendChild(o);
+  sdFillMsg(idx);
+  loadParentInfo().then(() => {
+    const pi = parentInfoMap[norm] || {};
+    const a = document.getElementById("sdAddr"), p2 = document.getElementById("sdPhone2"), line = document.getElementById("sdAddrLine");
+    if (a) a.value = pi.address || "";
+    if (p2) p2.value = pi.phone2 || "";
+    if (line) { line.textContent = pi.address ? "🏠 " + pi.address : "🏠 No address on file yet"; line.style.color = pi.address ? "#6b6990" : "#92400e"; }
+  });
+}
+let parentInfoMap = {};
+async function loadParentInfo() {
+  try {
+    const r = await fetch(SHEET_URL + "?type=parentInfo&nocache=" + Date.now(), { mode: "cors" });
+    const d = await r.json();
+    if (Array.isArray(d)) { parentInfoMap = {}; d.forEach(x => { parentInfoMap[incNorm(x.phone)] = x; }); }
+  } catch (x) {}
+}
+function sdMsgFor(e, type) {
+  const norm = incNorm(e.h);
+  const rec = incParentRecord(norm);
+  const date = rec && rec.date ? rec.date : "this Sunday";
+  const first = String(e.parent || "").trim() || "family";
+  const cls = "Grade " + e.grade + (e.teacher ? " (" + e.teacher + ")" : "");
+  if (type === "reminder") return "Hello " + first + " 🙏\n\nA friendly reminder that you are scheduled to help in " + cls + " Sunday School on " + date + ". Thank you for serving with us! If you can't make it, please let us know early so we can arrange a swap.\n\nBlessings 💙";
+  if (type === "info") return "Hello " + first + " 🙏\n\nWe are updating our Sunday School records for " + e.child + " (" + cls + "). Could you please confirm your best phone number and home address with us? Thank you!\n\nBlessings 💙";
+  return "Hello " + first + " 🙏\n\nThank you for being part of " + cls + " Sunday School today with " + e.child + "! We are grateful for your help and your time. See you next Sunday 💙";
+}
+function sdFillMsg(idx) {
+  const e = window._stuReg[idx], sel = document.getElementById("sdMsgType"), t = document.getElementById("sdMsgText");
+  if (e && sel && t) t.value = sdMsgFor(e, sel.value);
+}
+async function sdCopyMsg() {
+  const t = document.getElementById("sdMsgText");
+  try { await navigator.clipboard.writeText(t.value); showToast("📋 Message copied — paste it in Viber"); }
+  catch (x) { t.select(); try { document.execCommand("copy"); showToast("📋 Message copied"); } catch (y) { showToast("Press and hold the text to copy"); } }
+}
+function sdShareMsg() {
+  const t = document.getElementById("sdMsgText").value;
+  try { navigator.clipboard.writeText(t); } catch (x) {}
+  window.location.href = "viber://forward?text=" + encodeURIComponent(t);
+  showToast("Opening Viber… (message also copied)");
 }
 function sdUpdateLocal(e, row) {
   const r = childrenSheetData.find(x => String(x.phone) === String(e.h) && String(x.name || x.childName || "").trim().toLowerCase() === String(e.child).trim().toLowerCase());
@@ -5417,11 +5483,19 @@ async function sdSave(idx) {
   if (!incOk(phoneRaw)) { msg.textContent = "Phone must be exactly 10 digits (it has " + incNorm(phoneRaw).length + ")."; return; }
   const phone = incNorm(phoneRaw);
   const row = { phone, parentName: parent, name, grade: Number(e.grade), teacher: e.teacher || getTeacherForGrade(e.grade) || "" };
+  const addr = (document.getElementById("sdAddr") || { value: "" }).value.trim();
+  const ph2raw = (document.getElementById("sdPhone2") || { value: "" }).value.trim();
+  if (ph2raw && !incOk(ph2raw)) { msg.textContent = "Second phone must be 10 digits or left empty (it has " + incNorm(ph2raw).length + ")."; return; }
+  const ph2 = ph2raw ? incNorm(ph2raw) : "";
+  const oldPi = parentInfoMap[incNorm(e.h)] || {};
+  const infoChanged = addr !== (oldPi.address || "") || ph2 !== (oldPi.phone2 || "") || phone !== String(e.h);
   const changed = [];
   if (name !== e.child) changed.push("name");
   if (parent !== e.parent) changed.push("parent");
   if (phone !== String(e.h)) changed.push("phone");
-  if (!changed.length) { msg.style.color = "#6b6990"; msg.textContent = "No changes to save."; return; }
+  if (!changed.length && !infoChanged) { msg.style.color = "#6b6990"; msg.textContent = "No changes to save."; return; }
+  if (infoChanged) { parentInfoMap[phone] = { phone, address: addr, phone2: ph2, notes: oldPi.notes || "" }; await postInc({ type: "saveParentInfo", phone, address: addr, phone2: ph2, notes: oldPi.notes || "" }); }
+  if (!changed.length) { sdClose(); showToast("✅ Parent details saved"); return; }
   await postInc({ type: "updateChild", oldPhone: e.h, oldChildName: e.child, phone, parentName: parent, childName: name, grade: row.grade, teacher: row.teacher, action: "edit", by: adminRole + (adminGrade ? " G" + adminGrade : ""), detail: "Changed " + changed.join(", ") });
   sdUpdateLocal(e, row);
   sdClose();
