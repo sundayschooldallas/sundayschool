@@ -3423,7 +3423,7 @@ function showAdminTab(tab) {
   }
   if (tab === "incoming" && adminRole === "superadmin") {
     renderIncomingTab();
-    loadIncomingFromSheet().then(() => renderIncomingTab()).catch(() => renderIncomingTab());
+    loadIncomingFromSheet().then(() => loadPromoteCodes()).then(() => renderIncomingTab()).catch(() => renderIncomingTab());
   }
   if (tab === "upload" && adminRole === "gradeadmin") {
     renderUploadTab();
@@ -5089,12 +5089,14 @@ function renderIncomingTab() {
     <div style="font-size:16px;font-weight:900;color:#0a3d45;margin-bottom:2px;">📥 Incoming Students</div>
     <div style="font-size:12px;color:#6b6990;font-weight:700;margin-bottom:10px;">Confirm each family's phone number and parent name, then promote the student into the class.</div>
     ${picker}${seedBtn}
+    <div id="incCodesBox"></div>
     <div id="incUploadsBox"></div>
     <input id="incSearchBox" oninput="setIncSearch(this.value)" value="${spEsc(incSearch)}" placeholder="🔍 Search name, parent or phone" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #d6d3f0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;margin-bottom:6px;">
     <div id="incStats" style="font-size:11px;font-weight:800;color:#3b2f8f;margin:4px 2px 10px;"></div>
     <div id="incListBox"></div>`;
   renderIncomingList();
   renderIncUploadsBox();
+  renderPromoteCodesBox();
 }
 
 function incSubmittedFor(g) { return incStudents.filter(s => s.status === "submitted" && Number(s.targetGrade) === Number(g)); }
@@ -5304,6 +5306,155 @@ async function upWithdraw() {
   for (const id of ids) await postInc({ type: "deleteIncomingStudent", id });
 }
 
+
+// ══════════════ STUDENT DETAILS + CODE-PROTECTED PROMOTE ══════════════
+window._stuReg = [];
+let promoteCodes = {};
+let promoteCodesLoaded = false;
+let studentLogRows = [];
+function newPromoteCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
+
+async function loadPromoteCodes() {
+  try {
+    const r = await fetch(SHEET_URL + "?type=promoteCodes&nocache=" + Date.now(), { mode: "cors" });
+    const d = await r.json();
+    if (Array.isArray(d)) { promoteCodes = {}; d.forEach(x => { promoteCodes[x.grade] = x.code; }); promoteCodesLoaded = true; }
+  } catch (e) {}
+  try {
+    const r2 = await fetch(SHEET_URL + "?type=studentLog&nocache=" + Date.now(), { mode: "cors" });
+    const d2 = await r2.json();
+    if (Array.isArray(d2)) studentLogRows = d2;
+  } catch (e) {}
+  // every class gets a code automatically (also for classes added later)
+  if (promoteCodesLoaded) {
+    for (const g of getActiveGrades()) {
+      if (!promoteCodes[g]) { promoteCodes[g] = newPromoteCode(); await postInc({ type: "savePromoteCode", grade: g, code: promoteCodes[g] }); }
+    }
+  }
+}
+function renderPromoteCodesBox() {
+  const box = document.getElementById("incCodesBox");
+  if (!box) return;
+  if (adminRole !== "superadmin") { box.innerHTML = ""; return; }
+  const rows = getActiveGrades().map(g => `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #ece9fb;">
+      <div style="flex:1;font-size:12px;font-weight:800;color:#0a3d45;">Grade ${g}</div>
+      <div style="font-size:14px;font-weight:900;letter-spacing:2px;color:#3b2f8f;">${promoteCodes[g] ? spEsc(promoteCodes[g]) : "—"}</div>
+      <button onclick="regenPromoteCode(${g})" style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#e0f5f7;color:#0a5260;cursor:pointer;">New code</button>
+    </div>`).join("");
+  const log = studentLogRows.slice(0, 8).map(l => `<div style="font-size:10px;color:#6b6990;font-weight:700;padding:3px 0;">${spEsc(l.time)} · ${spEsc(l.action)} · ${spEsc(l.child)}${l.action === "promote" ? " · Gr." + spEsc(l.from) + " → Gr." + spEsc(l.to) : ""} · ${spEsc(l.by)}</div>`).join("");
+  box.innerHTML = `<div style="background:#fff8e6;border:1.5px solid #f3dfa5;border-radius:14px;padding:10px 12px;margin-bottom:12px;">
+    <div style="font-size:13px;font-weight:900;color:#854f0b;">🔑 Promote codes</div>
+    <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">A teacher needs their class's code to move a student out of that class. Give each teacher their code privately. Super Admin never needs a code.</div>
+    ${rows}${log ? `<div style="margin-top:8px;border-top:2px solid #f3dfa5;padding-top:6px;"><div style="font-size:11px;font-weight:900;color:#854f0b;">Recent changes</div>${log}</div>` : ""}</div>`;
+}
+async function regenPromoteCode(g) {
+  const ok = await modalConfirm("Make a new promote code for Grade " + g + "? The old code stops working.", { title: "New code", okLabel: "Make new code" });
+  if (!ok) return;
+  promoteCodes[g] = newPromoteCode();
+  renderPromoteCodesBox();
+  await postInc({ type: "savePromoteCode", grade: g, code: promoteCodes[g] });
+}
+
+function sdCanEdit(grade) {
+  if (adminRole === "superadmin" || adminRole === "admin") return true;
+  return adminRole === "gradeadmin" && Number(grade) === Number(adminGrade);
+}
+function sdClose() { const o = document.getElementById("sdOverlay"); if (o) o.remove(); }
+function sdOpen(idx) {
+  const e = window._stuReg[idx];
+  if (!e) return;
+  sdClose();
+  const norm = incNorm(e.h);
+  const rec = incParentRecord(norm);
+  const canEdit = sdCanEdit(e.grade);
+  const needCode = adminRole === "gradeadmin";
+  const lab = t => `<div style="font-size:10px;font-weight:800;color:#6b6990;margin:10px 0 3px;">${t}</div>`;
+  const fld = (id, v, extra) => `<input id="${id}" value="${spEsc(v)}" ${canEdit ? "" : "disabled"} ${extra || ""} style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:#1e1b4b;background:${canEdit ? "white" : "#f4f3fb"};">`;
+  const grades = getActiveGrades().filter(g => Number(g) !== Number(e.grade));
+  const o = document.createElement("div");
+  o.id = "sdOverlay";
+  o.style.cssText = "position:fixed;inset:0;background:rgba(10,8,30,0.7);z-index:99998;display:flex;align-items:flex-end;justify-content:center;";
+  o.innerHTML = `<div style="background:white;border-radius:22px 22px 0 0;padding:18px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;font-family:'Nunito',sans-serif;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:17px;font-weight:900;color:#0a3d45;">👦 ${spEsc(e.child)}</div>
+      <button onclick="sdClose()" style="border:none;background:#f0eefb;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;">✕</button>
+    </div>
+    <div style="font-size:12px;color:#6b6990;font-weight:700;margin-top:2px;">Grade ${spEsc(e.grade)} · ${spEsc(e.teacher || "No teacher")}</div>
+    <div style="font-size:11px;font-weight:800;margin-top:6px;color:${rec && rec.pin ? "#15803d" : "#92400e"};">${rec && rec.pin ? "🔐 Parent login set up" : "⚠️ No parent login (PIN) yet"} · ${rec && rec.date ? "📅 Duty: " + spEsc(rec.date) : "No duty date scheduled"}</div>
+    ${lab("Student name")}${fld("sdName", e.child)}
+    ${lab("Parent name")}${fld("sdParent", e.parent)}
+    ${lab("Phone (10 digits)")}${fld("sdPhone", e.h, 'inputmode="tel"')}
+    <div id="sdMsg" style="font-size:12px;font-weight:800;color:#b42318;margin-top:8px;"></div>
+    ${canEdit ? `<button onclick="sdSave(${idx})" style="width:100%;margin-top:10px;padding:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;border:none;border-radius:12px;background:#e0f5f7;color:#0a5260;cursor:pointer;">💾 Save changes</button>
+    <div style="margin-top:16px;padding-top:12px;border-top:2px solid #f0eefb;">
+      <div style="font-size:13px;font-weight:900;color:#3b2f8f;">🎓 Move / promote to another class</div>
+      <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Use this if ${spEsc(e.child)} is in the wrong class or is being promoted.</div>
+      <select id="sdGrade" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;background:white;">${grades.map(g => `<option value="${g}">Grade ${g}</option>`).join("")}</select>
+      ${needCode ? `${lab("Promote code (from the Super Admin)")}<input id="sdCode" type="password" inputmode="numeric" autocomplete="off" placeholder="Enter your class promote code" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;">` : ""}
+      <button onclick="sdPromote(${idx})" style="width:100%;margin-top:10px;padding:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;border:none;border-radius:12px;background:linear-gradient(135deg,#0a5260,#3b2f8f);color:white;cursor:pointer;">🎓 Promote / move</button>
+    </div>` : `<div style="font-size:12px;color:#9a98b5;font-weight:700;margin-top:12px;">👁 View only — this is another teacher's class.</div>`}
+  </div>`;
+  document.body.appendChild(o);
+}
+function sdUpdateLocal(e, row) {
+  const r = childrenSheetData.find(x => String(x.phone) === String(e.h) && String(x.name || x.childName || "").trim().toLowerCase() === String(e.child).trim().toLowerCase());
+  if (r) { r.phone = row.phone; r.parentName = row.parentName; r.name = row.name; r.childName = row.name; r.grade = row.grade; r.teacher = row.teacher; }
+  try { localStorage.setItem("childInfo__" + row.phone, JSON.stringify({ name: row.name, grade: row.grade, teacher: row.teacher, parentName: row.parentName, unassigned: false, graduated: false })); } catch (x) {}
+}
+function sdRefresh() {
+  try { renderClassesTab(); } catch (x) {}
+  try { renderStudentsTab(); } catch (x) {}
+  try { renderTrackerTab(); } catch (x) {}
+}
+async function sdSave(idx) {
+  const e = window._stuReg[idx];
+  const name = document.getElementById("sdName").value.trim();
+  const parent = document.getElementById("sdParent").value.trim();
+  const phoneRaw = document.getElementById("sdPhone").value;
+  const msg = document.getElementById("sdMsg");
+  if (!name) { msg.textContent = "Student name is required."; return; }
+  if (!parent) { msg.textContent = "Parent name is required."; return; }
+  if (!incOk(phoneRaw)) { msg.textContent = "Phone must be exactly 10 digits (it has " + incNorm(phoneRaw).length + ")."; return; }
+  const phone = incNorm(phoneRaw);
+  const row = { phone, parentName: parent, name, grade: Number(e.grade), teacher: e.teacher || getTeacherForGrade(e.grade) || "" };
+  const changed = [];
+  if (name !== e.child) changed.push("name");
+  if (parent !== e.parent) changed.push("parent");
+  if (phone !== String(e.h)) changed.push("phone");
+  if (!changed.length) { msg.style.color = "#6b6990"; msg.textContent = "No changes to save."; return; }
+  await postInc({ type: "updateChild", oldPhone: e.h, oldChildName: e.child, phone, parentName: parent, childName: name, grade: row.grade, teacher: row.teacher, action: "edit", by: adminRole + (adminGrade ? " G" + adminGrade : ""), detail: "Changed " + changed.join(", ") });
+  sdUpdateLocal(e, row);
+  sdClose();
+  showToast("✅ " + name + " updated");
+  sdRefresh();
+}
+async function sdPromote(idx) {
+  const e = window._stuReg[idx];
+  const msg = document.getElementById("sdMsg");
+  const newG = Number(document.getElementById("sdGrade").value);
+  if (!newG) return;
+  if (adminRole === "gradeadmin") {
+    const code = (document.getElementById("sdCode").value || "").trim();
+    if (!code) { msg.textContent = "Enter your class promote code first."; return; }
+    msg.style.color = "#6b6990"; msg.textContent = "Checking code…";
+    let res = null;
+    try { const r = await fetch(SHEET_URL + "?type=verifyPromoteCode&grade=" + Number(e.grade) + "&code=" + encodeURIComponent(code) + "&nocache=" + Date.now(), { mode: "cors" }); res = await r.json(); } catch (x) {}
+    msg.style.color = "#b42318";
+    if (!res) { msg.textContent = "Couldn't check the code — check your connection and try again."; return; }
+    if (res.nocode) { msg.textContent = "No promote code exists for your class yet. Ask the Super Admin."; return; }
+    if (!res.ok) { msg.textContent = "❌ Wrong promote code."; return; }
+  }
+  const ok = await modalConfirm("Move " + spEsc(e.child) + " from Grade " + e.grade + " to Grade " + newG + "?", { title: "Confirm promote", okLabel: "Yes, move" });
+  if (!ok) return;
+  const teacher = getTeacherForGrade(newG) || "";
+  const phone = incOk(e.h) ? incNorm(e.h) : e.h;
+  const row = { phone: e.h, parentName: e.parent, name: e.child, grade: newG, teacher };
+  await postInc({ type: "updateChild", oldPhone: e.h, oldChildName: e.child, phone: e.h, parentName: e.parent, childName: e.child, grade: newG, teacher, fromGrade: e.grade, action: "promote", by: adminRole + (adminGrade ? " G" + adminGrade : ""), detail: "Code " + (adminRole === "gradeadmin" ? "verified" : "not needed") });
+  sdUpdateLocal(e, row);
+  sdClose();
+  showToast("🎓 " + e.child + " moved to Grade " + newG);
+  sdRefresh();
+}
 
 function getTeacherListHtml(grade, teacherStr, color) {
   // teacherStr may be "Name1" or "Name1 & Name2" or "Name1, Name2"
@@ -7903,6 +8054,7 @@ function renderClassesTab() {
 
   // Collect ALL students — bypass adminGrade filter for display
   // We use raw sheet data loaded separately so all grades show
+  window._stuReg = [];
   const allGrades = { 6: [], 7: [], 8: [], 9: [] };
   const pending = [], unassigned = [];
   const seen = new Set();
@@ -7986,7 +8138,7 @@ function renderClassesTab() {
     return false;
   };
 
-  const editRowHTML = (e, color) => `
+  const editRowHTML = (e, color) => { const ri = window._stuReg.push(e) - 1; return `
     <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
       <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">${e.child.charAt(0).toUpperCase()}</div>
       <div style="flex:1;min-width:100px;">
@@ -7998,19 +8150,20 @@ function renderClassesTab() {
         
         <button onclick="unassignStudent('${e.h}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fff4e0;color:#854f0b;">⏸ Unassign</button>
         <button onclick="removeStudent('${e.h}','${e.parent}','${e.child}')" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#fdeaea;color:#a32d2d;">🗑️ Delete</button>
-        ` : `<div style="font-size:11px;color:#22a06b;font-weight:700;">✅ Your class</div>`}
+        ` : ``}
+        <button onclick="sdOpen(${ri})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#e8e4fb;color:#3b2f8f;">📋 Details</button>
       </div>
-    </div>`;
+    </div>`; };
 
-  const readRowHTML = (e, color) => `
+  const readRowHTML = (e, color) => { const ri = window._stuReg.push(e) - 1; return `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:0.5px solid #f0eefb;">
       <div style="width:30px;height:30px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;flex-shrink:0;opacity:0.7;">${e.child.charAt(0).toUpperCase()}</div>
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:700;color:#0a3d45;">${e.child}</div>
         <div style="font-size:11px;color:#bbb;">Parent: ${e.parent}</div>
       </div>
-      <div style="font-size:10px;color:#bbb;font-weight:700;">👁 Read only</div>
-    </div>`;
+      <button onclick="sdOpen(${ri})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#f0eefb;color:#6b6990;">👁 View</button>
+    </div>`; };
 
   let html = `<div style="background:#e8e4fb;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#0a5260;font-weight:700;">🎓 Your class has full edit rights. Other classes are read-only and collapsible.</div>`;
 
