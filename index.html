@@ -5747,6 +5747,19 @@ function starPendingGet() { try { return JSON.parse(localStorage.getItem("pendin
 function starPendingSet(a) { try { localStorage.setItem("pendingStars", JSON.stringify(a)); } catch (x) {} }
 function starSyncPending() { const ids = new Set(parentStars.map(x => x.id)); starPendingSet(starPendingGet().filter(p => ids.has(p.id))); }
 // Stars given on this phone stay visible until the Google Sheet confirms them
+// POST that tries to read the server's answer (falls back to fire-and-forget)
+async function postIncRead(body) {
+  try {
+    const res = await fetch(SHEET_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body) });
+    const raw = await res.text();
+    let data = null;
+    try { data = JSON.parse(raw); } catch (x) {}
+    return { readable: true, raw, data };
+  } catch (x) {
+    await postInc(body);
+    return { readable: false, raw: String(x), data: null };
+  }
+}
 async function loadParentStars() {
   try {
     const r = await fetch(SHEET_URL + "?type=parentStars&nocache=" + Date.now(), { mode: "cors" });
@@ -5825,13 +5838,24 @@ async function starGive(idx) {
   parentStars.push(star);
   starPendingSet(starPendingGet().concat([star]));
   try { renderClassesTab(); } catch (x) {}
-  await postInc(Object.assign({ type: "saveParentStar" }, star));
+  const saveRes = await postIncRead(Object.assign({ type: "saveParentStar" }, star));
+  let serverOk = false;
+  if (saveRes.readable) {
+    if (saveRes.data && saveRes.data.ok) {
+      serverOk = true;
+      if (saveRes.data.duplicate) { parentStars = parentStars.filter(x => x.id !== star.id); starSyncPending(); await loadParentStars(); try { renderClassesTab(); } catch (x) {} }
+      else starPendingSet(starPendingGet().filter(p => p.id !== star.id));
+    } else {
+      await customModal({ title: "⚠️ Sheet refused the star", message: "The star shows on this phone only.\n\nThe Google Sheet answered:\n" + spEsc(String(saveRes.raw).slice(0, 220)) + "\n\n" + (/Unknown type/i.test(saveRes.raw) ? "That means the OLD Code.gs is still running. In Apps Script: Deploy → Manage deployments → pencil → Version: New version → Deploy. Also check that index.html's web-app link is the same deployment." : "Send me this message and I will fix it."), type: "alert" });
+    }
+  }
   const n = starCount(e.parent).yr;
   showToast("⭐ Star given to " + e.parent + (isVol ? " (volunteered)" : "") + " — " + n + " this year");
   starShowResult(star);
+  if (serverOk) return;
   setTimeout(async () => {
     await loadParentStars();
-    if (starPendingGet().some(p => p.id === star.id)) {
+    if (!saveRes.readable && starPendingGet().some(p => p.id === star.id)) {
       await customModal({ title: "⚠️ Star not saved to the sheet", message: "The star for " + spEsc(star.parentName) + " is showing on this phone only — the Google Sheet did not confirm it.\n\nMost likely the newest Code.gs is not deployed yet:\nApps Script → Deploy → Manage deployments → pencil → New version → Deploy.\n\nAfter that, open this class again and the star will sync.", type: "alert" });
     }
   }, 3500);
