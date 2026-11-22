@@ -5693,9 +5693,11 @@ function renderStarBox() {
   if (!box) return;
   if (adminRole !== "superadmin") { box.innerHTML = ""; return; }
   const rows = getActiveGrades().map(g => `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #f3dfa5;">
-      <div style="flex:1;font-size:12px;font-weight:800;color:#0a3d45;">Grade ${g}</div>
-      <div style="font-size:15px;font-weight:900;letter-spacing:2px;color:#3b2f8f;">${starPins[g] ? spEsc(starPins[g]) : "—"}</div>
-      <button onclick="regenStarPin(${g})" style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#e0f5f7;color:#0a5260;cursor:pointer;">New PIN</button>
+      <div style="font-size:12px;font-weight:800;color:#0a3d45;width:58px;">Grade ${g}</div>
+      <div style="font-size:15px;font-weight:900;letter-spacing:2px;color:#3b2f8f;width:62px;">${starPins[g] ? spEsc(starPins[g]) : "—"}</div>
+      <input id="pinIn_${g}" inputmode="numeric" maxlength="8" placeholder="Your own PIN" style="flex:1;min-width:0;padding:7px 8px;border:1.5px solid #e6d9a8;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;">
+      <button onclick="setStarPin(${g})" style="padding:7px 9px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#dcfce7;color:#15803d;cursor:pointer;">Set</button>
+      <button onclick="regenStarPin(${g})" style="padding:7px 9px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🎲 Auto</button>
     </div>`).join("");
   const lead = starLeaders().slice(0, 10).map((x, i) => `<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e1b4b;padding:3px 0;"><span>${i + 1}. ${spEsc(x.name)}</span><span>⭐ ${x.n}</span></div>`).join("");
   const byP = {};
@@ -5703,7 +5705,7 @@ function renderStarBox() {
   const cleanup = Object.values(byP).sort((a, b) => a.name.localeCompare(b.name)).map(x => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid #f3dfa5;font-size:12px;font-weight:700;color:#1e1b4b;"><span style="flex:1;">${spEsc(x.name)} · ⭐ ${x.n}</span><button onclick="starClearParent(${JSON.stringify(x.key).replace(/"/g, "&quot;")})" style="padding:5px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;background:#fee2e2;color:#b42318;cursor:pointer;">🧹 Clear</button></div>`).join("");
   box.innerHTML = `<div style="background:#fffbea;border:1.5px solid #f3dfa5;border-radius:14px;padding:10px 12px;margin-bottom:12px;">
     <div style="font-size:13px;font-weight:900;color:#854f0b;">🔑 Teacher PINs</div>
-    <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">One PIN per class. A teacher uses it to give a parent ⭐ and to promote or move a student. A new class gets its PIN automatically. Give each teacher their PIN privately. Super Admin never needs one.</div>
+    <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">One PIN per class. Type your own and tap <b>Set</b>, or tap <b>🎲 Auto</b> to make a random one. A teacher uses it to give a parent ⭐ and to promote or move a student. A new class gets its PIN automatically. Give each teacher their PIN privately. Super Admin never needs one.</div>
     ${rows}
     ${studentLogRows.length ? `<div style="margin-top:8px;border-top:2px solid #f3dfa5;padding-top:6px;"><div style="font-size:11px;font-weight:900;color:#854f0b;margin-bottom:3px;">Recent student changes</div>${studentLogRows.slice(0, 8).map(l => `<div style="font-size:10px;color:#6b6990;font-weight:700;padding:2px 0;">${spEsc(l.time)} · ${spEsc(l.action)} · ${spEsc(l.child)}${l.action === "promote" ? " · Gr." + spEsc(l.from) + " → Gr." + spEsc(l.to) : ""} · ${spEsc(l.by)}</div>`).join("")}</div>` : ""}
     <div style="margin-top:8px;border-top:2px solid #f3dfa5;padding-top:6px;"><div style="font-size:11px;font-weight:900;color:#854f0b;margin-bottom:3px;">🏆 Top parents this school year</div>${lead || '<div style="font-size:11px;color:#9a98b5;font-weight:700;">No stars given yet.</div>'}</div>
@@ -5736,6 +5738,17 @@ async function starClearAll() {
   try { renderClassesTab(); } catch (e) {}
   await starDeleteMany(list);
   showToast("🧹 All stars cleared");
+}
+async function setStarPin(g) {
+  const el = document.getElementById("pinIn_" + g);
+  const v = el ? String(el.value).replace(/\D/g, "") : "";
+  if (v.length < 4 || v.length > 8) { showToast("PIN must be 4 to 8 digits (numbers only)"); return; }
+  const dupe = Object.keys(starPins).find(k => Number(k) !== Number(g) && starPins[k] === v);
+  if (dupe) { const ok = await modalConfirm("Grade " + dupe + " already uses " + v + ". Use the same PIN for Grade " + g + " too?", { title: "PIN already used", okLabel: "Use it anyway" }); if (!ok) return; }
+  starPins[g] = v;
+  renderStarBox();
+  await postInc({ type: "saveStarPin", grade: g, pin: v });
+  showToast("🔑 Grade " + g + " PIN set to " + v);
 }
 async function regenStarPin(g) {
   const ok = await modalConfirm("Make a new teacher PIN for Grade " + g + "? The old PIN stops working.", { title: "New teacher PIN", okLabel: "Make new PIN" });
