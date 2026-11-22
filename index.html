@@ -5686,11 +5686,43 @@ function renderStarBox() {
       <button onclick="regenStarPin(${g})" style="padding:6px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#e0f5f7;color:#0a5260;cursor:pointer;">New PIN</button>
     </div>`).join("");
   const lead = starLeaders().slice(0, 10).map((x, i) => `<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e1b4b;padding:3px 0;"><span>${i + 1}. ${spEsc(x.name)}</span><span>⭐ ${x.n}</span></div>`).join("");
+  const byP = {};
+  parentStars.forEach(x => { const k = starKey(x.parentName); if (!byP[k]) byP[k] = { key: k, name: x.parentName, n: 0 }; byP[k].n++; });
+  const cleanup = Object.values(byP).sort((a, b) => a.name.localeCompare(b.name)).map(x => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid #f3dfa5;font-size:12px;font-weight:700;color:#1e1b4b;"><span style="flex:1;">${spEsc(x.name)} · ⭐ ${x.n}</span><button onclick="starClearParent(${JSON.stringify(x.key).replace(/"/g, "&quot;")})" style="padding:5px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;background:#fee2e2;color:#b42318;cursor:pointer;">🧹 Clear</button></div>`).join("");
   box.innerHTML = `<div style="background:#fffbea;border:1.5px solid #f3dfa5;border-radius:14px;padding:10px 12px;margin-bottom:12px;">
     <div style="font-size:13px;font-weight:900;color:#854f0b;">⭐ Parent stars</div>
     <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Each teacher needs their class star PIN to give a star (after a first confirm). Give each teacher their PIN privately.</div>
     ${rows}
-    <div style="margin-top:8px;border-top:2px solid #f3dfa5;padding-top:6px;"><div style="font-size:11px;font-weight:900;color:#854f0b;margin-bottom:3px;">🏆 Top parents this school year</div>${lead || '<div style="font-size:11px;color:#9a98b5;font-weight:700;">No stars given yet.</div>'}</div></div>`;
+    <div style="margin-top:8px;border-top:2px solid #f3dfa5;padding-top:6px;"><div style="font-size:11px;font-weight:900;color:#854f0b;margin-bottom:3px;">🏆 Top parents this school year</div>${lead || '<div style="font-size:11px;color:#9a98b5;font-weight:700;">No stars given yet.</div>'}</div>
+    ${cleanup ? `<div style="margin-top:8px;border-top:2px solid #f3dfa5;padding-top:6px;"><div style="font-size:11px;font-weight:900;color:#b42318;margin-bottom:3px;">🧹 Clean up test stars</div>${cleanup}<button onclick="starClearAll()" style="margin-top:8px;width:100%;padding:9px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:none;border-radius:8px;background:#fee2e2;color:#b42318;cursor:pointer;">Clear ALL stars for everyone</button></div>` : ""}</div>`;
+}
+async function starDeleteMany(list) {
+  for (const st of list) { await postInc({ type: "deleteParentStar", id: st.id }); }
+}
+async function starClearParent(key) {
+  if (adminRole !== "superadmin") return;
+  const list = parentStars.filter(x => starKey(x.parentName) === key);
+  if (!list.length) return;
+  const nm = list[0].parentName;
+  const ok = await modalConfirm("Remove all " + list.length + " ⭐ for " + spEsc(nm) + "? This is meant for test stars and cannot be undone.", { title: "Clear stars", danger: true, okLabel: "Clear stars" });
+  if (!ok) return;
+  parentStars = parentStars.filter(x => starKey(x.parentName) !== key);
+  renderStarBox();
+  try { renderClassesTab(); } catch (e) {}
+  await starDeleteMany(list);
+  showToast("🧹 Cleared stars for " + nm);
+}
+async function starClearAll() {
+  if (adminRole !== "superadmin") return;
+  const list = parentStars.slice();
+  if (!list.length) return;
+  const t = await modalPrompt("This removes ALL " + list.length + " stars for EVERY parent and cannot be undone.\n\nType CLEAR to confirm.", "CLEAR", { title: "Clear all stars", danger: true, okLabel: "Clear all" });
+  if (t === null || String(t).trim().toUpperCase() !== "CLEAR") { if (t !== null) showToast("Not cleared — you must type CLEAR"); return; }
+  parentStars = [];
+  renderStarBox();
+  try { renderClassesTab(); } catch (e) {}
+  await starDeleteMany(list);
+  showToast("🧹 All stars cleared");
 }
 async function regenStarPin(g) {
   const ok = await modalConfirm("Make a new star PIN for Grade " + g + "? The old PIN stops working.", { title: "New star PIN", okLabel: "Make new PIN" });
