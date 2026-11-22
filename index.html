@@ -5558,12 +5558,14 @@ async function sdRenderCard() {
   const cv = document.getElementById("sdCardCanvas"), ta = document.getElementById("sdMsgText");
   if (!cv || !ta) return;
   const e = window._stuReg[window._sdIdx];
-  const grade = e ? e.grade : "";
+  await sdDrawCard(cv, ta.value, e ? e.grade : "");
+}
+async function sdDrawCard(cv, text, grade) {
   try { await document.fonts.load("700 40px Nunito"); await document.fonts.load("900 70px Nunito"); } catch (x) {}
   const W = 1080, M = 64, PAD = 56, bodyW = W - 2 * M - 2 * PAD;
   const meas = document.createElement("canvas").getContext("2d");
   const FONT = "Nunito, 'Segoe UI', sans-serif";
-  const paras = String(ta.value || "").split("\n");
+  const paras = String(text || "").split("\n");
   const items = [];
   let bodyH = 0;
   paras.forEach((p, i) => {
@@ -5605,30 +5607,29 @@ async function sdRenderCard() {
   ctx.textAlign = "center"; ctx.fillStyle = "#ffffff"; ctx.font = "800 38px " + FONT;
   ctx.fillText("💙 With love from our Sunday School family", W / 2, H - 80);
 }
-function sdCardBlob() { return new Promise(res => document.getElementById("sdCardCanvas").toBlob(res, "image/png")); }
-async function sdShareImage() {
-  await sdRenderCard();
-  const blob = await sdCardBlob();
+function cvBlob(id) { return new Promise(res => document.getElementById(id).toBlob(res, "image/png")); }
+async function cvShare(id) {
+  const blob = await cvBlob(id);
   if (!blob) { showToast("Couldn't make the image"); return; }
   const file = new File([blob], "sunday-school-message.png", { type: "image/png" });
-  try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
-  } catch (x) { if (x && x.name === "AbortError") return; }
-  sdSaveImage();
+  try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; } }
+  catch (x) { if (x && x.name === "AbortError") return; }
+  cvSave(id);
 }
-async function sdCopyImage() {
-  await sdRenderCard();
-  try { const blob = await sdCardBlob(); await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); showToast("🖼️ Image copied — paste it in Viber"); }
+async function cvCopy(id) {
+  try { const blob = await cvBlob(id); await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); showToast("🖼️ Image copied — paste it in Viber"); }
   catch (x) { showToast("Couldn't copy the image — use Share or Save instead"); }
 }
-async function sdSaveImage() {
-  await sdRenderCard();
-  const blob = await sdCardBlob();
+async function cvSave(id) {
+  const blob = await cvBlob(id);
   if (!blob) return;
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "sunday-school-message.png";
   document.body.appendChild(a); a.click(); a.remove();
   showToast("⬇️ Image saved — attach it in Viber");
 }
+async function sdShareImage() { await sdRenderCard(); return cvShare("sdCardCanvas"); }
+async function sdCopyImage() { await sdRenderCard(); return cvCopy("sdCardCanvas"); }
+async function sdSaveImage() { await sdRenderCard(); return cvSave("sdCardCanvas"); }
 async function sdCopyMsg() {
   const t = document.getElementById("sdMsgText");
   try { await navigator.clipboard.writeText(t.value); showToast("📋 Message copied — paste it in Viber"); }
@@ -5743,6 +5744,24 @@ function starScheduledToday(name) {
   const t0 = new Date(getMockNow().getFullYear(), getMockNow().getMonth(), getMockNow().getDate()).getTime();
   return roster.some(w => { const d = sdToDate(w.date); return d && d.getTime() === t0 && (w.parents || []).some(p => starKey(p.name) === starKey(name)); });
 }
+function starPickType(e, c, sched) {
+  return new Promise(resolve => {
+    const o = document.createElement("div");
+    o.style.cssText = "position:fixed;inset:0;background:rgba(10,8,30,0.72);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;";
+    const btn = (id, label, on) => `<button id="${id}" style="width:100%;padding:14px;margin-top:10px;border-radius:12px;border:${on ? "2.5px solid #ffe08a" : "1.5px solid rgba(255,255,255,0.25)"};background:${on ? "linear-gradient(135deg,#6366f1,#06b6d4)" : "rgba(255,255,255,0.08)"};color:white;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;">${label}</button>`;
+    o.innerHTML = `<div style="background:linear-gradient(165deg,#1e1b4b 0%,#312e81 60%,#0e7490 100%);border:1px solid rgba(255,255,255,0.15);border-radius:22px;padding:22px;max-width:420px;width:100%;color:white;font-family:'Nunito',sans-serif;">
+      <div style="font-size:17px;font-weight:900;margin-bottom:8px;">Step 1 of 2 — Give star?</div>
+      <div style="font-size:13.5px;line-height:1.6;color:rgba(255,255,255,0.9);">⭐ <b>${spEsc(e.parent)}</b> (parent of ${spEsc(e.child)}), Grade ${spEsc(e.grade)}, today.<br>They have ${c.yr} ⭐ this school year.<br><br>${sched ? "📅 They ARE on today's schedule." : "They are NOT on today's schedule."}<br>Why are they getting this star?</div>
+      ${btn("stPickReq", "📅 Their required turn", sched)}
+      ${btn("stPickVol", "🙌 Extra volunteering", !sched)}
+      <button id="stPickCancel" style="width:100%;padding:12px;margin-top:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.2);background:transparent;color:white;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;">Cancel</button></div>`;
+    document.body.appendChild(o);
+    const done = v => { o.remove(); resolve(v); };
+    o.querySelector("#stPickReq").onclick = () => done("required");
+    o.querySelector("#stPickVol").onclick = () => done("volunteer");
+    o.querySelector("#stPickCancel").onclick = () => done(null);
+  });
+}
 async function starGive(idx) {
   const e = window._stuReg[idx];
   if (!e) return;
@@ -5760,9 +5779,10 @@ async function starGive(idx) {
     return;
   }
   const c = starCount(e.parent);
-  const isVol = !starScheduledToday(e.parent);
-  const step1 = await modalConfirm("Give a ⭐ to " + spEsc(e.parent) + " (parent of " + spEsc(e.child) + ") for coming to Grade " + e.grade + " today?\n\n" + (isVol ? "🙌 NOT scheduled today — this will be marked as extra VOLUNTEERING." : "📅 Scheduled today — marked as their required turn.") + "\n\nThey have " + c.yr + " ⭐ this school year.", { title: "Step 1 of 2 — Give star?", okLabel: "Continue" });
-  if (!step1) return;
+  const sched = starScheduledToday(e.parent);
+  const pick = await starPickType(e, c, sched);
+  if (!pick) return;
+  const isVol = pick === "volunteer";
   if (adminRole === "gradeadmin") {
     const pin = await modalPrompt("Enter your teacher PIN to confirm. (Ask the Super Admin if you don't have it.)", "Teacher PIN", { title: "Step 2 of 2 — Teacher PIN", okLabel: "Give ⭐" });
     if (pin === null) return;
@@ -5781,6 +5801,31 @@ async function starGive(idx) {
   await postInc(Object.assign({ type: "saveParentStar" }, star));
   const n = starCount(e.parent).yr;
   showToast("⭐ Star given to " + e.parent + (isVol ? " (volunteered)" : "") + " — " + n + " this year");
+  starShowResult(star);
+}
+function starCardText(star) {
+  const n = starCount(star.parentName).yr;
+  const kid = star.childName;
+  const body = star.type === "volunteer"
+    ? "🙌 Thank you " + star.parentName + " for also volunteering today, outside of your scheduled turn! We truly appreciate your extra help and heart for serving. 💙"
+    : "Thank you " + star.parentName + " for joining us today" + (kid ? " (" + kid + "'s parent)" : "") + "! We really appreciate your participation and commitment. 💙";
+  return "⭐ Star of the day! ⭐\n\n" + body + "\n\n" + "🌟 " + n + " star" + (n === 1 ? "" : "s") + " this school year" + (star.type === "volunteer" ? " — earned by volunteering!" : "!");
+}
+function starShowResult(star) {
+  const o = document.createElement("div");
+  o.id = "starResultOverlay";
+  o.style.cssText = "position:fixed;inset:0;background:rgba(10,8,30,0.78);z-index:99999;display:flex;align-items:flex-end;justify-content:center;";
+  o.innerHTML = `<div style="background:white;border-radius:22px 22px 0 0;padding:16px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;font-family:'Nunito',sans-serif;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-size:16px;font-weight:900;color:#0a3d45;">⭐ Star saved — share it!</div>
+    <button onclick="document.getElementById('starResultOverlay').remove()" style="border:none;background:#f0eefb;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;">✕</button></div>
+    <canvas id="starCardCanvas" width="1080" height="1080" style="width:100%;height:auto;border-radius:14px;border:1.5px solid #e0dcf7;background:#f4f3fb;"></canvas>
+    <button onclick="cvShare('starCardCanvas')" style="width:100%;margin-top:10px;padding:13px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;border:none;border-radius:10px;background:linear-gradient(135deg,#7360f2,#a855f7);color:white;cursor:pointer;">📤 Share image to Viber</button>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button onclick="cvCopy('starCardCanvas')" style="flex:1;padding:11px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📋 Copy image</button>
+      <button onclick="cvSave('starCardCanvas')" style="flex:1;padding:11px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">⬇️ Save image</button>
+    </div></div>`;
+  document.body.appendChild(o);
+  sdDrawCard(document.getElementById("starCardCanvas"), starCardText(star), star.grade);
 }
 function renderParentStarsCard() {
   if (!myName) return "";
