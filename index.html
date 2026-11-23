@@ -3432,7 +3432,7 @@ function showAdminTab(tab) {
     if (btn) { btn.style.background = tab === t ? "#3b2f8f" : "#e0f5f7"; btn.style.color = tab === t ? "white" : "#3b2f8f"; }
   });
   if (tab === "classes") {
-    loadParentStars().then(() => { try { renderClassesTab(); } catch (x) {} });
+    Promise.all([loadParentStars(), loadAttMarks(), loadSchedulePlan()]).then(() => { try { renderClassesTab(); } catch (x) {} });
     // Load ALL children for the class tab (read-only view of all grades)
     const savedGrade = adminGrade;
     adminGrade = null; // temporarily clear so all grades load
@@ -5141,6 +5141,135 @@ function renderSchedCard() {
   } catch (x) { return ""; }
 }
 
+// ══════════════ DUTY ATTENDANCE MARKS (attended / no-show) ══════════════
+let attMarks = [];
+async function loadAttMarks() {
+  try {
+    const r = await fetch(SHEET_URL + "?type=attMarks&nocache=" + Date.now(), { mode: "cors" });
+    const d = await r.json();
+    if (Array.isArray(d)) { const keep = (attMarks || []).filter(m => m._local && !d.some(x => x.id === m.id)); attMarks = d.concat(keep); }
+  } catch (x) {}
+}
+function attDutyDate() { const d = getMockNow(); const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); while (x.getDay() !== 0) x.setDate(x.getDate() + 1); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); }
+function attMarkFor(phone, iso) { const n = incNorm(phone); return (attMarks || []).find(m => m.date === iso && incNorm(m.phone) === n) || null; }
+function attPlanFamsOn(iso) {
+  try { if (!schedPlan) return []; const w = schedPlan.weeks.find(x => x.date === iso && x.type !== "noclass"); return w ? [schedFam(w.a), schedFam(w.b)].filter(Boolean) : []; } catch (x) { return []; }
+}
+function attRosterOn(g, iso) {
+  const out = [];
+  try { sdGradeWeeks(Number(g)).forEach(w => { const i = w.dt.getFullYear() + "-" + String(w.dt.getMonth() + 1).padStart(2, "0") + "-" + String(w.dt.getDate()).padStart(2, "0"); if (i === iso) w.parents.forEach(p => out.push(p)); }); } catch (x) {}
+  return out;
+}
+// Is this row's parent on duty this (or the coming) Sunday?
+function attDutyInfo(e) {
+  const D = attDutyDate(), norm = incNorm(e.h), key = starKey(e.parent);
+  let on = attPlanFamsOn(D).some(fm => fm.phones.some(p => incNorm(p) === norm));
+  if (!on) on = attRosterOn(e.grade, D).some(p => starKey(p.name) === key);
+  return { date: D, today: D === starISO(), on: on };
+}
+function attStatusFor(e) {
+  const iso = starISO(), m = attMarkFor(e.h, iso);
+  if (m) return m.status;
+  if (starredToday(e.parent)) return "attended";
+  return "";
+}
+// Everyone scheduled today for this class
+function attScheduledToday(e) {
+  const iso = starISO(), seen = new Set(), out = [];
+  attPlanFamsOn(iso).forEach(fm => { const ph = incNorm(fm.phones[0] || ""); const k = ph || fm.id; if (seen.has(k)) return; seen.add(k); out.push({ name: fm.parent, phone: ph }); });
+  attRosterOn(e.grade, iso).forEach(p => { const ph = incNorm(p.h || ""); const k = ph || p.name; if (seen.has(k)) return; seen.add(k); out.push({ name: p.name, phone: ph }); });
+  return out;
+}
+function attAllNoShow(e) {
+  const iso = starISO(), list = attScheduledToday(e);
+  if (!list.length) return false;
+  return list.every(p => { const m = p.phone ? attMarkFor(p.phone, iso) : null; return m && m.status === "noshow" && !starredToday(p.name); });
+}
+function attMood(e) {
+  if (!e) return "";
+  const m = attMarkFor(e.h, starISO());
+  if ((m && m.status === "noshow") || attAllNoShow(e)) return "noshow";
+  return "";
+}
+function attBadge(e) {
+  try {
+    const st = attStatusFor(e);
+    if (st === "noshow") return `<div style="display:inline-block;margin-top:3px;padding:2px 9px;border-radius:20px;background:#fde2e2;color:#b91c1c;font-size:11px;font-weight:900;">🚫 No-show today</div>`;
+    if (st === "attended") return "";
+    const d = attDutyInfo(e);
+    if (!d.on) return "";
+    const lbl = d.today ? "📅 On duty today" : "📅 Next: " + schedNice(d.date).replace(/, \d{4}$/, "");
+    return `<div onclick="sdOpenByParent('${spEsc(e.h)}','${spEsc(encodeURIComponent(String(e.child)).replace(/'/g, "%27"))}')" style="display:inline-block;margin-top:3px;padding:2px 9px;border-radius:20px;background:#fff1c9;color:#92400e;font-size:11px;font-weight:900;cursor:pointer;">${lbl}</div>`;
+  } catch (x) { return ""; }
+}
+function sdOpenByParent(h, encChild) {
+  const kid = decodeURIComponent(encChild);
+  const i = (window._stuReg || []).findIndex(r => r && String(r.h) === String(h) && r.child === kid);
+  if (i > -1) sdOpen(i);
+}
+async function attPost(phone, parentName, grade, status, iso) {
+  const id = iso + "_" + incNorm(phone);
+  attMarks = (attMarks || []).filter(m => m.id !== id);
+  if (status) attMarks.push({ id, date: iso, grade: Number(grade), parentName, phone: incNorm(phone), status, markedBy: spActorLabel(), _local: true });
+  const body = status ? { type: "saveAttMark", id, date: iso, grade: Number(grade), parentName, phone: incNorm(phone), status, markedBy: spActorLabel() } : { type: "deleteAttMark", id };
+  const res = await postIncRead(body);
+  if (res.readable && res.data && res.data.ok) { const m = attMarks.find(x => x.id === id); if (m) delete m._local; return true; }
+  if (res.readable) await customModal({ title: "⚠️ Sheet didn't save the mark", message: "The mark shows on this phone only.\n\nThe Google Sheet answered:\n" + spEsc(String(res.raw).slice(0, 200)) + "\n\nRedeploy the newest Code.gs (New version) and try again.", type: "alert" });
+  return false;
+}
+function attRefresh(idx) {
+  try { renderClassesTab(); } catch (x) {}
+  sdRenderDuty(idx);
+  sdFillMsg(idx, true);
+}
+async function attMarkOne(idx, status) {
+  const e = window._stuReg[idx]; if (!e) return;
+  const iso = starISO();
+  if (status === "noshow") {
+    const ok = await modalConfirm("Mark " + spEsc(e.parent) + " as a no-show for today? The message will say we missed them.", { title: "Mark no-show?", okLabel: "Mark no-show", danger: true });
+    if (!ok) return;
+  }
+  await attPost(e.h, e.parent, e.grade, status, iso);
+  showToast(status === "noshow" ? "🚫 Marked no-show" : status === "attended" ? "✅ Marked attended" : "↩️ Mark cleared");
+  attRefresh(idx);
+}
+async function attNobody(idx) {
+  const e = window._stuReg[idx]; if (!e) return;
+  const list = attScheduledToday(e).filter(p => p.phone);
+  if (!list.length) { showToast("Nobody is scheduled today"); return; }
+  const ok = await modalConfirm("Nobody came today? This marks " + list.map(p => spEsc(p.name)).join(" and ") + " as no-show. The card turns red and the message says we missed everyone.", { title: "Nobody showed up", okLabel: "Yes, mark all no-show", danger: true });
+  if (!ok) return;
+  const iso = starISO();
+  for (const p of list) await attPost(p.phone, p.name, e.grade, "noshow", iso);
+  showToast("🚫 All scheduled families marked no-show");
+  attRefresh(idx);
+}
+function attMyDates(e) {
+  const norm = incNorm(e.h), today = starISO(), key = starKey(e.parent), out = [];
+  try { if (schedPlan) schedPlan.weeks.forEach(w => { if (w.type === "noclass" || w.date < today) return; const fams = [schedFam(w.a), schedFam(w.b)].filter(Boolean); const me = fams.find(fm => fm.phones.some(p => incNorm(p) === norm)); if (me) { const o = fams.find(fm => fm !== me); out.push({ date: w.date, perf: w.type === "performance", with: o ? o.parent : "" }); } }); } catch (x) {}
+  try { sdGradeWeeks(Number(e.grade)).forEach(w => { const i = w.dt.getFullYear() + "-" + String(w.dt.getMonth() + 1).padStart(2, "0") + "-" + String(w.dt.getDate()).padStart(2, "0"); if (i >= today && w.parents.some(p => starKey(p.name) === key) && !out.some(o => o.date === i)) out.push({ date: i, perf: false, with: "", roster: true }); }); } catch (x) {}
+  out.sort((x, y) => x.date.localeCompare(y.date));
+  return out;
+}
+function sdRenderDuty(idx) {
+  const box = document.getElementById("sdDuty"); const e = window._stuReg[idx];
+  if (!box || !e) return;
+  const d = attDutyInfo(e), m = attMarkFor(e.h, starISO());
+  const dates = attMyDates(e);
+  const datesHtml = `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#f4f3fb;">
+    <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:4px;">📅 Scheduled dates</div>
+    ${dates.length ? dates.slice(0, 6).map(x => `<div style="font-size:12px;font-weight:700;color:#2a2750;padding:2px 0;">${spEsc(schedNice(x.date))}${x.perf ? " 🎭" : ""}${x.with ? ' <span style="color:#6b6990;font-weight:600;">with ' + spEsc(x.with) + "</span>" : ""}</div>`).join("") + (dates.length > 6 ? `<div style="font-size:11px;color:#6b6990;font-weight:700;">+ ${dates.length - 6} more</div>` : "") : `<div style="font-size:12px;color:#92400e;font-weight:700;">Not scheduled yet</div>`}
+  </div>`;
+  if (!d.on && !m) { box.innerHTML = `<div style="font-size:12px;color:#9a98b5;font-weight:700;">Not on the volunteer schedule this Sunday.</div>` + datesHtml; return; }
+  const st = attStatusFor(e);
+  const b = (label, bg, col, fn) => `<button onclick="${fn}" style="flex:1;padding:11px;border:none;border-radius:10px;background:${bg};color:${col};font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">${label}</button>`;
+  if (!d.today && !m) { box.innerHTML = `<div style="font-size:12px;font-weight:800;color:#92400e;">📅 Next on duty: ${spEsc(schedNice(d.date))}. You can mark attendance on the day.</div>` + datesHtml; return; }
+  box.innerHTML = `<div style="font-size:13px;font-weight:900;color:${st === "noshow" ? "#b91c1c" : st === "attended" ? "#15803d" : "#92400e"};margin-bottom:8px;">${st === "noshow" ? "🚫 Marked no-show today" : st === "attended" ? "✅ Attended today" : "📅 On duty today — not marked yet"}</div>
+    <div style="display:flex;gap:8px;">${b("✅ Attended", "#dcfce7", "#15803d", "attMarkOne(" + idx + ",'attended')")}${b("🚫 No-show", "#fde2e2", "#b91c1c", "attMarkOne(" + idx + ",'noshow')")}</div>
+    ${m ? `<button onclick="attMarkOne(${idx},'')" style="width:100%;margin-top:8px;padding:9px;border:none;border-radius:10px;background:#f4f3fb;color:#6b6990;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">↩️ Clear mark</button>` : ""}
+    <button onclick="attNobody(${idx})" style="width:100%;margin-top:8px;padding:10px;border:none;border-radius:10px;background:#b91c1c;color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">🚫 Nobody came — mark all scheduled as no-show</button>` + datesHtml;
+}
+
 function signupManagerCardHtml(sec) {
   const regs = signupRegs.filter(r => r.sectionId === sec.id)
     .sort((a, b) => a.grade - b.grade || String(a.childName).localeCompare(String(b.childName)));
@@ -6052,6 +6181,10 @@ function sdOpen(idx) {
       </div>
     </div>
     <div style="margin-top:16px;padding-top:12px;border-top:2px solid #f0eefb;">
+      <div style="font-size:13px;font-weight:900;color:#3b2f8f;margin-bottom:6px;">📅 Volunteer duty</div>
+      <div id="sdDuty"></div>
+    </div>
+    <div style="margin-top:16px;padding-top:12px;border-top:2px solid #f0eefb;">
       <button onclick="ctSaveOne(${idx})" style="width:100%;margin-bottom:14px;padding:11px;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;">📇 Save parent as phone contact (.vcf, with Viber label)</button>
       <div style="font-size:13px;font-weight:900;color:#3b2f8f;">🙋 Sign-ups</div>
       <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Add ${spEsc(e.child)} to an open team or event.</div>
@@ -6068,6 +6201,8 @@ function sdOpen(idx) {
   document.body.appendChild(o);
   sdFillMsg(idx);
   sdRenderSignups(idx);
+  sdRenderDuty(idx);
+  Promise.all([loadAttMarks(), loadSchedulePlan()]).then(() => { sdRenderDuty(idx); sdFillMsg(idx); }).catch(() => {});
   loadSignupsFromSheet().then(() => sdRenderSignups(idx)).catch(() => {});
   Promise.all([loadStatusesFromSheet(), loadNewParentsFromSheet(), loadParentStars()]).then(() => sdFillMsg(idx)).catch(() => {});
   loadParentInfo().then(() => {
@@ -6157,11 +6292,16 @@ function sdAutoMsg(e) {
   // my own line
   let mySched = false, myConfirmed = false;
   today.forEach(x => x.parents.forEach(p => { if (starKey(p.name) === myKey) { mySched = true; if (getStatus(x.week.date, p.name) === "confirmed") myConfirmed = true; } }));
+  const myMark = attMarkFor(e.h, todayISO);
+  if (attPlanFamsOn(todayISO).some(fm => fm.phones.some(p => incNorm(p) === incNorm(e.h)))) mySched = true;
+  const myNoShow = !!(myMark && myMark.status === "noshow");
+  if (myMark && myMark.status === "attended") myConfirmed = true;
+  if (myNoShow) myConfirmed = false;
   const lines = [];
   let missed = false;
   if (myStar && myStar.type === "volunteer") lines.push("🙌 Thank you " + me + " for also volunteering today, outside of your scheduled turn! We truly appreciate your extra help and heart for serving. 💙" + sdStarLine(me));
   else if (myStar || myConfirmed) lines.push("Thank you " + me + " for participating today" + (myKid ? " (" + myKid + "'s parent)" : "") + "! We really appreciate your participation and commitment. 💙" + (myStar ? sdStarLine(me) : (starCount(me).yr ? "\n⭐ You have " + starCount(me).yr + " star" + (starCount(me).yr === 1 ? "" : "s") + " so far this school year!" : "")));
-  else if (mySched) { missed = true; lines.push("We missed you " + me + " at today's session and hope everything is going well! 🙏"); }
+  else if (myNoShow || mySched) { missed = true; lines.push("Sorry we missed you today, " + me + ". 🙏 We hope you and your family are doing well, and you are in our prayers. 💙"); }
   else lines.push("Thank you " + me + " for being part of our Grade " + g + " family" + (myKid ? " with " + myKid : "") + "! 💙");
   // other parents who attended as their required turn
   const seen = new Set([myKey]);
@@ -6169,9 +6309,12 @@ function sdAutoMsg(e) {
   today.forEach(x => x.parents.forEach(p => {
     const k = starKey(p.name); if (seen.has(k)) return;
     const st = starredToday(p.name);
-    if (getStatus(x.week.date, p.name) === "confirmed" || (st && st.type !== "volunteer")) { seen.add(k); reqOthers.push(sdWithKid(p.name, sdChildOf(p.name))); }
+    const pm = p.h ? attMarkFor(p.h, todayISO) : null;
+    if ((getStatus(x.week.date, p.name) === "confirmed" && !(pm && pm.status === "noshow")) || (st && st.type !== "volunteer")) { seen.add(k); reqOthers.push(sdWithKid(p.name, sdChildOf(p.name))); }
   }));
   gradeStars.filter(st => st.type !== "volunteer").forEach(st => { const k = starKey(st.parentName); if (seen.has(k)) return; seen.add(k); reqOthers.push(sdWithKid(st.parentName, st.childName)); });
+  (attMarks || []).filter(m => m.date === todayISO && m.status === "attended" && Number(m.grade) === g).forEach(m => { const k = starKey(m.parentName); if (seen.has(k)) return; seen.add(k); reqOthers.push(sdWithKid(m.parentName, "")); });
+  if (attAllNoShow(e) && !myNoShow) lines.push("Sorry we missed our scheduled families today. 🙏 We hope everyone is doing well and we look forward to seeing you soon. 💙");
   if (reqOthers.length) lines.push("Thank you also " + sdNames(reqOthers) + " for participating today. 💙");
   // other parents who volunteered today
   const vols = [];
@@ -6181,7 +6324,10 @@ function sdAutoMsg(e) {
   if (next) {
     const who = next.parents.map(p => { const kid = sdChildOf(p.name); return p.name + "'s turn" + (kid ? ", representing " + kid : ""); });
     nextLine = (missed ? "As a reminder, next week is " : "Next week it will be ") + who.join(", and ") + ". " + (missed ? "We hope to see you then!" : "We look forward to seeing everyone again!");
-  } else nextLine = "Next week's schedule will be shared soon. We look forward to seeing everyone again!";
+  } else {
+    const nf = (function () { try { const w = (schedPlan ? schedPlan.weeks : []).filter(x => x.date > todayISO && x.type !== "noclass").sort((a, b) => a.date.localeCompare(b.date))[0]; return w ? [schedFam(w.a), schedFam(w.b)].filter(Boolean) : []; } catch (x) { return []; } })();
+    nextLine = nf.length ? (missed ? "As a reminder, next week is " : "Next week it will be ") + nf.map(f => f.parent + "'s turn").join(" and ") + ". " + (missed ? "We hope to see you then!" : "We look forward to seeing everyone again!") : "Next week's schedule will be shared soon. We look forward to seeing everyone again!";
+  }
   return "Hello " + me + " 🙏\n\n" + lines.join("\n\n") + "\n\n" + nextLine;
 }
 // ── Image card for Viber ──
@@ -6200,9 +6346,10 @@ async function sdRenderCard() {
   const cv = document.getElementById("sdCardCanvas"), ta = document.getElementById("sdMsgText");
   if (!cv || !ta) return;
   const e = window._stuReg[window._sdIdx];
-  await sdDrawCard(cv, ta.value, e ? e.grade : "");
+  await sdDrawCard(cv, ta.value, e ? e.grade : "", attMood(e));
 }
-async function sdDrawCard(cv, text, grade) {
+async function sdDrawCard(cv, text, grade, mood) {
+  const RED = mood === "noshow";
   try { await document.fonts.load("700 40px Nunito"); await document.fonts.load("900 70px Nunito"); } catch (x) {}
   const W = 1080, M = 64, PAD = 56, bodyW = W - 2 * M - 2 * PAD;
   const meas = document.createElement("canvas").getContext("2d");
@@ -6224,7 +6371,7 @@ async function sdDrawCard(cv, text, grade) {
   cv.width = W; cv.height = H;
   const ctx = cv.getContext("2d");
   const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#0a5260"); bg.addColorStop(0.55, "#3b2f8f"); bg.addColorStop(1, "#7c3aed");
+  if (RED) { bg.addColorStop(0, "#7f1d1d"); bg.addColorStop(0.55, "#b91c1c"); bg.addColorStop(1, "#dc2626"); } else { bg.addColorStop(0, "#0a5260"); bg.addColorStop(0.55, "#3b2f8f"); bg.addColorStop(1, "#7c3aed"); }
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
   [[140, 120, 220], [960, 260, 170], [880, H - 160, 260], [90, H - 260, 150]].forEach(c => { ctx.fillStyle = "rgba(255,255,255,0.07)"; ctx.beginPath(); ctx.arc(c[0], c[1], c[2], 0, 7); ctx.fill(); });
   ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "34px " + FONT;
@@ -6232,22 +6379,22 @@ async function sdDrawCard(cv, text, grade) {
   ctx.textAlign = "center"; ctx.fillStyle = "#ffffff";
   ctx.font = "900 64px " + FONT; ctx.fillText("Sunday School", W / 2, 130);
   const now = getMockNow(), days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"], mons = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  ctx.font = "700 40px " + FONT; ctx.fillStyle = "#ffe08a";
+  ctx.font = "700 40px " + FONT; ctx.fillStyle = RED ? "#fecaca" : "#ffe08a";
   ctx.fillText((grade ? "Grade " + grade + " · " : "") + days[now.getDay()] + ", " + mons[now.getMonth()] + " " + now.getDate(), W / 2, 200);
   ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14;
   ctx.fillStyle = "#ffffff"; sdRoundRect(ctx, M, cardTop, W - 2 * M, cardH, 44); ctx.fill();
   ctx.shadowColor = "transparent";
-  ctx.fillStyle = "#f3a712"; sdRoundRect(ctx, M, cardTop, 16, cardH, 8); ctx.fill();
+  ctx.fillStyle = RED ? "#dc2626" : "#f3a712"; sdRoundRect(ctx, M, cardTop, 16, cardH, 8); ctx.fill();
   ctx.textAlign = "left";
   let y = cardTop + PAD;
   items.forEach(it => {
     if (it.gap) { y += it.gap; return; }
     ctx.font = (it.head ? "900 50px " : "600 42px ") + FONT;
-    ctx.fillStyle = it.head ? "#3b2f8f" : "#1e1b4b";
+    ctx.fillStyle = it.head ? (RED ? "#991b1b" : "#3b2f8f") : "#1e1b4b";
     it.lines.forEach(l => { y += it.lh; ctx.fillText(l, M + PAD, y - (it.lh - (it.head ? 50 : 42)) / 2 - 6); });
   });
   ctx.textAlign = "center"; ctx.fillStyle = "#ffffff"; ctx.font = "800 38px " + FONT;
-  ctx.fillText("💙 With love from our Sunday School family", W / 2, H - 80);
+  ctx.fillText(RED ? "🙏 With love and respect from our Sunday School family" : "💙 With love from our Sunday School family", W / 2, H - 80);
 }
 function cvBlob(id) { return new Promise(res => document.getElementById(id).toBlob(res, "image/png")); }
 async function cvShare(id) {
@@ -9306,12 +9453,13 @@ function renderClassesTab() {
   };
 
   const editRowHTML = (e, color) => { const ri = window._stuReg.push(e) - 1; return `
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:0.5px solid #f0eefb;flex-wrap:wrap;${attStatusFor(e) === "noshow" ? "background:#fdeaea;border-left:4px solid #dc2626;" : ""}">
       <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">${e.child.charAt(0).toUpperCase()}</div>
       <div style="flex:1;min-width:100px;">
         <div style="font-size:14px;font-weight:800;color:#0a3d45;">${e.child}</div>
         <div style="font-size:12px;color:#7b7a90;">Parent: ${e.parent}</div>
         ${starBadge(e.parent)}
+        ${attBadge(e)}
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;">
         <button onclick="starGive(${ri})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:${starredToday(e.parent) ? "#dcfce7" : "#fff4cc"};color:${starredToday(e.parent) ? "#15803d" : "#854f0b"};">${starredToday(e.parent) ? "⭐ ✓" : "⭐ Star"}</button>
@@ -9331,6 +9479,7 @@ function renderClassesTab() {
         <div style="font-size:13px;font-weight:700;color:#0a3d45;">${e.child}</div>
         <div style="font-size:11px;color:#bbb;">Parent: ${e.parent}</div>
         ${starBadge(e.parent)}
+        ${attBadge(e)}
       </div>
       <button onclick="sdOpen(${ri})" style="padding:6px 9px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:8px;cursor:pointer;background:#f0eefb;color:#6b6990;">👁 View</button>
     </div>`; };
