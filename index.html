@@ -3374,6 +3374,7 @@ function renderAdminDash() {
   const parentsTab = `<button id="tabParents" onclick="showAdminTab('parents')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">➕ Parents</button>`;
   const signupsTab = `<button id="tabSignups" onclick="showAdminTab('signups')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🙋 Sign-Ups</button>`;
   const incomingTab = !isSuperAdmin ? "" : `<button id="tabIncoming" onclick="showAdminTab('incoming')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📥 Incoming</button>`;
+  const exportTab = !isSuperAdmin ? "" : `<button id="tabExport" onclick="showAdminTab('export')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📇 Export</button>`;
   const uploadTab = adminRole !== "gradeadmin" ? "" : `<button id="tabUpload" onclick="showAdminTab('upload')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📤 Upload</button>`;
   const lessonTab = `<button id="tabLesson" onclick="showAdminTab('lesson')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📖 Lesson</button>`;
 
@@ -3385,6 +3386,7 @@ function renderAdminDash() {
       ${lessonTab}
       ${signupsTab}
       ${incomingTab}
+      ${exportTab}
       ${uploadTab}
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🎓 Students</button>
@@ -3398,6 +3400,7 @@ function renderAdminDash() {
     <div id="tabLessonContent" style="display:none;"></div>
     <div id="tabSignupsContent" style="display:none;"></div>
     ${isSuperAdmin ? `<div id="tabIncomingContent" style="display:none;"></div>` : ""}
+    ${isSuperAdmin ? `<div id="tabExportContent" style="display:none;"></div>` : ""}
     ${adminRole === "gradeadmin" ? `<div id="tabUploadContent" style="display:none;"></div>` : ""}
     <div id="tabTrackerContent" style="display:none;"></div>
     <div id="tabClassesContent" style="display:none;"></div>
@@ -3416,7 +3419,7 @@ function renderAdminDash() {
 }
 
 function showAdminTab(tab) {
-  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson","signups","incoming","upload"];
+  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson","signups","incoming","export","upload"];
   allTabs.forEach(t => {
     const idSuffix = t === "superadmin" ? "SuperAdmin" : t.charAt(0).toUpperCase() + t.slice(1);
     const content = document.getElementById("tab" + idSuffix + "Content");
@@ -3450,6 +3453,10 @@ function showAdminTab(tab) {
   }
   if (tab === "lesson") {
     loadLessonPlansFromSheet().then(() => renderLessonPlanViewerTab()).catch(() => renderLessonPlanViewerTab());
+  }
+  if (tab === "export" && adminRole === "superadmin") {
+    renderExportTab();
+    Promise.all([loadChildrenFromSheet(), loadParentInfo(), loadNewParentsFromSheet()]).then(() => renderExportTab()).catch(() => {});
   }
   if (tab === "incoming" && adminRole === "superadmin") {
     renderIncomingTab();
@@ -4697,6 +4704,189 @@ function spPdfEvent(gi) {
   if (g) spMakePdf(g.sections.map(s => s.id), g.eventName + "_" + g.year + "_SignUps");
 }
 
+// ══════════════ CONTACT EXPORT (PDF / phone contacts / Google CSV) ══════════════
+let ctGrades = new Set();
+let ctPick = new Set();
+let ctSearch = "";
+function ctLabel() { const el = document.getElementById("ctLabel"); return (el && el.value.trim()) || "Viber"; }
+function ctOpt(id, def) { const el = document.getElementById(id); return el ? el.checked : def; }
+function ctFamilies() {
+  const map = {};
+  (childrenSheetData || []).forEach(r => {
+    if (!r || !r.phone || r.graduated || r.unassigned) return;
+    const ph = incNorm(String(r.phone).split("_child")[0]);
+    if (!ph) return;
+    if (!map[ph]) map[ph] = { phone: ph, parent: "", kids: [], grades: new Set() };
+    const f = map[ph];
+    if (!f.parent && r.parentName) f.parent = r.parentName;
+    f.kids.push({ name: r.childName || r.name || "", grade: Number(r.grade) });
+    f.grades.add(Number(r.grade));
+  });
+  Object.values(map).forEach(f => {
+    const rec = incParentRecord(f.phone);
+    if (!f.parent && rec) f.parent = rec.name || "";
+    const pi = parentInfoMap[f.phone] || {};
+    f.phone2 = pi.phone2 ? incNorm(pi.phone2) : "";
+    f.address = pi.address || "";
+    if (!f.parent) f.parent = "Parent of " + (f.kids[0] ? f.kids[0].name : "student");
+  });
+  return Object.values(map).sort((a, b) => a.parent.localeCompare(b.parent));
+}
+function ctSelected(fams) {
+  fams = fams || ctFamilies();
+  return fams.filter(f => ctPick.has(f.phone) || [...f.grades].some(g => ctGrades.has(g)));
+}
+function ctFirstNames(f) { return f.kids.map(k => String(k.name).split(" ")[0]).filter(Boolean).join(" & "); }
+function ctDisplay(f) {
+  const lab = ctLabel();
+  return f.parent + " (" + ctFirstNames(f) + ")" + (ctOpt("ctInName", true) ? " - " + lab : "");
+}
+function ctLabels(f) {
+  const lab = ctLabel();
+  return [lab].concat([...f.grades].sort((a, b) => a - b).map(g => lab + " Gr " + g));
+}
+function ctVEsc(t) { return String(t == null ? "" : t).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\;"); }
+function ctVcard(f) {
+  const parts = f.parent.trim().split(/\s+/);
+  const last = parts.length > 1 ? parts.pop() : "";
+  const first = parts.join(" ");
+  const inc2 = ctOpt("ctPhone2", true);
+  const kids = f.kids.map(k => k.name + " (Grade " + k.grade + ")").join(", ");
+  const L = ["BEGIN:VCARD", "VERSION:3.0",
+    "N:" + ctVEsc(last) + ";" + ctVEsc(first) + (ctOpt("ctInName", true) ? " (" + ctVEsc(ctFirstNames(f)) + ") - " + ctVEsc(ctLabel()) : " (" + ctVEsc(ctFirstNames(f)) + ")") + ";;;",
+    "FN:" + ctVEsc(ctDisplay(f)),
+    "ORG:" + ctVEsc("Sunday School - " + ctLabel()),
+    "TEL;TYPE=CELL,VOICE:+1" + f.phone];
+  if (inc2 && f.phone2 && f.phone2.length === 10) L.push("TEL;TYPE=CELL,VOICE:+1" + f.phone2);
+  if (f.address) L.push("ADR;TYPE=HOME:;;" + ctVEsc(f.address) + ";;;;");
+  L.push("CATEGORIES:" + ctLabels(f).map(ctVEsc).join(","));
+  L.push("NOTE:" + ctVEsc("Parent of " + kids + ". Label: " + ctLabels(f).join(", ")));
+  L.push("END:VCARD");
+  return L.join("\r\n");
+}
+function ctCsvCell(t) { t = String(t == null ? "" : t); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+function ctGoogleCsv(list) {
+  const head = ["First Name", "Last Name", "Organization Name", "Notes", "Labels", "Phone 1 - Label", "Phone 1 - Value", "Phone 2 - Label", "Phone 2 - Value", "Address 1 - Label", "Address 1 - Formatted"];
+  const rows = list.map(f => {
+    const parts = f.parent.trim().split(/\s+/);
+    const last = parts.length > 1 ? parts.pop() : "";
+    const first = parts.join(" ") + " (" + ctFirstNames(f) + ")" + (ctOpt("ctInName", true) ? " - " + ctLabel() : "");
+    const inc2 = ctOpt("ctPhone2", true) && f.phone2 && f.phone2.length === 10;
+    return [first, last, "Sunday School", "Parent of " + f.kids.map(k => k.name + " (Grade " + k.grade + ")").join(", "),
+      "* myContacts ::: " + ctLabels(f).join(" ::: "), "Mobile", "+1" + f.phone, inc2 ? "Mobile" : "", inc2 ? "+1" + f.phone2 : "", f.address ? "Home" : "", f.address].map(ctCsvCell).join(",");
+  });
+  return head.join(",") + "\r\n" + rows.join("\r\n");
+}
+function ctDownload(name, mime, text) {
+  const blob = new Blob([text], { type: mime + ";charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1500);
+}
+function ctFileTag() { const g = [...ctGrades].sort((a, b) => a - b); return (g.length ? "Gr" + g.join("-") : "Selected") + "_" + new Date().toISOString().slice(0, 10); }
+function ctNeedSelection() {
+  const list = ctSelected();
+  if (!list.length) { showToast("Pick at least one grade or family first"); return null; }
+  return list;
+}
+function ctExportVcf() {
+  const list = ctNeedSelection(); if (!list) return;
+  ctDownload(ctLabel().replace(/\W+/g, "_") + "_Contacts_" + ctFileTag() + ".vcf", "text/vcard", list.map(ctVcard).join("\r\n") + "\r\n");
+  showToast("📇 " + list.length + " contacts exported — open the file to import");
+}
+function ctExportCsv() {
+  const list = ctNeedSelection(); if (!list) return;
+  ctDownload(ctLabel().replace(/\W+/g, "_") + "_GoogleContacts_" + ctFileTag() + ".csv", "text/csv", ctGoogleCsv(list));
+  showToast("📊 " + list.length + " contacts exported for Google Contacts");
+}
+async function ctExportPdf() {
+  const list = ctNeedSelection(); if (!list) return;
+  let JsPDF;
+  try { JsPDF = await spPdfLoadLib(); } catch (x) { await customModal({ title: "Couldn't build the PDF", message: "The PDF tool could not load. Check your internet connection and try again.", type: "alert" }); return; }
+  const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 36;
+  const cols = [{ k: "n", t: "#", w: 24 }, { k: "parent", t: "Parent / guardian", w: 130 }, { k: "kids", t: "Child(ren)", w: 118 }, { k: "gr", t: "Gr", w: 30 },
+    { k: "phone", t: "Phone", w: 84 }, { k: "phone2", t: "2nd phone", w: 84 }, { k: "address", t: "Address", w: 170 }, { k: "label", t: "Label", w: 0 }];
+  cols[7].w = W - 2 * M - cols.slice(0, 7).reduce((a, c) => a + c.w, 0);
+  const gen = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const gl = [...ctGrades].sort((a, b) => a - b);
+  let page = 1, y = 0;
+  doc.setFillColor(59, 47, 143); doc.rect(0, 0, W, 64, "F"); doc.setFillColor(236, 72, 153); doc.rect(0, 64, W, 4, "F");
+  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.text(ctLabel() + " Contact List", M, 32);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  doc.text("Sunday School  |  " + (gl.length ? "Grades " + gl.join(", ") + "  |  " : "") + list.length + " contacts  |  Generated " + gen, M, 50);
+  y = 90;
+  function footer() { doc.setTextColor(140, 138, 170); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text("Confidential - family contact information. For ministry use only.", M, H - 18); doc.text("Page " + page, W - M, H - 18, { align: "right" }); }
+  function header() {
+    doc.setFillColor(238, 235, 252); doc.rect(M, y - 12, W - 2 * M, 20, "F"); doc.setTextColor(59, 47, 143); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+    let x = M; cols.forEach(c => { doc.text(c.t, x + 5, y + 1); x += c.w; }); y += 18;
+  }
+  header();
+  list.forEach((f, i) => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    const vals = { n: String(i + 1), parent: f.parent, kids: f.kids.map(k => k.name).join(", "), gr: [...f.grades].sort((a, b) => a - b).join(","), phone: incFmt(f.phone), phone2: f.phone2 ? incFmt(f.phone2) : "", address: f.address, label: ctLabels(f).join(", ") };
+    const cells = cols.map(c => doc.splitTextToSize(spPdfClean(vals[c.k]) || "-", c.w - 10));
+    const rh = Math.max.apply(null, cells.map(c => c.length)) * 11 + 8;
+    if (y + rh > H - 40) { footer(); doc.addPage(); page++; y = 40; header(); }
+    if (i % 2 === 0) { doc.setFillColor(248, 247, 253); doc.rect(M, y - 10, W - 2 * M, rh, "F"); }
+    let x = M;
+    cells.forEach((c, ci) => { doc.setFont("helvetica", ci === 1 ? "bold" : "normal"); if (ci === 4 || ci === 5) doc.setTextColor(10, 82, 96); else if (ci === 7) doc.setTextColor(115, 96, 242); else doc.setTextColor(30, 27, 75); doc.text(c, x + 5, y); x += cols[ci].w; });
+    y += rh;
+  });
+  footer();
+  doc.save(ctLabel().replace(/\W+/g, "_") + "_ContactList_" + ctFileTag() + ".pdf");
+  showToast("📄 PDF ready");
+}
+function ctToggleGrade(g) { if (ctGrades.has(g)) ctGrades.delete(g); else ctGrades.add(g); renderExportTab(); }
+function ctAllGrades(on) { ctGrades = on ? new Set(getActiveGrades()) : new Set(); renderExportTab(); }
+function ctTogglePick(ph) { if (ctPick.has(ph)) ctPick.delete(ph); else ctPick.add(ph); ctUpdateCount(); const el = document.getElementById("ctRow_" + ph); if (el) el.style.background = ctPick.has(ph) ? "#e6f7ee" : "#f4f3fb"; }
+function ctSearchInput(v) { ctSearch = v; ctRenderPickList(); }
+function ctUpdateCount() { const el = document.getElementById("ctCount"); if (el) el.textContent = ctSelected().length + " contact" + (ctSelected().length === 1 ? "" : "s") + " selected"; }
+function ctRenderPickList() {
+  const box = document.getElementById("ctPickList"); if (!box) return;
+  const q = ctSearch.trim().toLowerCase();
+  const fams = ctFamilies().filter(f => !q || (f.parent + " " + f.kids.map(k => k.name).join(" ") + " " + f.phone).toLowerCase().includes(q)).slice(0, 80);
+  box.innerHTML = fams.map(f => `<label id="ctRow_${f.phone}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;margin-bottom:5px;background:${ctPick.has(f.phone) ? "#e6f7ee" : "#f4f3fb"};cursor:pointer;">
+    <input type="checkbox" ${ctPick.has(f.phone) ? "checked" : ""} onchange="ctTogglePick('${f.phone}')" style="width:18px;height:18px;">
+    <span style="font-size:13px;font-weight:800;color:#2a2750;">${spEsc(f.parent)}<span style="font-weight:600;color:#6b6990;"> · ${spEsc(f.kids.map(k => k.name + " Gr" + k.grade).join(", "))}</span></span></label>`).join("") || `<div style="font-size:12px;color:#9a98b5;font-weight:700;">No matches.</div>`;
+  ctUpdateCount();
+}
+function renderExportTab() {
+  const el = document.getElementById("tabExportContent"); if (!el) return;
+  const keepLabel = (document.getElementById("ctLabel") || {}).value;
+  const grades = getActiveGrades();
+  const btn = "padding:12px;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;color:white;width:100%;margin-top:8px;";
+  el.innerHTML = `
+    <div style="font-size:12px;color:#6b6990;margin-bottom:12px;">Export parent contacts with a <b>label</b> so they are easy to find and add in Viber. Pick whole classes, individual families, or both.</div>
+    <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:6px;">1️⃣ Classes</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      ${grades.map(g => `<button onclick="ctToggleGrade(${g})" style="padding:9px 14px;border:none;border-radius:20px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;background:${ctGrades.has(g) ? "#3b2f8f" : "#e0f5f7"};color:${ctGrades.has(g) ? "white" : "#3b2f8f"};">${ctGrades.has(g) ? "✓ " : ""}Grade ${g}</button>`).join("")}
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;"><a href="#" onclick="ctAllGrades(true);return false;" style="font-size:12px;font-weight:800;color:#7360f2;">Select all</a><a href="#" onclick="ctAllGrades(false);return false;" style="font-size:12px;font-weight:800;color:#7360f2;">Clear</a></div>
+    <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:6px;">2️⃣ Individual families (optional)</div>
+    <input type="text" oninput="ctSearchInput(this.value)" value="${spEsc(ctSearch)}" placeholder="Search parent, child or phone" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;margin-bottom:8px;">
+    <div id="ctPickList" style="max-height:260px;overflow:auto;margin-bottom:14px;"></div>
+    <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:6px;">3️⃣ Label &amp; options</div>
+    <input id="ctLabel" type="text" value="${spEsc(keepLabel || "Viber")}" placeholder="Label (e.g. Viber)" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;margin-bottom:8px;">
+    <label style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700;color:#2a2750;margin-bottom:6px;"><input type="checkbox" id="ctInName" checked> Also put the label in the contact name, e.g. "Dad B (Ben) - Viber" (searchable on any phone)</label>
+    <label style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700;color:#2a2750;margin-bottom:10px;"><input type="checkbox" id="ctPhone2" checked> Include the 2nd phone number</label>
+    <div id="ctCount" style="font-size:13px;font-weight:900;color:#15803d;margin-bottom:4px;"></div>
+    <button onclick="ctExportVcf()" style="${btn}background:linear-gradient(135deg,#7360f2,#a855f7);">📇 Phone contacts (.vcf)</button>
+    <button onclick="ctExportCsv()" style="${btn}background:linear-gradient(135deg,#0a5260,#0d7a8a);">📊 Google Contacts (.csv) — adds a real label</button>
+    <button onclick="ctExportPdf()" style="${btn}background:linear-gradient(135deg,#ec4899,#8b5cf6);">📄 PDF contact list</button>
+    <div style="font-size:11px;color:#6b6990;font-weight:600;margin-top:10px;line-height:1.5;">💡 <b>.vcf:</b> tap the downloaded file → open with Contacts → Save. <b>.csv:</b> on a computer go to contacts.google.com → Import; each contact gets the label "${spEsc(keepLabel || "Viber")}" plus a grade label, then Viber picks them up from your phone contacts.</div>`;
+  ctRenderPickList();
+}
+function ctSaveOne(idx) {
+  const e = window._stuReg[idx]; if (!e) return;
+  const ph = incNorm(e.h);
+  const f = ctFamilies().find(x => x.phone === ph);
+  if (!f) { showToast("No contact found for this family"); return; }
+  ctDownload(f.parent.replace(/\W+/g, "_") + ".vcf", "text/vcard", ctVcard(f) + "\r\n");
+  showToast("📇 Contact file ready — open it to save");
+}
+
 function signupManagerCardHtml(sec) {
   const regs = signupRegs.filter(r => r.sectionId === sec.id)
     .sort((a, b) => a.grade - b.grade || String(a.childName).localeCompare(String(b.childName)));
@@ -5608,6 +5798,7 @@ function sdOpen(idx) {
       </div>
     </div>
     <div style="margin-top:16px;padding-top:12px;border-top:2px solid #f0eefb;">
+      <button onclick="ctSaveOne(${idx})" style="width:100%;margin-bottom:14px;padding:11px;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;">📇 Save parent as phone contact (.vcf, with Viber label)</button>
       <div style="font-size:13px;font-weight:900;color:#3b2f8f;">🙋 Sign-ups</div>
       <div style="font-size:11px;color:#6b6990;font-weight:700;margin:2px 0 6px;">Add ${spEsc(e.child)} to an open team or event.</div>
       <div id="sdSignups"></div>
