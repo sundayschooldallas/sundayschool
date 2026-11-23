@@ -4969,15 +4969,30 @@ function schedISO(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).p
 function schedParse(iso) { const p = String(iso).split("-"); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); }
 function schedNice(iso) { return schedParse(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }); }
 function schedIsLastSunday(d) { const n = new Date(d); n.setDate(n.getDate() + 7); return n.getMonth() !== d.getMonth(); }
-function schedSundays() {
-  const now = (typeof getMockNow === "function" ? getMockNow() : new Date());
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+// The Sunday AFTER today (the schedule starts next weekend); fixed once and stored in the plan
+function schedStartISO() {
+  if (schedPlan && schedPlan.start) return schedPlan.start;
+  const n = (typeof getMockNow === "function" ? getMockNow() : new Date());
+  const d = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1);
   while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
+  return schedISO(d);
+}
+function schedSundays() {
+  const d = schedParse(schedStartISO());
   const endYear = d.getMonth() >= 8 ? d.getFullYear() + 1 : d.getFullYear();   // school year ends Aug 31
   const end = new Date(endYear, 7, 31);
   const out = [];
   while (d <= end) { out.push(new Date(d)); d.setDate(d.getDate() + 7); }
   return out;
+}
+// Older saved plans started today: drop weeks before the start date
+function schedTrim() {
+  if (!schedPlan || !schedPlan.weeks) return false;
+  let changed = false;
+  if (!schedPlan.start) { schedPlan.start = schedStartISO(); changed = true; }
+  const before = schedPlan.weeks.length;
+  schedPlan.weeks = schedPlan.weeks.filter(w => w.date >= schedPlan.start);
+  return changed || schedPlan.weeks.length !== before;
 }
 function schedGrade0(f) { return Number(String(f.grades).split(",")[0]) || 0; }
 // Fill every non-manual Sunday with two DIFFERENT families, balanced and rotating
@@ -5021,9 +5036,9 @@ async function loadSchedulePlan() {
   try {
     const r = await fetch(SHEET_URL + "?type=schedulePlan&nocache=" + Date.now(), { mode: "cors" });
     const d = await r.json();
-    if (d && d.families && d.weeks) { schedPlan = d; try { localStorage.setItem(SCHED_KEY, JSON.stringify(d)); } catch (x) {} return; }
+    if (d && d.families && d.weeks) { schedPlan = d; const ch = schedTrim(); try { localStorage.setItem(SCHED_KEY, JSON.stringify(schedPlan)); } catch (x) {} if (ch && typeof adminRole !== "undefined" && adminRole === "superadmin") schedSave(true); return; }
   } catch (x) {}
-  if (!schedPlan) { try { const c = JSON.parse(localStorage.getItem(SCHED_KEY) || "null"); if (c && c.families) schedPlan = c; } catch (x) {} }
+  if (!schedPlan) { try { const c = JSON.parse(localStorage.getItem(SCHED_KEY) || "null"); if (c && c.families) { schedPlan = c; schedTrim(); } } catch (x) {} }
 }
 async function schedSave(quiet) {
   if (!schedPlan) return;
@@ -5035,6 +5050,7 @@ async function schedSave(quiet) {
 }
 async function schedMake(keep) {
   if (!schedPlan) schedPlan = { families: schedFreshFamilies(), weeks: [] };
+  if (!schedPlan.start) schedPlan.start = schedStartISO();
   schedGenerate(keep);
   await schedSave(true);
   showToast("📅 Schedule created");
@@ -5117,6 +5133,7 @@ function renderScheduleTab() {
   const famRows = schedPlan.families.map(f => `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;margin-bottom:4px;background:${f.skip ? "#fdecec" : "#f4f3fb"};font-size:12px;font-weight:700;color:#2a2750;cursor:pointer;">
       <input type="checkbox" ${f.skip ? "" : "checked"} onchange="schedToggleSkip('${f.id}')" style="width:17px;height:17px;flex:none;"> <span style="flex:1;">${spEsc(schedFamLabel(f))}${f.phones.length ? "" : ' <b style="color:#b91c1c;">· no phone</b>'}</span><span style="color:#6b6990;">${cnt[f.id] || 0}×</span></label>`).join("");
   el.innerHTML = `
+    <div style="font-size:12px;color:#3b2f8f;font-weight:800;margin-bottom:4px;">📅 Starts ${spEsc(schedNice(schedPlan.start || schedPlan.weeks[0].date))}</div>
     <div style="font-size:12px;color:#6b6990;font-weight:700;margin-bottom:10px;">${schedPlan.weeks.filter(w => w.type !== "noclass").length} Sundays · ${act.length} families in rotation · two different families every Sunday · 🎭 = last Sunday of the month</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
       <button onclick="schedPdf()" style="${bt}background:linear-gradient(135deg,#ec4899,#8b5cf6);color:white;">📄 PDF</button>
@@ -5161,11 +5178,16 @@ function attRosterOn(g, iso) {
   return out;
 }
 // Is this row's parent on duty this (or the coming) Sunday?
-function attDutyInfo(e) {
-  const D = attDutyDate(), norm = incNorm(e.h), key = starKey(e.parent);
+function attNextSunday() { const n = getMockNow(); const x = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1); while (x.getDay() !== 0) x.setDate(x.getDate() + 1); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); }
+function attOnDate(e, D) {
+  const norm = incNorm(e.h), key = starKey(e.parent);
   let on = attPlanFamsOn(D).some(fm => fm.phones.some(p => incNorm(p) === norm));
   if (!on) on = attRosterOn(e.grade, D).some(p => starKey(p.name) === key);
-  return { date: D, today: D === starISO(), on: on };
+  return on;
+}
+function attDutyInfo(e) {
+  const D = attDutyDate(), N = attNextSunday();
+  return { date: D, today: D === starISO(), on: attOnDate(e, D), nextDate: N, nextOn: attOnDate(e, N) };
 }
 function attStatusFor(e) {
   const iso = starISO(), m = attMarkFor(e.h, iso);
@@ -5193,13 +5215,13 @@ function attMood(e) {
 }
 function attBadge(e) {
   try {
-    const st = attStatusFor(e);
-    if (st === "noshow") return `<div style="display:inline-block;margin-top:3px;padding:2px 9px;border-radius:20px;background:#fde2e2;color:#b91c1c;font-size:11px;font-weight:900;">🚫 No-show today</div>`;
-    if (st === "attended") return "";
-    const d = attDutyInfo(e);
-    if (!d.on) return "";
-    const lbl = d.today ? "📅 On duty today" : "📅 Next: " + schedNice(d.date).replace(/, \d{4}$/, "");
-    return `<div onclick="sdOpenByParent('${spEsc(e.h)}','${spEsc(encodeURIComponent(String(e.child)).replace(/'/g, "%27"))}')" style="display:inline-block;margin-top:3px;padding:2px 9px;border-radius:20px;background:#fff1c9;color:#92400e;font-size:11px;font-weight:900;cursor:pointer;">${lbl}</div>`;
+    const st = attStatusFor(e), d = attDutyInfo(e);
+    const chip = (txt, bg, col) => `<div onclick="sdOpenByParent('${spEsc(e.h)}','${encodeURIComponent(String(e.child)).replace(/'/g, "%27")}')" style="display:inline-block;margin:3px 4px 0 0;padding:2px 9px;border-radius:20px;background:${bg};color:${col};font-size:11px;font-weight:900;cursor:pointer;">${txt}</div>`;
+    let out = "";
+    if (st === "noshow") out += `<div style="display:inline-block;margin:3px 4px 0 0;padding:2px 9px;border-radius:20px;background:#fde2e2;color:#b91c1c;font-size:11px;font-weight:900;">🚫 No-show today</div>`;
+    else if (d.today && d.on && st !== "attended") out += chip("📅 On duty today", "#fff1c9", "#92400e");
+    if (d.nextOn) out += chip("➡️ Next: " + schedNice(d.nextDate).replace(/, \d{4}$/, ""), "#e0eaff", "#1e40af");
+    return out;
   } catch (x) { return ""; }
 }
 function sdOpenByParent(h, encChild) {
