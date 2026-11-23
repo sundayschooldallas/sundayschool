@@ -2292,7 +2292,8 @@ function showMainApp() {
     loadStatusesFromSheet(),
     loadTrackerFromSheet(myName),
     loadNewParentsFromSheet(),
-    loadParentStars()
+    loadParentStars(),
+    loadSchedulePlan()
   ]).then(() => { try { renderMyCard(); } catch(e){} }).catch(() => {});
 }
 
@@ -2665,7 +2666,7 @@ function renderMyCard() {
         ${respondHTML}
       </div>
 
-      ${(function(){ try { return renderParentStarsCard(); } catch(e) { return ""; } })()}
+      ${(function(){ try { return renderParentStarsCard() + renderSchedCard(); } catch(e) { return ""; } })()}
       ${(function(){ try { return renderParentTracker(); } catch(e) { return ""; } })()}
 
     </div>`;
@@ -3375,6 +3376,7 @@ function renderAdminDash() {
   const signupsTab = `<button id="tabSignups" onclick="showAdminTab('signups')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🙋 Sign-Ups</button>`;
   const incomingTab = !isSuperAdmin ? "" : `<button id="tabIncoming" onclick="showAdminTab('incoming')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📥 Incoming</button>`;
   const exportTab = !isSuperAdmin ? "" : `<button id="tabExport" onclick="showAdminTab('export')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📇 Export</button>`;
+  const schedTab = !isSuperAdmin ? "" : `<button id="tabSchedule" onclick="showAdminTab('schedule')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📅 Schedule</button>`;
   const uploadTab = adminRole !== "gradeadmin" ? "" : `<button id="tabUpload" onclick="showAdminTab('upload')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📤 Upload</button>`;
   const lessonTab = `<button id="tabLesson" onclick="showAdminTab('lesson')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">📖 Lesson</button>`;
 
@@ -3387,6 +3389,7 @@ function renderAdminDash() {
       ${signupsTab}
       ${incomingTab}
       ${exportTab}
+      ${schedTab}
       ${uploadTab}
       <button id="tabTracker" onclick="showAdminTab('tracker')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">⭐ Tracker</button>
       <button id="tabClasses" onclick="showAdminTab('classes')" style="flex:1;min-width:50px;padding:9px 4px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border:none;border-radius:10px;background:#e0f5f7;color:#0a5260;cursor:pointer;">🎓 Students</button>
@@ -3401,6 +3404,7 @@ function renderAdminDash() {
     <div id="tabSignupsContent" style="display:none;"></div>
     ${isSuperAdmin ? `<div id="tabIncomingContent" style="display:none;"></div>` : ""}
     ${isSuperAdmin ? `<div id="tabExportContent" style="display:none;"></div>` : ""}
+    ${isSuperAdmin ? `<div id="tabScheduleContent" style="display:none;"></div>` : ""}
     ${adminRole === "gradeadmin" ? `<div id="tabUploadContent" style="display:none;"></div>` : ""}
     <div id="tabTrackerContent" style="display:none;"></div>
     <div id="tabClassesContent" style="display:none;"></div>
@@ -3419,7 +3423,7 @@ function renderAdminDash() {
 }
 
 function showAdminTab(tab) {
-  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson","signups","incoming","export","upload"];
+  const allTabs = ["attendance","swap","pin","tracker","classes","students","superadmin","parents","lesson","signups","incoming","export","schedule","upload"];
   allTabs.forEach(t => {
     const idSuffix = t === "superadmin" ? "SuperAdmin" : t.charAt(0).toUpperCase() + t.slice(1);
     const content = document.getElementById("tab" + idSuffix + "Content");
@@ -3453,6 +3457,10 @@ function showAdminTab(tab) {
   }
   if (tab === "lesson") {
     loadLessonPlansFromSheet().then(() => renderLessonPlanViewerTab()).catch(() => renderLessonPlanViewerTab());
+  }
+  if (tab === "schedule" && adminRole === "superadmin") {
+    renderScheduleTab();
+    loadSchedulePlan().then(() => renderScheduleTab()).catch(() => {});
   }
   if (tab === "export" && adminRole === "superadmin") {
     renderExportTab();
@@ -4906,6 +4914,231 @@ function ctSaveOne(idx) {
   if (!f) { showToast("No contact found for this family"); return; }
   ctDownload(f.parent.replace(/\W+/g, "_") + ".vcf", "text/vcard", ctVcard(f) + "\r\n");
   showToast("📇 Contact file ready — open it to save");
+}
+
+// ══════════════ PARENT SCHEDULE PLANNER (Super Admin) ══════════════
+// 40 families from the deduplicated roster (one entry per household)
+const SCHED_SEED = [
+["Abraham / Tibletz Tesfamariam","Mathew Abraham","7","3108953634,6266448206"],
+["Adam and Ruth","Nathan Adam","8","9724814976"],
+["Almaz Lgam / Almaz Ljam","Ebenezer Brhane","7","9197983113,9195345631"],
+["Amanuel Habte","Bruk Amanuel; Bruk Habte","7","4693951835"],
+["Baire / Senait","Nahom Baire","7","6146450670,6146950610"],
+["Bereket Isayas","(name obscured in source)","8",""],
+["Daniel Tsigereda","Jonathn Araya","7","5732397032"],
+["Dizebina Antino","Huruy Redie","7","9713378224"],
+["Drar","Abigail Drar; Noah Drar","7,8","8179075928"],
+["Eden GileMichael","Semaria Teclebrhan","7","2142263004"],
+["Elshalom Parent","Elshalom","8","7204706318"],
+["Eyasu / Eyasu Ashiel","Lydia Eyasu","7","7023550281,7023721476"],
+["Feewov","Neko Feewov","7","2142296912"],
+["Fiori Araia / Ruth's minor daf","Ruth Gebremichael","8","4159008984,4159008985,5104637571"],
+["Frezghi","Phinehas T","8","2145178851"],
+["Ghirmay Araia","Shushan Tesfay","8","2145847142"],
+["Habtom","Fikri Habtom; Rae Tewelde","7,8","4692649554"],
+["Huruy Habtay / Nahyi ers Parent","Nayhier Habtay","7","4692379656,4693405819"],
+["John and Meron / Merom Tesfa","Abigail Woldezghi","8","5106967994,5106467994"],
+["Liya","Ghirmay Andemeskel","8","6503070926"],
+["Mehari and Rahwa","Priscilla Mehari","8","7146835957"],
+["Meron Michael","Hiyabiel Bereket","8","5108623261"],
+["Michael / Michael Gebre","Caleb Michael","7","3195943109,3195943104"],
+["Michal","Noah Michael","7","2145158636"],
+["Nathan R Parent","Nathan R","7","9095507330"],
+["Nathans Parent","Nathan Baraki","7","9404424355"],
+["Rahwa and Ermias","Elhana Tucabo; Eliana Tucabo","7","7572145102"],
+["Rozina Zere","Samuel Araya","7","4698597443"],
+["Samuel Goitom","Essay Goitom","7","5106418990"],
+["Samuel Hadgu","Essey Samuel","7","5102419113"],
+["Sarons Parent","Saron Woldegaber","7","2148640447"],
+["Selam Habte","Abner Yonas; Betty Samuel","7,8","2146064743,9404655647"],
+["Selamawit Gebresilassie","Tsion Haile","7","4693459379"],
+["Semhar Abraham","Betty Samuel","8","9455462914,9405546294"],
+["Solomon And Yorus","Senay Solomon","8","2147533005"],
+["Teklit and Rahel","Mark Teklit","7","7207676401"],
+["Tesfu Beraki","Lilly Beraki; Naomi Beraki; Liyana Efrem","8","7039537160,7039537159"],
+["Yemane Issac","Jonathan Tsegay","7","2147498471"],
+["Yohannes Okubay","Yoel Yohannes","7","4692307903,4692301903"],
+["Yordanos Mogos","Hiruy Tesfamichael","8","2145806043,2144545896"]
+];
+let schedPlan = null;   // { families:[{id,parent,kids,grades,phones,skip}], weeks:[{date,type,a,b,manual,note}] }
+const SCHED_KEY = "schedPlanCache";
+function schedFreshFamilies() {
+  return SCHED_SEED.map((f, i) => ({ id: "f" + (i + 1), parent: f[0], kids: f[1], grades: f[2], phones: f[3] ? f[3].split(",") : [], skip: !f[3] }));
+}
+function schedISO(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function schedParse(iso) { const p = String(iso).split("-"); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); }
+function schedNice(iso) { return schedParse(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }); }
+function schedIsLastSunday(d) { const n = new Date(d); n.setDate(n.getDate() + 7); return n.getMonth() !== d.getMonth(); }
+function schedSundays() {
+  const now = (typeof getMockNow === "function" ? getMockNow() : new Date());
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
+  const endYear = d.getMonth() >= 8 ? d.getFullYear() + 1 : d.getFullYear();   // school year ends Aug 31
+  const end = new Date(endYear, 7, 31);
+  const out = [];
+  while (d <= end) { out.push(new Date(d)); d.setDate(d.getDate() + 7); }
+  return out;
+}
+function schedGrade0(f) { return Number(String(f.grades).split(",")[0]) || 0; }
+// Fill every non-manual Sunday with two DIFFERENT families, balanced and rotating
+function schedGenerate(keepManual) {
+  const fams = schedPlan.families.filter(f => !f.skip);
+  const old = {}; (schedPlan.weeks || []).forEach(w => { old[w.date] = w; });
+  const weeks = schedSundays().map(d => {
+    const iso = schedISO(d), o = old[iso];
+    if (keepManual && o && o.manual) return o;
+    return { date: iso, type: schedIsLastSunday(d) ? "performance" : "regular", a: "", b: "", manual: false, note: "" };
+  });
+  const count = {}, last = {};
+  fams.forEach(f => { count[f.id] = 0; last[f.id] = -99; });
+  weeks.forEach((w, i) => { if (w.manual && w.type !== "noclass") [w.a, w.b].forEach(id => { if (id && count[id] != null) { count[id]++; last[id] = i; } }); });
+  let prevPair = "";
+  weeks.forEach((w, i) => {
+    if (w.manual || w.type === "noclass") return;
+    const pick = (exclude, wantOtherGrade) => {
+      const c = fams.filter(f => !exclude.includes(f.id));
+      c.sort((x, y) => {
+        const rx = (last[x.id] === i - 1 ? 1 : 0), ry = (last[y.id] === i - 1 ? 1 : 0);
+        if (rx !== ry) return rx - ry;                       // never two weeks in a row if avoidable
+        if (count[x.id] !== count[y.id]) return count[x.id] - count[y.id];
+        if (wantOtherGrade != null) { const gx = schedGrade0(x) !== wantOtherGrade ? 0 : 1, gy = schedGrade0(y) !== wantOtherGrade ? 0 : 1; if (gx !== gy) return gx - gy; }
+        if (last[x.id] !== last[y.id]) return last[x.id] - last[y.id];
+        return x.id.localeCompare(y.id, undefined, { numeric: true });
+      });
+      return c[0];
+    };
+    const a = pick([], null);
+    let b = pick([a.id], schedGrade0(a));
+    if (b && [a.id, b.id].sort().join("|") === prevPair) { const b2 = fams.filter(f => f.id !== a.id && f.id !== b.id).sort((x, y) => count[x.id] - count[y.id] || last[x.id] - last[y.id])[0]; if (b2 && count[b2.id] <= count[b.id] + 1) b = b2; }
+    w.a = a.id; w.b = b ? b.id : "";
+    [a, b].forEach(f => { if (f) { count[f.id]++; last[f.id] = i; } });
+    prevPair = [w.a, w.b].sort().join("|");
+  });
+  schedPlan.weeks = weeks;
+}
+function schedFam(id) { return (schedPlan && schedPlan.families.find(f => f.id === id)) || null; }
+async function loadSchedulePlan() {
+  try {
+    const r = await fetch(SHEET_URL + "?type=schedulePlan&nocache=" + Date.now(), { mode: "cors" });
+    const d = await r.json();
+    if (d && d.families && d.weeks) { schedPlan = d; try { localStorage.setItem(SCHED_KEY, JSON.stringify(d)); } catch (x) {} return; }
+  } catch (x) {}
+  if (!schedPlan) { try { const c = JSON.parse(localStorage.getItem(SCHED_KEY) || "null"); if (c && c.families) schedPlan = c; } catch (x) {} }
+}
+async function schedSave(quiet) {
+  if (!schedPlan) return;
+  try { localStorage.setItem(SCHED_KEY, JSON.stringify(schedPlan)); } catch (x) {}
+  const res = await postIncRead({ type: "saveSchedulePlan", plan: JSON.stringify(schedPlan) });
+  if (res.readable && res.data && res.data.ok) { if (!quiet) showToast("✅ Schedule saved"); }
+  else if (res.readable) { await customModal({ title: "Sheet didn't accept the schedule", message: "The Google Sheet answered:\n" + spEsc(String(res.raw).slice(0, 200)) + "\n\nRedeploy the newest Code.gs (New version) and press Save again.", type: "alert" }); }
+  else if (!quiet) showToast("Saved on this phone — sheet unconfirmed");
+}
+async function schedMake(keep) {
+  if (!schedPlan) schedPlan = { families: schedFreshFamilies(), weeks: [] };
+  schedGenerate(keep);
+  await schedSave(true);
+  showToast("📅 Schedule created");
+  renderScheduleTab();
+}
+async function schedRegen() {
+  const ok = await modalConfirm("Re-create the schedule? Sundays you edited by hand stay exactly as they are; every other Sunday is re-assigned.", { title: "Re-create schedule", okLabel: "Re-create" });
+  if (ok) schedMake(true);
+}
+function schedSetPick(i, slot, id) { const w = schedPlan.weeks[i]; w[slot] = id; w.manual = true; schedSave(true); renderScheduleTab(); }
+function schedSetType(i, t) { const w = schedPlan.weeks[i]; w.type = t; w.manual = true; if (t === "noclass") { w.a = ""; w.b = ""; } schedSave(true); renderScheduleTab(); }
+function schedToggleSkip(id) { const f = schedFam(id); if (!f) return; f.skip = !f.skip; schedSave(true); renderScheduleTab(); }
+function schedFamLabel(f) { return f ? f.parent + " (" + f.kids.split(";")[0].trim() + (f.kids.indexOf(";") > -1 ? " +" : "") + ")" : "—"; }
+function schedCounts() { const c = {}; (schedPlan.weeks || []).forEach(w => { if (w.type === "noclass") return; [w.a, w.b].forEach(id => { if (id) c[id] = (c[id] || 0) + 1; }); }); return c; }
+function schedMessage() {
+  const lines = ["📅 *Sunday School parent schedule* 🙏", ""];
+  (schedPlan.weeks || []).forEach(w => {
+    if (w.type === "noclass") { lines.push(schedNice(w.date).replace(/, \d{4}$/, "") + " — no class"); return; }
+    const A = schedFam(w.a), B = schedFam(w.b);
+    lines.push(schedNice(w.date).replace(/, \d{4}$/, "") + (w.type === "performance" ? " 🎭" : "") + " — " + (A ? A.parent : "?") + " & " + (B ? B.parent : "?"));
+  });
+  lines.push("", "🎭 = possible performance day. Please be there on your date; if you can't, swap with another family. Thank you! 💙");
+  return lines.join("\n");
+}
+async function schedCopy() { try { await navigator.clipboard.writeText(schedMessage()); showToast("📋 Schedule message copied"); } catch (x) { await customModal({ title: "Copy this", message: schedMessage(), type: "alert" }); } }
+async function schedPdf() {
+  if (!schedPlan || !schedPlan.weeks.length) return;
+  let JsPDF; try { JsPDF = await spPdfLoadLib(); } catch (x) { await customModal({ title: "Couldn't build the PDF", message: "The PDF tool could not load. Check your internet connection and try again.", type: "alert" }); return; }
+  const doc = new JsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 36;
+  const cols = [{ t: "Sunday", w: 100 }, { t: "Type", w: 70 }, { t: "Family 1 (phone)", w: 180 }, { t: "Family 2 (phone)", w: W - 2 * M - 350 }];
+  let y = 0, page = 1;
+  doc.setFillColor(59, 47, 143); doc.rect(0, 0, W, 60, "F"); doc.setFillColor(236, 72, 153); doc.rect(0, 60, W, 4, "F");
+  doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text("Parent Participation Schedule", M, 30);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text("Two families each Sunday  |  * = possible performance day  |  Generated " + new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), M, 47);
+  y = 86;
+  const foot = () => { doc.setTextColor(140, 138, 170); doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.text("Confidential - family contact information. Page " + page, M, H - 18); };
+  const head = () => { doc.setFillColor(238, 235, 252); doc.rect(M, y - 12, W - 2 * M, 20, "F"); doc.setTextColor(59, 47, 143); doc.setFont("helvetica", "bold"); doc.setFontSize(9); let x = M; cols.forEach(c => { doc.text(c.t, x + 5, y + 1); x += c.w; }); y += 18; };
+  head();
+  schedPlan.weeks.forEach((w, i) => {
+    const A = schedFam(w.a), B = schedFam(w.b);
+    const fmt = f => f ? [f.parent + " - " + f.kids.split(";")[0].trim() + (f.kids.indexOf(";") > -1 ? " +" : ""), f.phones.map(incFmt).join(", ")] : ["-"];
+    const cells = [[schedNice(w.date).replace(/, \d{4}$/, "")], [w.type === "performance" ? "Performance*" : w.type === "noclass" ? "No class" : "Regular"],
+      w.type === "noclass" ? ["-"] : fmt(A), w.type === "noclass" ? ["-"] : fmt(B)];
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    const wrapped = cells.map((c, ci) => [].concat.apply([], c.map(t => doc.splitTextToSize(spPdfClean(t), cols[ci].w - 10))));
+    const rh = Math.max.apply(null, wrapped.map(c => c.length)) * 11 + 8;
+    if (y + rh > H - 40) { foot(); doc.addPage(); page++; y = 40; head(); }
+    if (w.type === "performance") { doc.setFillColor(255, 243, 214); doc.rect(M, y - 10, W - 2 * M, rh, "F"); } else if (i % 2 === 0) { doc.setFillColor(248, 247, 253); doc.rect(M, y - 10, W - 2 * M, rh, "F"); }
+    let x = M; wrapped.forEach((c, ci) => { doc.setFont("helvetica", ci === 0 ? "bold" : "normal"); doc.setTextColor(30, 27, 75); doc.text(c, x + 5, y); x += cols[ci].w; });
+    y += rh;
+  });
+  foot(); doc.save("Parent_Schedule_" + new Date().toISOString().slice(0, 10) + ".pdf"); showToast("📄 PDF ready");
+}
+function renderScheduleTab() {
+  const el = document.getElementById("tabScheduleContent"); if (!el) return;
+  const bt = "padding:10px 14px;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;";
+  if (!schedPlan || !schedPlan.weeks || !schedPlan.weeks.length) {
+    el.innerHTML = `<div style="font-size:13px;color:#6b6990;font-weight:700;margin-bottom:12px;line-height:1.5;">Plan every Sunday from today to the end of the school year. Each Sunday gets <b>two different families</b>, rotated fairly so everyone serves about the same number of times. The <b>last Sunday of every month</b> is marked 🎭 as a possible performance day.</div>
+      <button onclick="schedMake(false)" style="${bt}width:100%;padding:14px;font-size:14px;background:linear-gradient(135deg,#7360f2,#a855f7);color:white;">📅 Create the schedule</button>`;
+    return;
+  }
+  const cnt = schedCounts(), act = schedPlan.families.filter(f => !f.skip);
+  const opts = sel => `<option value="">— choose family —</option>` + schedPlan.families.map(f => `<option value="${f.id}" ${f.id === sel ? "selected" : ""}>${spEsc(schedFamLabel(f))}${f.skip ? " (skipped)" : ""}</option>`).join("");
+  const rows = schedPlan.weeks.map((w, i) => {
+    const bg = w.type === "performance" ? "#fff6dc" : w.type === "noclass" ? "#fdecec" : "#f4f3fb";
+    const same = w.a && w.a === w.b;
+    return `<div style="background:${bg};border-radius:12px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+        <div style="font-size:13px;font-weight:900;color:#2a2750;">${schedNice(w.date)}${w.type === "performance" ? " 🎭" : ""}${w.manual ? ' <span style="font-size:10px;color:#92400e;">✏️ edited</span>' : ""}</div>
+        <select onchange="schedSetType(${i},this.value)" style="padding:6px;border:1.5px solid #d6d3f0;border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;background:white;">
+          <option value="regular" ${w.type === "regular" ? "selected" : ""}>Regular</option><option value="performance" ${w.type === "performance" ? "selected" : ""}>🎭 Performance</option><option value="noclass" ${w.type === "noclass" ? "selected" : ""}>🚫 No class</option></select>
+      </div>
+      ${w.type === "noclass" ? `<div style="font-size:12px;color:#b91c1c;font-weight:800;">No class this Sunday</div>` : `
+      <select onchange="schedSetPick(${i},'a',this.value)" style="width:100%;box-sizing:border-box;padding:9px;border:1.5px solid #d6d3f0;border-radius:8px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;margin-bottom:5px;background:white;">${opts(w.a)}</select>
+      <select onchange="schedSetPick(${i},'b',this.value)" style="width:100%;box-sizing:border-box;padding:9px;border:1.5px solid #d6d3f0;border-radius:8px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;background:white;">${opts(w.b)}</select>
+      ${same ? `<div style="font-size:11px;color:#b91c1c;font-weight:800;margin-top:4px;">⚠️ Both slots are the same family — pick two different families.</div>` : ""}`}
+    </div>`;
+  }).join("");
+  const famRows = schedPlan.families.map(f => `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;margin-bottom:4px;background:${f.skip ? "#fdecec" : "#f4f3fb"};font-size:12px;font-weight:700;color:#2a2750;cursor:pointer;">
+      <input type="checkbox" ${f.skip ? "" : "checked"} onchange="schedToggleSkip('${f.id}')" style="width:17px;height:17px;flex:none;"> <span style="flex:1;">${spEsc(schedFamLabel(f))}${f.phones.length ? "" : ' <b style="color:#b91c1c;">· no phone</b>'}</span><span style="color:#6b6990;">${cnt[f.id] || 0}×</span></label>`).join("");
+  el.innerHTML = `
+    <div style="font-size:12px;color:#6b6990;font-weight:700;margin-bottom:10px;">${schedPlan.weeks.filter(w => w.type !== "noclass").length} Sundays · ${act.length} families in rotation · two different families every Sunday · 🎭 = last Sunday of the month</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+      <button onclick="schedPdf()" style="${bt}background:linear-gradient(135deg,#ec4899,#8b5cf6);color:white;">📄 PDF</button>
+      <button onclick="schedCopy()" style="${bt}background:#7360f2;color:white;">📋 Copy for Viber</button>
+      <button onclick="schedSave(false)" style="${bt}background:#15803d;color:white;">💾 Save</button>
+      <button onclick="schedRegen()" style="${bt}background:#e0f5f7;color:#0a5260;">🔄 Re-create</button>
+    </div>
+    <details style="margin-bottom:12px;"><summary style="font-size:13px;font-weight:900;color:#3b2f8f;cursor:pointer;">👨‍👩‍👧 Families in the rotation (untick to skip a family)</summary><div style="margin-top:8px;">${famRows}</div></details>
+    ${rows}`;
+}
+function renderSchedCard() {
+  try {
+    if (!schedPlan || !myPhone) return "";
+    const norm = incNorm(myPhone);
+    const fam = schedPlan.families.find(f => f.phones.some(p => incNorm(p) === norm));
+    if (!fam) return "";
+    const today = schedISO(new Date());
+    const mine = schedPlan.weeks.filter(w => w.type !== "noclass" && w.date >= today && (w.a === fam.id || w.b === fam.id)).slice(0, 4);
+    if (!mine.length) return "";
+    const rows = mine.map(w => { const otherId = w.a === fam.id ? w.b : w.a; const o = schedFam(otherId); return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #e0f5f7;font-size:13px;font-weight:700;color:#0a3d45;"><span>${schedNice(w.date).replace(/, \d{4}$/, "")}${w.type === "performance" ? " 🎭" : ""}</span><span style="color:#6b6990;font-weight:600;">with ${spEsc(o ? o.parent : "—")}</span></div>`; }).join("");
+    return `<div style="background:white;border-radius:16px;padding:14px 16px;margin-top:14px;box-shadow:0 2px 10px rgba(13,122,138,0.1);"><div style="font-size:14px;font-weight:900;color:#0a5260;margin-bottom:4px;">📅 Your upcoming Sundays</div>${rows}</div>`;
+  } catch (x) { return ""; }
 }
 
 function signupManagerCardHtml(sec) {
