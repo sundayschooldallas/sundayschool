@@ -1416,6 +1416,10 @@ function showChildInfoScreen() {
   document.getElementById("childSelectScreen").style.display = "none";
   document.getElementById("mainApp").style.display = "none";
   document.getElementById("childInfoScreen").style.display = "block";
+  // make sure the form itself is visible (it can be left hidden by the duty board)
+  const pdb = document.getElementById("publicDutyBoard"); if (pdb) pdb.style.display = "none";
+  const mla = document.getElementById("mainLoginArea"); if (mla) mla.style.display = "block";
+  const dtw = document.getElementById("dutyBoardTriggerWrap"); if (dtw) dtw.style.display = "block";
   resetChildInfoForm();
 }
 
@@ -1448,13 +1452,36 @@ async function showApp() {
   document.getElementById("childSelectScreen").style.display = "none";
 
   // Make sure we have the latest classes, registered-children list, and duty calendar before deciding what to show
-  try { await Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadChildrenFromSheet(), loadEventsCalendarFromSheet()]); } catch(e) {}
+  // Show a loading card right away, and never wait more than ~3.5s for a slow sheet:
+  // the screen appears on time and keeps updating when the sheet finally answers.
+  let ld = document.getElementById("appLoading");
+  if (!ld) {
+    ld = document.createElement("div"); ld.id = "appLoading";
+    ld.style.cssText = "position:fixed;inset:0;z-index:9000;background:#e0f5f7;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;color:#0a5260;font-weight:800;font-size:15px;";
+    ld.innerHTML = '<div style="font-size:34px;margin-bottom:10px;">⏳</div>Loading your family…';
+    document.body.appendChild(ld);
+  }
+  const allLoads = Promise.all([loadClassesFromSheet(), loadDeletedGradesFromSheet(), loadChildrenFromSheet(), loadEventsCalendarFromSheet()].map(p => Promise.resolve(p).catch(() => {})));
+  await Promise.race([allLoads, new Promise(r => setTimeout(r, 3500))]);
+  ld.remove();
 
   myChildren = getChildrenForPhone(myPhone);
 
   if (myChildren.length === 0) {
     // No child registered yet under this phone — show the registration screen
     showChildInfoScreen();
+    // If the sheet answers late and this family already has kids, switch to the picker
+    allLoads.then(() => {
+      const info = document.getElementById("childInfoScreen");
+      const nameEl = document.getElementById("childNameInput");
+      if (!info || info.style.display === "none" || (nameEl && nameEl.value.trim()) || pendingChildren.length) return;
+      const found = getChildrenForPhone(myPhone);
+      if (!found.length) return;
+      myChildren = found; myChildInfo = null;
+      info.style.display = "none";
+      renderChildSelectScreen();
+      document.getElementById("childSelectScreen").style.display = "block";
+    });
   } else {
     // One or more children found on this phone — always let the parent confirm
     // which one, or register a new one, rather than silently picking for them
