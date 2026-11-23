@@ -5105,6 +5105,152 @@ async function schedPdf() {
   });
   foot(); doc.save("Parent_Schedule_" + new Date().toISOString().slice(0, 10) + ".pdf"); showToast("📄 PDF ready");
 }
+// ── Parent-friendly views (short, no phones/addresses) ──
+function schedFriendly(f) {
+  if (!f) return "—";
+  const segs = String(f.parent).split(" / ").map(x => x.trim()).filter(Boolean);
+  let n = segs[0] || f.parent;
+  if (segs.length > 1 && n.indexOf(" ") < 0) n = segs[1];
+  const kid = String(f.kids || "").split(";")[0].trim().split(" ")[0];
+  return n + (kid ? " (" + kid + ")" : "");
+}
+function schedParentData() {
+  const weeks = (schedPlan ? schedPlan.weeks : []).filter(w => w.type !== "noclass");
+  const months = [], byFam = {};
+  weeks.forEach(w => {
+    const d = schedParse(w.date);
+    const mk = d.getFullYear() + "-" + d.getMonth();
+    let m = months.find(x => x.key === mk);
+    if (!m) { m = { key: mk, name: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }), rows: [] }; months.push(m); }
+    const A = schedFam(w.a), B = schedFam(w.b);
+    m.rows.push({ day: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), perf: w.type === "performance", names: [schedFriendly(A), schedFriendly(B)] });
+    [w.a, w.b].forEach(id => { if (id) (byFam[id] = byFam[id] || []).push({ day: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), perf: w.type === "performance" }); });
+  });
+  const fams = Object.keys(byFam).map(id => ({ name: schedFriendly(schedFam(id)), dates: byFam[id] })).sort((a, b) => a.name.localeCompare(b.name));
+  return { months, fams };
+}
+async function schedPdfParents() {
+  if (!schedPlan || !schedPlan.weeks.length) return;
+  let JsPDF; try { JsPDF = await spPdfLoadLib(); } catch (x) { await customModal({ title: "Couldn't build the PDF", message: "The PDF tool could not load. Check your internet connection and try again.", type: "alert" }); return; }
+  const D = schedParentData();
+  const doc = new JsPDF({ orientation: "portrait", unit: "pt", format: "letter" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 32, GAP = 14, CW = (W - 2 * M - GAP) / 2;
+  let page = 1;
+  const banner = (title, sub) => {
+    doc.setFillColor(59, 47, 143); doc.rect(0, 0, W, 78, "F"); doc.setFillColor(236, 72, 153); doc.rect(0, 78, W, 4, "F");
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.text(title, M, 36);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.text(sub, M, 58);
+  };
+  const foot = () => { doc.setTextColor(140, 138, 170); doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.text("Please be there on your Sunday. If you can't, swap with another family and tell your teacher.  Thank you!", M, H - 18); doc.text("Page " + page, W - M, H - 18, { align: "right" }); };
+  banner("Parent Volunteer Schedule", "Two families help each Sunday   |   * = possible performance day (last Sunday of the month)");
+  let yL = 100, yR = 100;
+  const nameW = CW - 62;
+  D.months.forEach(m => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+    const rows = m.rows.map(r => ({ r, lines: doc.splitTextToSize(spPdfClean(r.names[0] + "  &  " + r.names[1]), nameW) }));
+    const h = 24 + rows.reduce((a, x) => a + x.lines.length * 11.5 + 7, 0) + 6;
+    let useLeft = yL <= yR;
+    let y = useLeft ? yL : yR;
+    if (y + h > H - 36) { const other = useLeft ? yR : yL; if (other + h <= H - 36) { useLeft = !useLeft; y = other; } else { foot(); doc.addPage(); page++; yL = yR = 40; useLeft = true; y = 40; } }
+    const x = M + (useLeft ? 0 : CW + GAP);
+    doc.setFillColor(248, 247, 253); doc.setDrawColor(224, 220, 247); doc.roundedRect(x, y, CW, h, 8, 8, "FD");
+    doc.setFillColor(115, 96, 242); doc.roundedRect(x, y, CW, 22, 8, 8, "F"); doc.rect(x, y + 12, CW, 10, "F");
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text(m.name, x + 10, y + 15);
+    let yy = y + 24;
+    rows.forEach(o => {
+      const rh = o.lines.length * 11.5 + 7;
+      if (o.r.perf) { doc.setFillColor(255, 243, 214); doc.rect(x + 3, yy, CW - 6, rh, "F"); }
+      doc.setTextColor(59, 47, 143); doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.text(o.r.day + (o.r.perf ? " *" : ""), x + 10, yy + 12);
+      doc.setTextColor(30, 27, 75); doc.setFont("helvetica", "normal"); doc.text(o.lines, x + 62, yy + 12);
+      yy += rh;
+    });
+    if (useLeft) yL = y + h + 10; else yR = y + h + 10;
+  });
+  foot(); doc.addPage(); page++;
+  banner("Find Your Name", "Your Sundays at a glance   |   * = possible performance day");
+  let y = 104;
+  D.fams.forEach((f, i) => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    const lines = doc.splitTextToSize(spPdfClean(f.dates.map(d => d.day + (d.perf ? "*" : "")).join("   ·   ")), W - 2 * M - 200);
+    const rh = Math.max(1, lines.length) * 12 + 8;
+    if (y + rh > H - 36) { foot(); doc.addPage(); page++; y = 40; }
+    if (i % 2 === 0) { doc.setFillColor(248, 247, 253); doc.rect(M, y - 11, W - 2 * M, rh, "F"); }
+    doc.setTextColor(30, 27, 75); doc.setFont("helvetica", "bold"); doc.text(spPdfClean(f.name), M + 8, y);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(59, 47, 143); doc.text(lines, M + 200, y);
+    y += rh;
+  });
+  foot();
+  doc.save("Parent_Schedule_For_Parents_" + new Date().toISOString().slice(0, 10) + ".pdf");
+  showToast("👪 Parents PDF ready");
+}
+function schedCanvasMonths(D) {
+  const W = 1080, M = 40, FONT = "Nunito, 'Segoe UI', sans-serif";
+  const meas = document.createElement("canvas").getContext("2d");
+  meas.font = "700 34px " + FONT;
+  const blocks = D.months.map(m => ({ m, rows: m.rows.map(r => ({ r, lines: sdWrap(meas, r.names[0] + "  &  " + r.names[1], W - 2 * M - 240) })) }));
+  let H = 260 + 60;
+  blocks.forEach(b => { H += 76 + b.rows.reduce((a, x) => a + Math.max(1, x.lines.length) * 44 + 22, 0) + 34; });
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  const bg = ctx.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#0a5260"); bg.addColorStop(0.55, "#3b2f8f"); bg.addColorStop(1, "#7c3aed");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = "900 62px " + FONT; ctx.fillText("Parent Volunteer Schedule", W / 2, 110);
+  ctx.font = "700 32px " + FONT; ctx.fillStyle = "#ffe08a"; ctx.fillText("Two families help each Sunday  ·  🎭 = possible performance day", W / 2, 170);
+  let y = 230;
+  blocks.forEach(b => {
+    const h = 76 + b.rows.reduce((a, x) => a + Math.max(1, x.lines.length) * 44 + 22, 0);
+    ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
+    ctx.fillStyle = "#fff"; sdRoundRect(ctx, M, y, W - 2 * M, h, 30); ctx.fill(); ctx.shadowColor = "transparent";
+    ctx.fillStyle = "#7360f2"; sdRoundRect(ctx, M, y, W - 2 * M, 62, 30); ctx.fill(); ctx.fillRect(M, y + 30, W - 2 * M, 32);
+    ctx.textAlign = "left"; ctx.fillStyle = "#fff"; ctx.font = "900 38px " + FONT; ctx.fillText(b.m.name, M + 28, y + 44);
+    let yy = y + 76;
+    b.rows.forEach(o => {
+      const rh = Math.max(1, o.lines.length) * 44 + 22;
+      if (o.r.perf) { ctx.fillStyle = "#fff3d6"; ctx.fillRect(M + 10, yy, W - 2 * M - 20, rh); }
+      ctx.fillStyle = "#3b2f8f"; ctx.font = "900 34px " + FONT; ctx.fillText(o.r.day + (o.r.perf ? " 🎭" : ""), M + 28, yy + 44);
+      ctx.fillStyle = "#1e1b4b"; ctx.font = "700 34px " + FONT;
+      o.lines.forEach((l, i) => ctx.fillText(l, M + 240, yy + 44 + i * 44));
+      yy += rh;
+    });
+    y += h + 34;
+  });
+  ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = "800 30px " + FONT; ctx.fillText("💙 Thank you for serving our Sunday School family", W / 2, H - 28);
+  return cv;
+}
+function schedCanvasNames(D) {
+  const W = 1080, M = 40, FONT = "Nunito, 'Segoe UI', sans-serif";
+  const meas = document.createElement("canvas").getContext("2d"); meas.font = "700 32px " + FONT;
+  const rows = D.fams.map(f => ({ f, lines: sdWrap(meas, f.dates.map(d => d.day + (d.perf ? " 🎭" : "")).join("  ·  "), W - 2 * M - 420) }));
+  let H = 300; rows.forEach(r => { H += Math.max(1, r.lines.length) * 42 + 26; }); H += 70;
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  const bg = ctx.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#0a5260"); bg.addColorStop(0.55, "#3b2f8f"); bg.addColorStop(1, "#7c3aed");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = "900 62px " + FONT; ctx.fillText("Find Your Name", W / 2, 110);
+  ctx.font = "700 32px " + FONT; ctx.fillStyle = "#ffe08a"; ctx.fillText("Your Sundays at a glance  ·  🎭 = possible performance day", W / 2, 170);
+  const top = 215, ch = H - top - 50;
+  ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8; ctx.fillStyle = "#fff"; sdRoundRect(ctx, M, top, W - 2 * M, ch, 30); ctx.fill(); ctx.shadowColor = "transparent";
+  let y = top + 20; ctx.textAlign = "left";
+  rows.forEach((r, i) => {
+    const rh = Math.max(1, r.lines.length) * 42 + 26;
+    if (i % 2 === 0) { ctx.fillStyle = "#f4f3fb"; ctx.fillRect(M + 12, y, W - 2 * M - 24, rh); }
+    ctx.fillStyle = "#1e1b4b"; ctx.font = "900 32px " + FONT; ctx.fillText(r.f.name.length > 22 ? r.f.name.slice(0, 21) + "…" : r.f.name, M + 28, y + 42);
+    ctx.fillStyle = "#3b2f8f"; ctx.font = "700 32px " + FONT; r.lines.forEach((l, k) => ctx.fillText(l, M + 400, y + 42 + k * 42));
+    y += rh;
+  });
+  return cv;
+}
+async function schedImages() {
+  if (!schedPlan || !schedPlan.weeks.length) return;
+  try { await document.fonts.load("700 34px Nunito"); await document.fonts.load("900 40px Nunito"); } catch (x) {}
+  const D = schedParentData();
+  const cvs = [schedCanvasMonths(D), schedCanvasNames(D)];
+  const files = [];
+  for (let i = 0; i < cvs.length; i++) { const blob = await new Promise(r => cvs[i].toBlob(r, "image/png")); if (blob) files.push(new File([blob], i === 0 ? "Parent_Schedule.png" : "Find_Your_Name.png", { type: "image/png" })); }
+  try { if (navigator.canShare && navigator.canShare({ files })) { await navigator.share({ files }); return; } } catch (x) { if (x && x.name === "AbortError") return; }
+  files.forEach((f, i) => setTimeout(() => { const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1500); }, i * 600));
+  showToast("🖼️ Images saved — send them in Viber");
+}
 function renderScheduleTab() {
   const el = document.getElementById("tabScheduleContent"); if (!el) return;
   const bt = "padding:10px 14px;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;";
@@ -5136,10 +5282,22 @@ function renderScheduleTab() {
     <div style="font-size:12px;color:#3b2f8f;font-weight:800;margin-bottom:4px;">📅 Starts ${spEsc(schedNice(schedPlan.start || schedPlan.weeks[0].date))}</div>
     <div style="font-size:12px;color:#6b6990;font-weight:700;margin-bottom:10px;">${schedPlan.weeks.filter(w => w.type !== "noclass").length} Sundays · ${act.length} families in rotation · two different families every Sunday · 🎭 = last Sunday of the month</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-      <button onclick="schedPdf()" style="${bt}background:linear-gradient(135deg,#ec4899,#8b5cf6);color:white;">📄 PDF</button>
-      <button onclick="schedCopy()" style="${bt}background:#7360f2;color:white;">📋 Copy for Viber</button>
       <button onclick="schedSave(false)" style="${bt}background:#15803d;color:white;">💾 Save</button>
       <button onclick="schedRegen()" style="${bt}background:#e0f5f7;color:#0a5260;">🔄 Re-create</button>
+    </div>
+    <div style="background:#f4f3fb;border:1.5px solid #e0dcf7;border-radius:14px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:2px;">👪 For parents — short &amp; friendly (no phones or addresses)</div>
+      <div style="font-size:11px;color:#6b6990;font-weight:700;margin-bottom:8px;">Month-by-month schedule plus a "Find your name" list. Send to the Viber group.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="schedPdfParents()" style="${bt}background:linear-gradient(135deg,#7360f2,#a855f7);color:white;">👪 Parents PDF</button>
+        <button onclick="schedImages()" style="${bt}background:linear-gradient(135deg,#0a5260,#0d7a8a);color:white;">🖼️ Parents images (Viber)</button>
+        <button onclick="schedCopy()" style="${bt}background:#e8e4fb;color:#3b2f8f;">📋 Copy as text</button>
+      </div>
+    </div>
+    <div style="background:#fff;border:1.5px solid #e0dcf7;border-radius:14px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:2px;">🧑‍🏫 For teachers — full detail</div>
+      <div style="font-size:11px;color:#6b6990;font-weight:700;margin-bottom:8px;">Every Sunday with both families' phone numbers.</div>
+      <button onclick="schedPdf()" style="${bt}background:linear-gradient(135deg,#ec4899,#8b5cf6);color:white;">📄 Teacher PDF (details)</button>
     </div>
     <details style="margin-bottom:12px;"><summary style="font-size:13px;font-weight:900;color:#3b2f8f;cursor:pointer;">👨‍👩‍👧 Families in the rotation (untick to skip a family)</summary><div style="margin-top:8px;">${famRows}</div></details>
     ${rows}`;
