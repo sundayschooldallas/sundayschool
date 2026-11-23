@@ -4707,13 +4707,14 @@ function spPdfEvent(gi) {
 // ══════════════ CONTACT EXPORT (PDF / phone contacts / Google CSV) ══════════════
 let ctGrades = new Set();
 let ctPick = new Set();
+let ctExcl = new Set();
 let ctSearch = "";
 function ctLabel() { const el = document.getElementById("ctLabel"); return (el && el.value.trim()) || "Viber"; }
 function ctOpt(id, def) { const el = document.getElementById(id); return el ? el.checked : def; }
 function ctFamilies() {
   const map = {};
   (childrenSheetData || []).forEach(r => {
-    if (!r || !r.phone || r.graduated || r.unassigned) return;
+    if (!r || !r.phone || r.graduated || r.unassigned || !(Number(r.grade) > 0)) return;
     const ph = incNorm(String(r.phone).split("_child")[0]);
     if (!ph) return;
     if (!map[ph]) map[ph] = { phone: ph, parent: "", kids: [], grades: new Set() };
@@ -4732,10 +4733,11 @@ function ctFamilies() {
   });
   return Object.values(map).sort((a, b) => a.parent.localeCompare(b.parent));
 }
-function ctSelected(fams) {
-  fams = fams || ctFamilies();
-  return fams.filter(f => ctPick.has(f.phone) || [...f.grades].some(g => ctGrades.has(g)));
+function ctIsSel(f) {
+  if (ctPick.has(f.phone)) return true;
+  return !ctExcl.has(f.phone) && [...f.grades].some(g => ctGrades.has(g));
 }
+function ctSelected(fams) { return (fams || ctFamilies()).filter(ctIsSel); }
 function ctFirstNames(f) { return f.kids.map(k => String(k.name).split(" ")[0]).filter(Boolean).join(" & "); }
 function ctDisplay(f) {
   const lab = ctLabel();
@@ -4838,18 +4840,36 @@ async function ctExportPdf() {
   doc.save(ctLabel().replace(/\W+/g, "_") + "_ContactList_" + ctFileTag() + ".pdf");
   showToast("📄 PDF ready");
 }
-function ctToggleGrade(g) { if (ctGrades.has(g)) ctGrades.delete(g); else ctGrades.add(g); renderExportTab(); }
-function ctAllGrades(on) { ctGrades = on ? new Set(getActiveGrades()) : new Set(); renderExportTab(); }
-function ctTogglePick(ph) { if (ctPick.has(ph)) ctPick.delete(ph); else ctPick.add(ph); ctUpdateCount(); const el = document.getElementById("ctRow_" + ph); if (el) el.style.background = ctPick.has(ph) ? "#e6f7ee" : "#f4f3fb"; }
+function ctToggleGrade(g) {
+  ctFamilies().filter(f => f.grades.has(g)).forEach(f => { ctExcl.delete(f.phone); });
+  if (ctGrades.has(g)) { ctGrades.delete(g); ctFamilies().filter(f => f.grades.has(g)).forEach(f => ctPick.delete(f.phone)); } else ctGrades.add(g);
+  renderExportTab();
+}
+function ctAllGrades(on) { ctGrades = on ? new Set(getActiveGrades()) : new Set(); ctExcl = new Set(); if (!on) ctPick = new Set(); renderExportTab(); }
+function ctTogglePick(ph) {
+  const f = ctFamilies().find(x => x.phone === ph); if (!f) return;
+  if (ctIsSel(f)) { ctPick.delete(ph); ctExcl.add(ph); } else { ctExcl.delete(ph); ctPick.add(ph); }
+  const el = document.getElementById("ctRow_" + ph); if (el) el.style.background = ctIsSel(f) ? "#e6f7ee" : "#f4f3fb";
+  ctUpdateCount();
+}
 function ctSearchInput(v) { ctSearch = v; ctRenderPickList(); }
 function ctUpdateCount() { const el = document.getElementById("ctCount"); if (el) el.textContent = ctSelected().length + " contact" + (ctSelected().length === 1 ? "" : "s") + " selected"; }
 function ctRenderPickList() {
   const box = document.getElementById("ctPickList"); if (!box) return;
   const q = ctSearch.trim().toLowerCase();
-  const fams = ctFamilies().filter(f => !q || (f.parent + " " + f.kids.map(k => k.name).join(" ") + " " + f.phone).toLowerCase().includes(q)).slice(0, 80);
-  box.innerHTML = fams.map(f => `<label id="ctRow_${f.phone}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;margin-bottom:5px;background:${ctPick.has(f.phone) ? "#e6f7ee" : "#f4f3fb"};cursor:pointer;">
-    <input type="checkbox" ${ctPick.has(f.phone) ? "checked" : ""} onchange="ctTogglePick('${f.phone}')" style="width:18px;height:18px;">
-    <span style="font-size:13px;font-weight:800;color:#2a2750;">${spEsc(f.parent)}<span style="font-weight:600;color:#6b6990;"> · ${spEsc(f.kids.map(k => k.name + " Gr" + k.grade).join(", "))}</span></span></label>`).join("") || `<div style="font-size:12px;color:#9a98b5;font-weight:700;">No matches.</div>`;
+  let fams = ctFamilies();
+  if (q) fams = fams.filter(f => (f.parent + " " + f.kids.map(k => k.name).join(" ") + " " + f.phone).toLowerCase().includes(q));
+  else if (ctGrades.size) fams = fams.filter(f => ctIsSel(f) || [...f.grades].some(g => ctGrades.has(g)));
+  box.innerHTML = fams.slice(0, 400).map(f => {
+    const sel = ctIsSel(f);
+    const ph2 = f.phone2 && f.phone2.length === 10 ? " · " + incFmt(f.phone2) : "";
+    return `<label id="ctRow_${f.phone}" style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:10px;margin-bottom:5px;background:${sel ? "#e6f7ee" : "#f4f3fb"};cursor:pointer;">
+    <input type="checkbox" ${sel ? "checked" : ""} onchange="ctTogglePick('${f.phone}')" style="width:18px;height:18px;margin-top:2px;flex:none;">
+    <span style="font-size:13px;font-weight:800;color:#2a2750;line-height:1.35;">${spEsc(f.parent)}
+      <span style="display:block;font-weight:700;color:#0a5260;font-size:12px;">📞 ${incFmt(f.phone)}${ph2}</span>
+      <span style="display:block;font-weight:600;color:#6b6990;font-size:12px;">${spEsc(f.kids.map(k => k.name + " (Gr " + k.grade + ")").join(", "))}</span>
+      ${f.address ? `<span style="display:block;font-weight:600;color:#6b6990;font-size:11px;">🏠 ${spEsc(f.address)}</span>` : ""}</span></label>`;
+  }).join("") || `<div style="font-size:12px;color:#9a98b5;font-weight:700;">${ctGrades.size ? "No families in the selected classes yet." : "Pick a class above, or search for a family."}</div>`;
   ctUpdateCount();
 }
 function renderExportTab() {
@@ -4864,7 +4884,8 @@ function renderExportTab() {
       ${grades.map(g => `<button onclick="ctToggleGrade(${g})" style="padding:9px 14px;border:none;border-radius:20px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;background:${ctGrades.has(g) ? "#3b2f8f" : "#e0f5f7"};color:${ctGrades.has(g) ? "white" : "#3b2f8f"};">${ctGrades.has(g) ? "✓ " : ""}Grade ${g}</button>`).join("")}
     </div>
     <div style="display:flex;gap:10px;margin-bottom:14px;"><a href="#" onclick="ctAllGrades(true);return false;" style="font-size:12px;font-weight:800;color:#7360f2;">Select all</a><a href="#" onclick="ctAllGrades(false);return false;" style="font-size:12px;font-weight:800;color:#7360f2;">Clear</a></div>
-    <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:6px;">2️⃣ Individual families (optional)</div>
+    <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:2px;">2️⃣ Families to export</div>
+    <div style="font-size:11px;color:#6b6990;font-weight:700;margin-bottom:6px;">Picking a class ticks all its families. Untick anyone to leave them out, or search to add a family from another class.</div>
     <input type="text" oninput="ctSearchInput(this.value)" value="${spEsc(ctSearch)}" placeholder="Search parent, child or phone" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #d6d3f0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;margin-bottom:8px;">
     <div id="ctPickList" style="max-height:260px;overflow:auto;margin-bottom:14px;"></div>
     <div style="font-size:12px;font-weight:900;color:#3b2f8f;margin-bottom:6px;">3️⃣ Label &amp; options</div>
